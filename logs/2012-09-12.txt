@@ -1,0 +1,1440 @@
+--- Log opened Wed Sep 12 00:00:02 2012
+00:01 < mscdex> anyone here that uses prepared statements in mysql, do you ever mix both named and positional parameters?
+00:01 < spion> dominictarr, through is very useful! thanks :)
+00:02 < dominictarr> spion, no prob!
+00:02 < spion> (turns out that I probably wont need mux-demux)
+00:04 < dominictarr> spion, if possible, without is better than with.
+00:04 <@isaacs> ChrisPartridge: that sounds like a bug in the docs
+00:04 <@isaacs> ChrisPartridge: what are they?
+00:05 <@isaacs> EyePulp: just install npm along with node
+00:05 < ChrisPartridge> isaacs: string
+00:05 < EyePulp> isaacs: I installed 8.8 from git - should that have gotten me npm as well?
+00:06 < addisonj> nope, only if you use the packages
+00:06 < ngoldman> gotta install both separately
+00:06 < EyePulp> rats
+00:09 < bnoordhuis> EyePulp: git as in github.com/joyent/node?
+00:10 < WarheadsSE> TooTallNate: yeah
+00:10 < EyePulp> bnoordhuis: si
+00:10 < bnoordhuis> EyePulp: that'll install npm unless you run configure with --without-npm
+00:10 < EyePulp> I think (it was before coffee earlier… very foggy)
+00:10 < EyePulp> bnoordhuis: hrm -  which npm doesn't bring anything back
+00:11 < bnoordhuis> EyePulp: where did you install node/npm to?
+00:11 < bnoordhuis> default is /usr/local/bin
+00:13 < EyePulp> bnoordhuis: I configured for a local install path in my home dir
+00:13 <@isaacs> EyePulp: yes.
+00:13 < bnoordhuis> EyePulp: in that case you'll need to add $HOME/path/to/node/bin to your PATH
+00:13 <@isaacs> EyePulp: make install installs both node and npm
+00:14 < bnoordhuis> ^ that guy is always so behind
+00:14 < EyePulp> heh
+00:14 <@isaacs> sorry, we're busy arguing about apple power adapters.
+00:14 <@isaacs> serious world problems getting intensely discussed here at joyent.
+00:15 < bnoordhuis> heh
+00:15 < WarheadsSE> that's an easy fix :p stop buying apple :p
+00:15 < EyePulp> cool - I'll check the instance when I get home and see if I'm already good to go
+00:16 < EyePulp> thx isaacs  & bnoordhuis .  see ya'll tomorrow
+00:16 <@isaacs> later!
+00:16 < WarheadsSE> TooTallNate: good news is this: seems to have played very nice .. "just works" this time round on v5
+00:16 < EyePulp> or is it y'all?  I think y'all.
+00:16  * spion hugs his ugly thinkpad <3
+00:18 < ChrisPartridge> isaacs: so it's an error in the docs, it *should* be returning a string?
+00:20 <@isaacs> ChrisPartridge: yeah, i guess so
+00:21  * isaacs shrug
+00:21 <@isaacs> i guess buffers wuld be nice
+00:22 <@isaacs> but strings are fine too, probably
+00:22 <@isaacs> if you care that much, use spawn, i guess.
+00:22 <@isaacs> fixing docs is easier than fixing code
+00:22 < ChrisPartridge> true that
+00:32 < CIA-116> node: Bert Belder openssl-1.0.1c-wip * ra07316c / deps/openssl/openssl.gyp : fix arm ? - http://git.io/x-da5g
+00:41 < addisonj> bnoordhuis: you are very impressive sir, just reading the mailing list and wonder how you have time to answer so many questions
+00:47 < CIA-116> node: Ben Noordhuis v0.8 * r4870a4e / doc/api/http.markdown : doc: http: expand request.headers documentation - http://git.io/p7_ubg
+00:48 < CIA-116> node: Bert Belder openssl-1.0.1c-wip * r1f5a7dd / (5 files in 3 dirs): openssl: update the GYP build to work with openssl 1.0.1c - http://git.io/B2PRFw
+00:48 < CIA-116> node: Bert Belder openssl-1.0.1c-wip * rf70a4b0 / (11 files in 2 dirs): openssl: remove obsolete patch files - http://git.io/Y3posg
+00:59 < Jay___> hi everybody
+00:59 < Jay___> hi, where can I find a socketIO  hosted solution that I can hook up to a flash application?
+00:59 < Jay___> i researched PubNub but dont think it's possible with them
+01:01 < starlog> janmower: hi tried those sysctls to tune up UDP throughput to no effect ... any other pointers?
+01:02 < janmower> starlog: you're probably maxing out node's udp
+01:03 < starlog> heres the thing: receives at 30K/s however with a response it dramatically degrades to 7K/sec (on a master single node.js)
+01:03 < starlog> why would responding throttle so dramatically ... no apparent blocking code ...
+01:05 < starlog> if delegate the response to a worker it degrades less ... down to 15K/sec tho still 50%
+01:07 < starlog> master uses practically no RAM (1% total 7GB) and CPU is at 53% ... worker even less (RAM 0.7% CPU 27%) so still lotta processing juice left over
+01:12 < janmower> starlog: hrm. do you know if the udp datagram sends a 'data' Event for every new received packet?
+01:12 < janmower> rather the udp datagram nodejs implementation
+01:13 < janmower> a 'data' event in udp could mean a new datagram arrived
+01:13 < janmower> however a tcp stream could be buffered
+01:13 < janmower> and then data could be called when a whole buffer full is received
+01:14 < janmower> this is me guessing however
+01:14 < starlog> by that do you mean firing the on receive callback as in server.on("message", function (msg, rinfo) ?
+01:15 < WarheadsSE> Jay___: que? Anywhere you can run a node application/service
+01:16 < starlog> it appears for every datagram received (in its entirety) the node.js "data event" fires
+01:17 < janmower> yea i think there's your answer
+01:17 < starlog> explain parfavor ... how would one receive the datagram if that callback does not get fired?
+01:18 < janmower> my guess is the tcp will load a whole stream of packets
+01:18 < starlog> and why would that degrade things? its the standard UDP send and receive
+01:18 < janmower> and then fire data when the stream has finished
+01:19 < starlog> yes tcp is stream ... however UDP is connectionless ... datagram ...
+01:19 < janmower> but telling everyone to wait for cpu while a dgram gets copied from network driver...
+01:19 < starlog> UDP is limited to 1500bytes
+01:19 < janmower> usually you listen and group whole buffers full of udp traffic
+01:20 < starlog> are you saying it is too granular ... fetching every datagram when it should be fetching a buffer full of datagrams then eventing?
+01:20 < janmower> that's probably how the tcp/http protocols get so fast at pushing data
+01:21 < janmower> and why the udp sux balls for pushing data
+01:21 < starlog> this is the standard node.js UDP 
+01:21 < starlog> : )
+01:21 < janmower> udp is usually faster only if you're doing everything from scratch
+01:22 < starlog> by that you mean writing ones own buffering
+01:22 < janmower> and handling your own memory and calls to the nic
+01:22 < starlog> gonna test the same scenario using TCP and get a sense how performance differs
+01:24 < janmower> i'd always use netcat/tar to quickly test how fast services reply
+01:24 < starlog> makes total sens what you saying ... that UDP is incurring the driver fetch penalty on every datagram
+01:25 < starlog> hence reason IO buffers exist
+01:25 < janmower> yea nic: here's a datagram -> node.js: here's an anonymous function to call
+01:25 < starlog> because processing buffers instant
+01:26 < starlog> so it should be nic > heres a datagram -> node.js [buffer buffer buffer] > anon function? 
+01:27 < janmower> yea only fire data on full buffer
+01:27 < starlog> what if only receive a single datagram ... will it linger in the buffer?
+01:28 < davidbanham> I'm trying to set up a private npm repository on iriscouch and battling. I've completed the steps on the npmjs.org github page, but I can't publish to it and trying to replicate from public returns the response {"error":"bad_request","reason":"Referer header required."}
+01:28 < WarheadsSE> starlog: more like "should it"
+01:28 < starlog> ok gonna dig deeper into UDP C code and see
+01:28 < janmower> starlog: depends on how you do your "flushing"
+01:29 < starlog> WarheadsSE: it definitely should not ... the sending process requires "instant response" to datagram received
+01:30 < timeturner> I'm getting this in npm's window:  Error: Python executable "python" is v2.7.1+, which is not supported by gyp.
+01:30 < timeturner> anyone know how to solve it
+01:30 < starlog> maybe zeromq ... altho not sure if supports UDP
+01:30 < TooTallNate> timeturner: should be fixed in the latest node-gyp
+01:30 < WarheadsSE> timeturner: eh, under which OS?
+01:30 < timeturner> failed to install iconv apparently because of it
+01:31 < timeturner> ubuntu
+01:31 < WarheadsSE> verify it is seeing the right python? python -v ?
+01:31 < timeturner> TooTallNate: cool thanks, will look forward to the update
+01:31 < TooTallNate> timeturner: it's released already, but node/npm usually stays a few releases behind
+01:32 < TooTallNate> timeturner: so you could update node-gyp right now and it should fix it
+01:32 < WarheadsSE> interesting that I had no such issues with python 2.7.3 on arch TooTallNate and timeturner 
+01:32 < TooTallNate> WarheadsSE: is the + sign
+01:32 < TooTallNate> s/is/it's/
+01:32 < timeturner> how do I update node-gyp
+01:32 < timeturner> updating node?
+01:32 < WarheadsSE> lol! right, the "i built this from source tree" + sign
+01:32 < TooTallNate> timeturner: what os?
+01:32 < WarheadsSE> ubun
+01:32 < timeturner> ubuntu server
+01:34 < starlog> report back with any updates. thanks :)
+01:34 < janmower> starlog: if your application demands 'instant response' then 'fire and forget' might not be the best...
+01:34 < WarheadsSE> ^
+01:34 < starlog> application = SIP and SIP = UDP (for most worlds)
+01:35 < WarheadsSE> I wonder how Voxer is doing it...
+01:35 < janmower> openvpn and other udp based services write all their own outoforder and guaranteed delivery stuff
+01:36 < termite> anyone use geonear with mongo? I am trying to use dbconn.command(dropQuery, callback);  But the result is null even though the query is correct
+01:36 < janmower> but as opposed to asking tcp for it's protocol, they do it on the application layer
+01:36 < starlog> that is why SIP has retransmit params
+01:36 < timeturner> is the node-gyp update a part of 0.8.9?
+01:37 < starlog> datagram loss is "edge case" so retrans only when required
+01:37 < TooTallNate> timeturner: just run "npm -g explore npm npm install node-gyp"
+01:37 < TooTallNate> timeturner: note that you may need "sudo"
+01:47 < timeturner> npm WARN prefer global node-gyp@0.6.10 should be installed with -g
+01:47 < timeturner> should I worry about that ^
+01:47 < TooTallNate> timeturner: no that's fine
+01:48 < timeturner> awesome, everything is working smoothly
+01:48 < timeturner> no errors in npm
+01:48 < timeturner> all green lights :D
+01:48 < timeturner> thanks TooTallNate!
+01:49 < TooTallNate> timeturner: excellent!
+02:11 < CIA-116> node: Ben Noordhuis openssl-1.0.1c-wip * r1e36fe2 / deps/openssl/openssl/crypto/sha/asm/sha1-armv4-large.pl : openssl: apply upstream sha1-armv4-large.pl patch - http://git.io/ESYKOQ
+02:23 < CIA-116> node: Ben Noordhuis openssl-1.0.1c-wip * ra3fbfcc / deps/openssl/openssl/crypto/sha/asm/sha1-armv4-large.pl : openssl: apply upstream sha1-armv4-large.pl patch (+9 more commits...) - http://git.io/qOv3KA
+02:29 < elbuo> hey, how do i update my package in npm?
+02:30 < AnonymousFunctio> Update a package you've posted?  Or update one you're using?
+02:32 < elbuo> i posted
+02:32 < deoxxa> npm publish
+02:32 < elbuo> ok i just did that good :)
+02:32 < elbuo> thanks
+02:47 < test___> hello
+02:47 < AnonymousFunctio> hi
+02:48 < test___> i am using nodejs to build udp server
+02:48 < WarheadsSE> K
+02:48 < test___> i can get voice data from client but how do push voice data to connected client?
+02:48 < Xenplex> I have trouble understanding something, in the API docs there is 
+02:49 < Xenplex> net.createServer([options], [connectionListener])
+02:49 < Xenplex> and in every code example
+02:49 < Xenplex> net.createServer(function(c) { // 'connection' listener
+02:49 < Xenplex> as far as my understanding goes, (function(c) is now the parameter of [options] ?
+02:49 < AnonymousFunctio> test___: http://nodejs.org/api/dgram.html#dgram_dgram_send_buf_offset_length_port_address_callback
+02:50 < AnonymousFunctio> Xenplex: You can put the callback function for the listener in either parameter.  Node's net module figures it out.
+02:50 < davidbanham> When running fleet deploy I get the following error. Anyone run into this? - fatal: protocol error: bad line length character: fata
+02:51 < WarheadsSE> Xenplex: they are both optional arguments
+02:51 < Xenplex> thanks Anon and Warhead, that explains many things
+02:51 < AnonymousFunctio> Xenplex: You know it's optional when in the documentation, it is surrounded by [brackets]
+02:52 < Xenplex> I knew that, just that I thought one would be still bound by their order if you pass parameters
+02:53 < test___> @Anonymous : It mean send voice data to all connected client except sender?
+02:54 < test___> i want build app like "push to talk" app
+02:54 < AnonymousFunctio> test___: ... and .send doesn't do it for you?
+02:55 < prettyrobots> I haven't said anything here in weeks.
+02:55 < AnonymousFunctio> prettyrobots: Yeah?
+02:55 < AnonymousFunctio> woot
+02:56 < test___> you can image you are in room voice chat. When you say everybody can listening
+02:57 < AnonymousFunctio> test___: What is your question?  You said you are receiving data, and you wanted to know how to send data.  The link I sent you describes how to send data.
+03:01 < MicronXD> Hi all
+03:02 < MicronXD> What's the callback for that's passed to net.createServer()?
+03:02 < test___> http://zello.com/ => i want create app like that
+03:02 < WarheadsSE> idk, what did you pass it MicronXD 
+03:02 < test___> can you suggest me about server side?
+03:02 < WarheadsSE> test___: what
+03:03 < WarheadsSE> both sides use .send() to send..
+03:03 < WarheadsSE> MicronXD: http://nodejs.org/api/net.html#net_net_createserver_options_connectionlistener
+03:03 < deviantgeek> just finished my first nodejs app. It's a very simple and easy to use supervisor (like forever) https://github.com/granjef3/charles
+03:03 < WarheadsSE> "The connectionListener argument is automatically set as a listener for the 'connection' event"
+03:03 < deviantgeek> It's in NPM too
+03:04 < MicronXD> WarheadsSE: The example in the api docs shows a callback that's passed in. http://nodejs.org/api/net.html#net_net_createserver_options_connectionlistener
+03:04 < WarheadsSE> MicronXD: "The connectionListener argument is automatically set as a listener for the 'connection' event"
+03:04 < WarheadsSE> the API also *says* that.
+03:05 < MicronXD> then what's the server.listen's second parameter for?
+03:05 < MicronXD> same thing?
+03:05 < whomp> i just got a vps and i want to deploy node so i've run the standard "hello, world" script. when i try to go to the site, though, it doesn't return anything. what should i do?
+03:05 < WarheadsSE> for listeningListener
+03:06 < WarheadsSE> MicronXD: "This function is asynchronous. When the server has been bound, 'listening' event will be emitted. the last parameter listeningListener will be added as an listener for the 'listening' event."
+03:06 < WarheadsSE> Says so right in the docs...
+03:07 < WarheadsSE> whomp: firewall issues at all ?
+03:07 < whomp> not that i know of. nginx worked fine. the vps is on godaddy
+03:07 < MicronXD> I understand that much... what I don't understand is what the difference is between the two
+03:07 < AnonymousFunctio> deviantgeek: Why is it called "Charles"?
+03:07 < Jay___> please guys, please I need help.
+03:08 < WarheadsSE> MicronXD: "listening" : hey, i'm now listening
+03:08 < Jay___> oops, sorry for double please, it was a typo
+03:08 < WarheadsSE> "connect" : dude, heres a new connection
+03:08 < AnonymousFunctio> MicronXD: The server doesn't begin listening immediately.  If you need to do something when the server is listening and the port is ready to accept connections, then you need the listening listener.
+03:08 < WarheadsSE> well Jay___ we dont know wtf you need help with
+03:08 < Jay___> anyway I need how to find out how to use Node.js on PubNub using a native clients
+03:09 < MicronXD> AnonymousFunctio: so you're saying server.listen is asynchronous?
+03:09 < AnonymousFunctio> Jay___: Native licents for what?
+03:09 < Jay___> all the Noje.js examples they provide use javascript on the client. so I'm lost
+03:09 < AnonymousFunctio> MicronXD: Yes
+03:09 < WarheadsSE> on PubNub .. you mean with PubNub?
+03:09 < MicronXD> AnonymousFunctio: lol! ok. I didn't realize that.
+03:09 < Jay___> yes with PubNub
+03:09 < MicronXD> AnonymousFunctio: thank you for clearing that up for me!
+03:10  * WarheadsSE points at docs
+03:10 < whomp> WarheadsSE, what might i try?
+03:10 < Jay___> they have lots of 'native client' apis for download, but it seems to be only for the Pub/Sub service
+03:10 < AnonymousFunctio> MicronXD: No problem.  It's safe to say that anything that has a callback is async by design.  (Otherwise, it's a bug.)
+03:10 < MicronXD> AnonymousFunctio: It seems a little extreme though... How long does it take to listen on a port? jeez :P
+03:10 < WarheadsSE> what did you specify as the listening IP ?
+03:10 < Jay___> but I need to use their Node  service
+03:10 < whomp> sry got DC'ed
+03:10 < AnonymousFunctio> MicronXD: Think of it more as a way to get your other stuff set up, for listeners on other events.
+03:11 < WarheadsSE> Jay___: so, you don't need to use node at all, just PubNub
+03:11 < WarheadsSE> ?
+03:11 < AnonymousFunctio> MicronXD: It probably all happens on the next tick (not positive... would need to check the src), but at least this way you have time to set up other event handlers in the curren tick.
+03:11 < Jay___> AnonymousFunctio, sorry for the typo, it's native *client*
+03:11 < WarheadsSE> ok.. define "it's"
+03:11 < AnonymousFunctio> Jay___: That was my typo.... and yes, I know what you are saying.  Client for what?
+03:11 < Jay___> no you dont understand, I need the server part of Node
+03:12 < WarheadsSE> >,<
+03:12 < AnonymousFunctio> Jay___: Then why did you say you needed a client?  I'm very confused.
+03:12  * WarheadsSE isnt getting it
+03:12 < WarheadsSE> I think.. 
+03:12 < Jay___> i will be using my native client but in the server it's Node ( the node server)
+03:12 < WarheadsSE> He wants a node server, and some non-node client
+03:12 < MicronXD> AnonymousFunctio: Oooh! ticks. Do you know of a good explanation of ticks in Node?
+03:12 < WarheadsSE> like, iOS obj-c or something
+03:12 < Jay___> yes
+03:12 < AnonymousFunctio> Ok, start from the beginning... WTF is PubNub and what do you want to do with it?
+03:12 < AnonymousFunctio> Oooohhhhhhh
+03:12 < davidbanham> Anyone had any experience deploying substack
+03:12 < mbalho> @enterprisestack?
+03:12 < Jay___> thanks, WarheadsSE, you got it
+03:12 < AnonymousFunctio> MicronXD: Yeah, one minute, there is a really nice article describing, let me find it
+03:13 < davidbanham> Anyone had any experience deploying substack's fleet or propagit? Really banging my head against them right now.
+03:13 < MicronXD> AnonymousFunctio: Sweet!! much appreciated =D
+03:13 < WarheadsSE> uhm Jay___  .. 
+03:13 < WarheadsSE> http://www.pubnub.com/devcenter
+03:13 < Jay___> oh I'm been all around the docs
+03:14 < Jay___> I don't find anything that can help me :(
+03:14 < WarheadsSE> <.<
+03:14 < WarheadsSE> pubnub, if I am not mistaken, is the go between your node server and the client apps
+03:14 < WarheadsSE> therefore, no direct app <=> node communication
+03:15 < WarheadsSE> app <=> pubnub <=> node
+03:15 < Jay___> if so, why when you look into the js examples, the connection is directly with the node server?
+03:15 < AnonymousFunctio> MicronXD: I can't find the link now... maybe someone else knows it... chef in a kitchen and what not.  I need to head out for now.
+03:16 < AnonymousFunctio> MicronXD: Basically, all of your JS code runs in a single thread.  When you want something to go do something, you tell it to start that task and get back to you.
+03:16 < AnonymousFunctio> MicronXD: So, if you want to read a whole file async, you tell Node to do it, and your code continues to run.  This loop of running stuff happens within a tick.
+03:17 < whomp> WarheadsSE, are you still there?
+03:17 < AnonymousFunctio> MicronXD: If you schedule something for next tick, using process.nextTick(), it will run... on the next tick.
+03:17 < WarheadsSE> i am whomp 
+03:17 < AnonymousFunctio> MicronXD: This is a shitty explanation, lol, sorry.  I'm falling asleep.
+03:17 < AnonymousFunctio> MicronXD: Pehaps someone else can fill in the gaps.  For now, I'm headed out.
+03:17 < AnonymousFunctio> WarheadsSE: Good luck.  :-D
+03:17  * AnonymousFunctio is asleep
+03:17 < WarheadsSE> Jay___:  .. listen
+03:18 < WarheadsSE> node pushes to pubnub, pubnub to client
+03:18 < WarheadsSE> thre may be nodejs handing out the web pages
+03:18 < WarheadsSE> but that is coincidental!
+03:18 < MicronXD> AnonymousFunctio: Thanks lol
+03:18 < WarheadsSE> whomp what IP did you tell it to listen on
+03:18 < MicronXD> AnonymousFunctio: good night!
+03:18 < whomp> WarheadsSE, to reiterate, i don't think any firewalls are causing problems. i already got nginx running smoothly. it's hosted by godaddy
+03:18 < whomp> 127.0.0.1
+03:18 < pyrotechnick> creationix: do you still use your meta-package?
+03:19 < WarheadsSE> ok
+03:19 < Jay___> WarheadsSE, thanks for helping me. maybe you are right about the connection not being directly to Node... however...
+03:19 < WarheadsSE> and.. you're connecting to this server from .. 
+03:19 < WarheadsSE> whomp: ^
+03:19 < Jay___> what I really want to use is their Socket.IO offering
+03:20 < whomp> i type in the IP of the server from my home comp on chrome, if that's what you're asking
+03:20 < WarheadsSE> then just us socket.io and STOP talking about pubnub
+03:20 < Jay___> and that on I garantee you is a direct  client <-> socket.io connect
+03:20 < Jay___> connection*
+03:20 < whomp> i have node.js listening on port 1337, and i type in IP:1337
+03:20 < WarheadsSE> yes, but socket.io != pubnub.
+03:20 < WarheadsSE> whomp: 
+03:20 < whomp> these might be noob moves, but i haven't done much of this sort of thing
+03:20 < whomp> what
+03:20 < WarheadsSE> whomp replaces this value
+03:21 < Jay___> ok then, but it's offered by them as well, right?
+03:21 < Jay___> see here
+03:21 < WarheadsSE> "there's no place like 127.0.0.1"
+03:21 < WarheadsSE> Jay___: ..
+03:21 < WarheadsSE> >.<
+03:21 < WarheadsSE> do you want this hub service, or to host it yourself?
+03:22 < rr1234> trying to compile node js on arm9, any tips?
+03:22 < Jay___> I need SaaS, I'm dummy at server maintainance Ç(
+03:22 < Jay___> WarheadsSE, see here for they socket io offering
+03:22 < whomp> WarheadsSE, what do you mean by that quote?
+03:22 < Jay___> https://help.pubnub.com/categories/search?utf8=%26%23x2713%3B&query=socket.io&for_search=1&commit=Search
+03:22 < rr1234> *i mean cross compile for ARM9
+03:23 < WarheadsSE> rr1234: ARM9 = armv5* ?
+03:23 < WarheadsSE> whomp: 127.0.0.1 = localhost = same as me 
+03:23 < rr1234> its this serial server: http://www.moxa.com/product/IA241_IA240.htm
+03:24 < rr1234> "ART 32-bit ARM9 industrial processor"
+03:24 < whomp> ah
+03:25 < whomp> right on, thx :D
+03:25 < WarheadsSE> rr1234: I need to find what is the exact comparable to the processor.
+03:25 < WarheadsSE> aka
+03:25 < WarheadsSE> 127.0.0.1:1337 isnt on your computer at home ;)
+03:26 < WarheadsSE> Jay___: .. just us their client libraries for the client side.
+03:26 < WarheadsSE> socket.io is, unless I am mistaken, a server, plus when used in a browser, _javascript_ 
+03:26 < WarheadsSE> pubnub client lib in language of choice = what you want.
+03:26 < Jay___> so that's my problem... the client libraries are for pub/sub only
+03:26 < WarheadsSE> gah
+03:27 < Jay___> all the Socket.io examples use javascript on client side, not a native client
+03:27 < WarheadsSE> Yes
+03:27 < WarheadsSE> Jay___:  BECAUSE THATS WHAT SOCKET.IO IS
+03:28 < Jay___> no socket IO is also a customized node.js that is running on the server, that's what I need to connect to
+03:28 < WarheadsSE> arg
+03:28 < WarheadsSE> so you arent using PubNub then
+03:29 < WarheadsSE> http://socket.io/ 
+03:29 < Jay___> well I want to use their Node.js offering, not their PUb/Sub offering
+03:29 < Jay___> pub sub, for one thing, is not autoritative
+03:29 < Jay___> I need an authoritative server
+03:30 < rr1234> it is just an ARM9 processor running embedded Linux 2.6 kernel
+03:30 < rr1234> it has its own cross compiler
+03:31 < WarheadsSE> rr1234: yes .
+03:31 < WarheadsSE> ARM isnt as simple as that.
+03:31 < WarheadsSE> ARM9 can mean many different things, depending on _which_ ARM9 reference design is implemented.
+03:31 < WarheadsSE> aka
+03:32 < Jay___> WarheadsSE, this explains the whole idea: http://www.simb.net/2011/04/15/flash-in-the-javascript-age/
+03:32 < WarheadsSE> does it implement armv4t or armv5t instructions rr1234 
+03:32 < rr1234> ok, not sure i'll try and find it
+03:33 < WarheadsSE> rr1234: Once I know the instruction set, I can help you out.
+03:33 < WarheadsSE> I maintain node on Arch Linux ARM
+03:34 < WarheadsSE> Jay___: that explains flash plus direct socket.io.
+03:34 < mscdex> wow, a single char match is 6x faster in regex than str.indexOf
+03:34 < WarheadsSE> Jay___: https://github.com/pubnub/pubnub-api/blob/master/socket.io/README.md
+03:35 < WarheadsSE> mscdex: welcome to the power of regex...
+03:36 < mscdex> it's just too bad i can't parse quoted strings with regex... while taking into account escaping chars
+03:37 < WarheadsSE> mscdex: methinks there is maybe some regex foo you are missing? or isn't implemented
+03:38 < WarheadsSE> Jay___: having read what you posted, plus what I linked: I still see it as use the standard native pubsubnub libs for the client, if the client doesnt have a socket.io capable
+03:38 < Jay___> wow
+03:38 < Jay___> it's at the very very bottom
+03:39 < WarheadsSE> this is why we read the _whole_ document
+03:39  * Jay___ reads it
+03:40 < Jay___> are you talking about the python example/
+03:40 < Jay___> ?
+03:40 < WarheadsSE> under "non-socket-io-communication" yes, the python-esque example.
+03:44 < Jay___> wait I think I'm getting it.. you send a normal pub message, but then you include a namespace reference?
+03:44 < Jay___> is that all?
+03:45 < WarheadsSE> ding
+03:47 < Jay___> omg, you are so smart
+03:47 < mscdex> WarheadsSE: nope, i've searched high and low
+03:47 < Jay___> I can't believe I will be finally able to do it
+03:47 < WarheadsSE> even looked at full PCRE syntax?
+03:48 < Jay___> are you asking me or him?
+03:50 < WarheadsSE> rr1234: Looking at this, tbh, it appears it it might be a an armv4, based on Mhz & ram. 
+03:50 < WarheadsSE> Jay___: that was meant for mscdex 
+03:50 < rr1234> I haven't found it yet, saw something about all ARM9 Cortex being armv7 though
+03:51 < rr1234> I was looking in the toolchain files but can't find it
+03:51 < WarheadsSE> rr1234: see this chunk http://en.wikipedia.org/wiki/List_of_ARM_microprocessor_cores
+03:51 < WarheadsSE> there is no ARM9 cortex
+03:51 < mscdex> WarheadsSE: i think it's mostly a problem of knowing whether a quote is actually being escaped or not
+03:52 < mscdex> or a backslash is escaped, etc
+03:52 < WarheadsSE> mscdex: hmm.. look like you need a back-look for \, but then you'd have an issue with \\"
+03:52 < mscdex> exactly :-)
+03:53 < mscdex> then you'd have to check for \\\\", etc
+03:53 < WarheadsSE> there is a way, but i m not 100% sure of the operability of regex in node atm
+03:53 < rr1234> WarheadsSE: There's reference to ARM926 and ARM946 in the cross compiler's file
+03:53 < mscdex> also with sql (which i'm parsing) allows "" to escape too
+03:53 < mscdex> :/
+03:54 < WarheadsSE> rr1234: point me at that please
+03:54 < WarheadsSE> parising sql with regex?
+03:54 < WarheadsSE> >.< oww
+03:55 < rr1234> Not sure if you actually want to install it, http://www.moxa.com/support/sarch_result.aspx?type=soft&prod_id=292&type_id=6
+03:56 < mscdex> WarheadsSE: not all of it, just quoted strings like i said
+03:56 < WarheadsSE> rr1234: I dont need to install it :p I need to read some bits
+04:00 < WarheadsSE> rr1234: EEW they packed the archive in the shell script then "zipped" it ?
+04:00 < WarheadsSE> i feel direty
+04:01 < rr1234> yeah I'm the one stuck with programming the damn thing
+04:01 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+04:01 < dr0id> wutisit?
+04:02 < WarheadsSE> rr1234: looks like it is an iMX variant
+04:02 < rr1234> how can you tell?
+04:04 < WarheadsSE> could be wrong but "mxscaleb/bin/xscale-linux-"
+04:05 < WarheadsSE> no, thats xscale, maybe PXA based.. not iMX
+04:05 < dev007_vn> hi
+04:09 < WarheadsSE> rr1234: let me do some de-packaging quick...
+04:12 < WarheadsSE> rr1234: nice.. partial archive header fail :)
+04:14 < rr1234> damn cannot find where it defines arch
+04:15 < WarheadsSE> K, got it.
+04:15 < WarheadsSE> (its untarring now)
+04:17 < WarheadsSE> rr1234: do you have one of these devices nearby ?
+04:18 < rr1234> nope its at work
+04:18 < WarheadsSE> k
+04:18 < WarheadsSE> because logging in, and running uname -a would save soooo much time
+04:20 < WarheadsSE> http://www.moxa.com/support/sarch_result.aspx?type=soft&prod_id=292
+04:20 < WarheadsSE> that appears to be their full source tarball
+04:23 < rr1234> ok... finally I believe its this guy: http://osg.informatik.tu-chemnitz.de/lehre/lab/doc/AT91RM9200%20-%20Complete.pdf
+04:25 < rr1234> armv4 looks like
+04:29 < WarheadsSE> if that is the processor
+04:30 < WarheadsSE> but, honetly, my brainis fried
+04:30 < WarheadsSE> get a uname -a from me
+04:30 < WarheadsSE> *for me
+04:30 < WarheadsSE> tomorrow.
+04:30  * WarheadsSE mumbles
+04:30 < WarheadsSE> yeah, that.
+04:33 < rr1234> ok will definitely do that thanks for help
+05:04 < owen1> anyone using anything other than AWS for hosting it's projects? i am looking for open source platform, if possible.
+05:04 < owen1> googling gives me http://www.cloudfoundry.org/ and http://www.ubuntu.com/cloud
+05:05 < WarheadsSE> ? node specifically?
+05:05 < WarheadsSE> nodester ?
+05:06 < owen1> WarheadsSE: not node. but anything
+05:06 < owen1> like AWS
+05:07 < WarheadsSE> AWS is just another vps, in the end
+05:11 <@Nexxy> rvagg, yus
+05:12 <@Nexxy> rvagg, https://github.com/ninjablocks
+05:17 < mscdex> woohoo! emulated prepared statements!
+05:17 < owen1> WarheadsSE: my employer has it's own datacenters. currently if i want to setup a typical website (2 servers + load balancer) i have to create tickets for creating cname, vips, wip, ACL, host names, etc. it's a long and annyoing process and involved a few ops people. is it possible to create something similar to AWS but internaly? simple web interface with a few buttons that will create those in minutes?
+05:18 < ChrisPartridge> mscdex: :o emulated?
+05:18 < mscdex> yeah, client-side
+05:19 < Guest56085> hi
+05:19 < mscdex> hi maya...er Guest56085
+05:19 < mscdex> ;-)
+05:19 < Guest56085> I am new to this
+05:19 < owen1> Guest56085: clearly (:
+05:20 < WarheadsSE> owen1: hmm
+05:20 < WarheadsSE> if my brain werent fried id give you a better otpion
+05:20 < Guest56085> Can anny one help me to create an interfece or to access tun/tap device through nodejs?
+05:21 < astropirate> My journey to the xmonad side is complete!
+05:21 < owen1> WarheadsSE: there was an attempt to use AWS, but the people abused it and spent too much money plus they did it without involving our ops, so there was a lot of political tension.
+05:21 < owen1> Guest56085: what's tun/tap
+05:22 < ChrisPartridge> astropirate: minimalism ftw!
+05:23 < WarheadsSE> owen1: in the end, something has to allocate all those resources
+05:24 < Guest56085> http://backreference.org/2010/03/26/tuntap-interface-tutorial/
+05:27 < Guest56085> I heard Koushik Dutta has done the similar work before
+05:27 < Guest56085> anyone thr?
+05:30 < astropirate> chrisdickinson, yes!  Gnome3's massive window borders made me want to cut myself and pour salt all over it
+05:30 < owen1> Guest56085: i clicked on that link, got scared and closed the tab (:
+05:31 < owen1> WTF is going on there
+05:32 < owen1> anyone know why Marak, the guy behind flatiron and hook.io was fired from nodejitsu and why is he sounds depressed? https://groups.google.com/forum/?fromgroups=#!topic/nodejs/FCsTCopm_dE
+05:32 < owen1> it's sad to read this
+05:33 < astropirate> owen1, he was cofounder if i got it right... i dont think he was fired
+05:33 < astropirate> but i'm speculating
+05:33 < astropirate> which i shoudlnt be doing
+05:33 < astropirate> <_<
+05:33 < othiym23> owen1: don't want to get into drama I don't know much about, but marak's had a rough couple of months
+05:34 < owen1> othiym23: it seems like he wanted to build open source, but nodejitsu pushed toward close solutions
+05:35 < owen1> "I've been fired from Nodejitsu and no longer have the resources or git commit access"
+05:35 < othiym23> owen1: that's certainly how he portrays it, but, y'know, there's a lot going on at Nodejitsu
+05:40 < Guest56085> is there anyone who can help me out?
+05:40 < boltR> is the best way to call commandline binaries with child_process?
+05:41 < othiym23> Guest56085: what exactly are you trying to do with tun/tap?
+05:41 < othiym23> something more than node-pcap can offer?
+05:42 < Guest56085> I am crating a tun device using C & I want to read & write on the same device from nodejs
+05:43 < ChrisPartridge> boltR: yup
+05:43 < boltR> ChrisPartridge: cool
+05:43 < Guest56085> or Is there any other way ?
+05:43 < othiym23> Guest56085: OK, so you should be able to just attach read / write streams to the tap device, right?
+05:43 < Guest56085> yes
+05:43 < othiym23> Guest56085: where are you running into difficulty?
+05:44 < Guest56085> I dont know how to open that tap device in  nodejs
+05:45 < Guest56085> In C if you want to access that device you need to fire "ioctl"
+05:47 < othiym23> I don't know about the ioctl code, but for the rest, you should just be able to treat the tun device like any other readable stream, and use fs.createReadStream('/dev/tun', callback)
+05:47 < othiym23> likewise with fs.createWriteStream()
+05:47 < Guest56085> ok
+05:48 < Guest56085> but how can I write on specific tap device
+05:48 < Guest56085> ?
+05:49 < othiym23> that's the piece you're doing with ioctls right now?
+05:49 < Guest56085> yes
+05:50 < othiym23> hmm... it's possible you've found a little hole in how Node interacts with OS-level stuff
+05:50 < othiym23> normally around sockets, you create the connection directly on a device
+05:51 < othiym23> does tun create a full virtual device visible to the OS?
+05:51 < gildean> it should
+05:52 < othiym23> Guest56085: is there anything on http://nodejs.org/api/os.html that looks relevant to your interests?
+05:52 < othiym23> like, say, os.networkInterfaces()?
+05:53 < othiym23> I actually do have the OS X tun and tap kexts installed on my Mac as part of Shimo
+05:54 < othiym23> never really played with them on their own
+05:56 < othiym23> and what if you try to bring up one of the virtual interfaces through a child process and then bind to the virtual device inside your Node script?
+05:57 < othiym23> actually, scratch that
+05:59 < othiym23> bring up a virtual device ("ifconfig tun1 169.x.x.x up") and then just create a fs.createReadStream("/dev/tun1", cb...)
+06:00 < othiym23> that said, if I weren't actually developing a tun / tap device driver, I'd probably just use node_pcap
+06:01 < Guest56085> os stuff will not help it shows me interface configuration
+06:02 < ChrisPartridge> you can't use net.createConnection(path) in a case like that?
+06:02 < othiym23> ChrisPartridge: /dev/tap* / /dev/tun* are character devices, not domain sockets, AFAIK
+06:03 < othiym23> Guest56085: okie-doke, but what about bringing up a virtual device and then just slapping a read / write stream on the device once it's bound?
+06:14 < Guest56085> I dont see any file "/dev/tun*"
+06:14 < Guest56085> thts the problem?
+06:19 < mscdex> sounds like a tun of work
+06:27 < rvagg> Nexxy: woo hoo! not moving to Australia though I take it?
+06:27 < davidbanham> You should totally move to Australia. It's great here. It would be much greater if "fleet deploy" would just bloody work though!
+06:27 < pyrotechnick> yeah it's awesome
+06:28 < pyrotechnick> then i could troll you in RL
+06:28 < rvagg> Nexxy: this is the 
+06:28 < rvagg> Nexxy: this is the 'super secret' stuff you were talking about when you took delivery of your blocks a few weeks back then? trying em out?
+06:31 < othiym23> Guest56085: what OS are you developing your tun / tap driver for?
+06:32 < Guest56085> linux
+06:38 < dr0id> weee!
+06:42 < othiym23> Guest56085: so yeah, your driver needs to be at the point where you can bring up the virtual interface and have it show up in /dev before I think you're going to be able to hook Node up to it
+06:42 < othiym23> can you gist me the C code you use to access / manager the driver?
+06:45 < superfluous> So, total noob here, done some hello world projects; But something I've noticed -- Everything online is from 2010 or 2011. A lot of sample projects I've found online don't work anymore.
+06:46 < superfluous> Is node dead? Has it evolved? And if it has, how come its harder to find current resources online?
+06:46 < bigkevmcd> superfluous: I think you're most likely looking in the wrong places
+06:47 < davidbanham> superfluous: nodejs.org http://nodeup.com/ are decent places to start
+06:47 < bigkevmcd> superfluous: https://github.com/joyent/node/wiki/Resources is also reasonable
+06:48 < davidbanham> Anybody got a working deployment of fleet running?
+06:49 < othiym23> davidbanham: presumably substack does ;)
+06:49  * ChrisPartridge giggles
+06:49 < davidbanham> othiym23: At this point I'm not even sure of that. Unless I'm doing something really, drastically wrong.
+06:50 < superfluous> I'm pretty sure i've been there before, and they're alright. I can get a webserver running, but it feels like a crappy version of rails when I do it
+06:50 < superfluous> i dont know, usually I can 'jump in' to things by looking at sample projects and seeing the conventions and stuff. But I'm having difficulty with node
+06:50 < othiym23> davidbanham: I haven't used fleet or seaport in anger yet, but I know that browserling uses one or both of them
+06:51 < substack> beep boop
+06:51 < substack> been using seaport for many months
+06:51 < pyrotechnick> markov chain ^
+06:51 < davidbanham> substack: He is summoned!
+06:51 < othiym23> superfluous: I know the docs on nodejs.org are pretty minimal, but they're also current and correct
+06:51 < substack> just this month started using fleet in production, but just for some testling processes
+06:52 < davidbanham> substack: Mate I've been battling all day with this error from git when doing a fleet deploy. Any pointers? fatal: protocol error: bad line length character: fata
+06:52 < pyrotechnick> T̫̺̳o̬̜ ì̬͎̲̟nv̖̗̻̣̹̕o͖̗̠̜̤k͍͚̹͖̼e̦̗̪͍̪͍ ̬ͅt̕h̠͙̮͕͓e̱̜̗͙̭ ̥͔̫͙̪͍̣͝ḥi̼̦͈̼v҉̩̟͚̞͎e͈̟̻͙̦̤-m̷̘̝̱í͚̞̦̳n̝̲̯̙̮͞d̴̺̦͕̫
+06:53 < othiym23> superfluous: if you're writing Node web apps and they feel too Railsy, it's probably best to step back and look at what 3rd party modules you're using and try paring that list back a little bit, until you're just using the built-in HTTP library and build back up from there
+06:54 < superfluous> well thats just it, i was writing it mainly from scratch. Granted, it was small and didnt do anything
+06:54 < othiym23> it makes evaluating your other options (express tako strata restify yadda yadda yadda) much simpler when you know what they're abstracting over
+06:55 < othiym23> Node's pretty simple!
+06:55 < superfluous> yeah i have no idea what i can (and should) do with it
+06:55 < othiym23> superfluous: have you seen substack's stream tutorial yet?
+06:56 < superfluous> i dont think so, but it sounds good
+06:56 < substack> superfluous: you should be using as many modules as possible
+06:56 < substack> well not so much the big ones
+06:56 < substack> but as many tiny modules as possible
+06:57 < substack> also split things up into little processes that talk to each other over the network
+06:57 < substack> that's fun times
+06:57 < substack> and has subtle benefits
+06:57 < othiym23> superfluous: https://github.com/substack/stream-handbook -- it's a work in progress, but it gives you a good idea of the creative space Node's streams cover
+06:57 < substack> othiym23: that's just streams though and streams are mostly a lower-order concern above syntax
+06:58 < substack> building apps that don't look like rails requires some higher-order approaches
+06:58 < othiym23> substack: no offense, dude, but if you'd given me the advice you just gave superfluous when I was first getting started, I would have had no idea what the hell you were talking about
+06:58 < othiym23> true, I agree
+06:58 < substack> othiym23: standard process concurrency tricks!
+06:58 < substack> standard issue, works in any language
+06:58 < othiym23> but working up from the low level is what gave me the perspective I found necessary to understand what the hell Node is
+06:58 < substack> even java
+06:59 < othiym23> sure, but "use lotsa little modules" doesn't really help define what sort of projects Node is and isn't good for
+06:59 < othiym23> and doing process-based concurrency in Java hurts, unless you reaaaaaaaally know what you're doing
+06:59 < substack> superfluous: try splitting up your app into a few http servers that can all just worry about doing one thing™
+06:59 < othiym23> and even then it kinda sucks unless you have a ton of spare RAM
+07:00 < othiym23> superfluous: do you have an app yet? ;)
+07:00 < superfluous> not in node i dont
+07:00 < othiym23> or, rather, do you have a problem you want to solve?
+07:00 < othiym23> cuz that seems like the first thing to nail down
+07:00 < substack> othiym23: it's fine so long as java isn't spinning up the procs
+07:00 < superfluous> Windows Azure, Android, and iOS developer
+07:00 < substack> anyways I'm in china I should wander around and get lost
+07:00 < othiym23> substack: yes you should, I'm jealous
+07:00 < superfluous> my problem is that I want to learn more about node (and javascript in general) so that I can be of more use at work
+07:00 < davidbanham> substack: Don't mean to be a hassle, but any ideas on that fleet deploy error?
+07:01 < davidbanham> substack: Ah, don't worry about it. Get out and have fun.
+07:01 < superfluous> and so I figured I start out and make some sort of simple social networking service just to get started with node. play around with persistance and stuff
+07:01 < othiym23> superfluous: OK, is there a little networky thing you'd like to hack on that needs low latency to work well?
+07:02 < substack> also I leveled up on my firewall-evasion fu
+07:02 < superfluous> multiplayer pacman? lol
+07:02 < superfluous> not really
+07:02 < othiym23> if you have an API you want clients to use, that'll make it a lot easier to figure out what goes where in Node-land
+07:04 < _Tristan> I just wrote this middleware to disallow objects being passed via post or get http://pastebin.com/GQXYRDXp and for some reason it's being run 5 times per request. Any idea why?
+07:05 < othiym23> superfluous: you could also check out http://2011.nodeknockout.com/ and try to figure out how those guys did what they did
+07:06 < othiym23> granted, most of that stuff is still in 0.4.x, but a lot of the architectural principles should be the same, the API changes aren't that huge
+07:06 < lvx3> substack: where in China are you?
+07:09 < lvx3> also, for firewall bypassing, OpenVPN on an Amazon instance works wonders
+07:10 < lvx3> at least until China has an argument with Japan and throttles internet traffic between the two >_<
+07:14 < ChrisPartridge> _Tristan: can't see why it would 
+07:14 < _Tristan> me neither... but it does :(
+07:16 < Guest56085> swry othiym23 I was out
+07:19 < Guest56085> yeh its the same code mentioned http://backreference.org/2010/03/26/tuntap-interface-tutorial/
+07:19 < Guest56085> here
+07:20 < _Tristan> oh, I see. Apparently app.end(int) is completely unacceptable and the best possible solution to such an issue is to repeat the function five times and then fail silently.
+07:21 < ChrisPartridge> _Tristan: ah yeah, just do res.send(400)
+07:26 < Tobsn> isaacs, you there?
+07:28 < Guest56085> I can see the inteface.Also IP assigned to it ....but not any entry in /dev
+07:33 < [AD]Turbo> hola
+07:33 < mdedetrich> does anyone here use rackspace cloud files? 
+07:34 < ChrisPartridge> mdedetrich: I have in the past
+07:34 < mdedetrich> sorry, more specifically, use it with node.js
+07:34 < mdedetrich> I'm using cloudfiles
+07:35 < mdedetrich> and I can't see how I am meant to get the uri back when uploading a file
+07:36 < mdedetrich> ChrisPartridge: what library did you use to upload stuff to cloudfiles?
+07:36 < othiym23> Guest56085: my tun / tap expertise on Linux is both minimal and extremely stale, so you've reached the limits of my knowledge
+07:36 < othiym23> Guest56085: I don't *think* the problem you're having is a Node one, though
+07:37 < othiym23> if you can find a character device or a Unix domain socket to point Node at, you should just be able to use Node streams at that point
+07:40 < ChrisPartridge> mdedetrich: I think i wrote something, let me take a look
+07:40 < mdedetrich> ChrisPartridge: I'm just uploading a file to a backspace container, and I want to get the URI back for the file
+07:40 < ChrisPartridge> mdedetrich: i was using node-cloudfiles
+07:41 < mdedetrich> ChrisPartridge: yeah so am I now, but its hardly documented
+07:42 < ChrisPartridge> mdedetrich: Look at the tests dude, plenty of examples in there
+07:42 < Tobsn> is anyone using node-dev or supervisor?
+07:42 < ChrisPartridge> Tobsn: use supervisor
+07:42 < Tobsn> its not reloading
+07:43 < Tobsn> its just starting once then crashing every time
+07:43 < Tobsn> or just not reloading on save
+07:43 < ChrisPartridge> errors?
+07:43 < Tobsn> none
+07:43 < Tobsn> it works directly
+07:44 < mdedetrich> ChrisPartridge: looked at the tests, they don't show me anything
+07:44 < Tobsn> verbose isnt outputting anything either
+07:44 < Tobsn> just crashing
+07:45 < mdedetrich> ChrisPartridge: tests just check if file is uploaded, it doesn't check anything regarding the uri of the file you just uploaded
+07:46 < Tobsn> mdedetrich, any reason you would use rackspace cloud files vs. s3?
+07:47 < mdedetrich> Tobsn: akamis CDN is MUCH MUCH better than AWS CDN
+07:47 < Tobsn> akamai?
+07:47 < davidbanham> Rackspace resell Akamai.
+07:47 < mdedetrich> its the CDN that rackspace uses
+07:47 < davidbanham> The primary benefit is that you don't have to deal with Akamai sales staff.
+07:47 < Tobsn> hehe
+07:47 < Tobsn> yes, thats a benefit
+07:48 < mdedetrich> also we have australian clients, and there is a akamai edge server right here in sydney :)
+07:48 < Tobsn> i use maxcdn because they give you a SSL cert on your custom domain for 30 bucks a month flat
+07:48 < mdedetrich> its also a lot faster than Amazon's CDN
+07:48 < mdedetrich> in fact I think akamai is the best CDN iirc, (maybe google beats it)
+07:49 < Tobsn> yeah, we worked with akamai in 2002 when we did stuff for paramount... thats pretty much what they do... delivering shit since internet exists
+07:49 < Tobsn> just price wise theyre a bit pricey
+07:49 < Tobsn> if you do a lot
+07:49 < mdedetrich> you get what you pay for
+07:49 < Tobsn> sure
+07:51 < mdedetrich> I'm just wondering why its so hard to get the uri back using the cloud files library
+07:51 < Tobsn> yeah supervisor isnt working at all... now node-dev suddenly works
+07:51 < Tobsn> mdedetrich, uri back?
+07:52 < Tobsn> from their api?
+07:52 < mdedetrich> Tobsn: well you upload a file to the cloud, you want to get the public uri of the file you just uploaded
+07:52 < Tobsn> whatcha getting back?
+07:52 < mdedetrich> a boolean if its uploaded or not....
+07:52 < Tobsn> lol
+07:53 < mdedetrich> its with their api
+07:53 < mdedetrich> I also used rackit, however that didn't even work
+07:53 < mdedetrich> I think I may have to edit the source code
+07:53 < mdedetrich> *sighs*
+07:54 < Tobsn> http://docs.rackspace.com/files/api/v1/cf-devguide/content/Create_Update_Object-d1e1965.html#d6e995
+07:54 < Tobsn> this?
+07:55 < mdedetrich> Tobsn: https://github.com/nodejitsu/node-cloudfiles
+07:55 < mdedetrich> thats the library I am using
+07:55 < Tobsn> well dah
+07:55 < Tobsn> oh
+07:55 < mdedetrich> I used to use rackit (https://github.com/rossj/rackit) which gave back the URI
+07:55 < Tobsn> i dont think you get a special url
+07:56 < mdedetrich> however didn't actually work in other areas
+07:56 < mdedetrich> Tobsn: you do, rackit did it
+07:56 < Tobsn> yeah its probably a special call that cloudfiles doesnt have
+07:56 < mdedetrich> Tobsn: from looking at source, cloud files ignores the result
+07:57 < mdedetrich> Tobsn: and just checks if it "worked"
+07:57 < Tobsn> why dont you use rackit?
+07:57 < mdedetrich> Tobsn: that didn't work in other areas, and is outdated
+07:57 < Tobsn> hehe
+07:57 < Tobsn> yeah, you hit one of those verticals
+07:58 < Tobsn> pick the one you like the source the best
+07:58 < Tobsn> and fix it
+07:58 < Tobsn> ;)
+07:58 < Tobsn> with those rest apis its mostly pretty fucking easy to fix/add stuff
+07:59 < mdedetrich> I just wish people did shit properly
+07:59 < Tobsn> maybe look into this here: https://github.com/niftylettuce/express-cdn
+07:59 < davidbanham> mdedetrich: Always wipe front to back, never back to front.
+07:59 < Tobsn> well people do shit properly until they have what they want ;)
+08:00 < mdedetrich> Tobsn: thats not rackspace
+08:00 < Tobsn> well it is
+08:00 < Tobsn> but "coming soon" lol
+08:00 < Tobsn> well youre fucked
+08:00 < davidbanham> Oh wait, I can actually add something useful here instead of just shit jokes.
+08:01 < Tobsn> either you go raw on it and hit the API yourself from example code or you fix it up ;)
+08:02 < davidbanham> mdedetrich: Be aware that there are lots and lots of holes in the nodejitsu cloud-files library. Have a look in the pull requests.
+08:03 < davidbanham> But the reason they're not returning the public URL of the file you just uploaded is because that doesn't get returned by the API.
+08:03 < Tobsn> yep
+08:03 < Tobsn> it jsut returns "Created"
+08:04 < mdedetrich> https://github.com/rossj/rackit/blob/master/lib/rackit.js
+08:04 < mdedetrich> check Rackit.prototype.add
+08:05 < Tobsn> 201 : 'Created',
+08:05 < mdedetrich> thats the HTTP status code
+08:05 < mdedetrich> it also returns JSON or something like that
+08:06 < davidbanham> I have to run, but we use both node and cloud files pretty heavily in production. If there's anything I can help with hit me on david@pinion.gg
+08:06 < mdedetrich> davidbanham: actually I think I got it
+08:06 < mdedetrich> davidbanham: I have to specifically use a container object to add a file
+08:07 < davidbanham> Choice.
+08:07 < Tobsn> mdedetrich
+08:07 < Tobsn> https://github.com/rossj/rackit/blob/master/lib/rackit.js#L642
+08:21 < Tobsn> ah nevermind, i guess the crash is what supervisor does to restart
+08:21 < Tobsn> and livereload was just reloading too fast...
+08:22 < Tobsn> 1.5 sec reload delay and and it works
+08:23 < Tobsn> node-dev isnt working at all... says it restarts and is running but nothing is running hehe
+08:23 < Tobsn> i shouldve sticked with nodemon
+08:23 < dr0id> not sure what node-dev is for, but I use nodemon and forever
+08:23 < dr0id> there's another system by isaacs I think, but not sure. everything lacks something. I don't think forever restarts on file changes :/
+08:24 < Tobsn> isaac is supervisor
+08:24 < Tobsn> tj is node.dev
+08:24 < Tobsn> node-dev
+08:28 < mdedetrich> Tobsn: figured it out
+08:28 < mdedetrich> \o/
+08:28 < Tobsn> ;)
+08:28 < Tobsn> fork, fix, pull ;)
+08:28 < mdedetrich> turns out, racket did shit behind the background
+08:28 < mdedetrich> nah
+08:29 < mdedetrich> you have to set your container to have a CDN
+08:29 < mdedetrich> and the container object has a cdn uri
+08:29 < mdedetrich> so to get back the URI its just
+08:29 < mdedetrich> console.info container.cdnUri + '/' + filename
+08:29 < mdedetrich> where filename is the filename of the file you just put into the cloud
+08:30 < Tobsn> ;)
+08:30 < Tobsn> wanted to say at some point that there is probably not a real public url, its just the file in a folder
+08:30 < Tobsn> but thought they use a separate function to retrieve the public url and never found it
+08:31 < mdedetrich> according to cloudfiles
+08:31 < mdedetrich> CDN implies public
+08:31 < Tobsn> yeah
+08:31 < mdedetrich> if you don't have CDN its just a private file storage
+08:31 < mdedetrich> yup its all working now
+08:31 < mdedetrich> *dances*
+08:32 < mdedetrich> but yeah, if you want a quality CDN
+08:32 < mdedetrich> I would either go rackspace or google cloud files
+08:43 < lvx3> Re: CDNs, I've found Cedexis data is quite useful for barganing the prices downwards
+08:44 < ZBZZN> Hello
+08:44 < ZBZZN> I am getting this : npm ERR! fetch failed https://github.com/LearnBoost/console-trace/tarball/8a54bf706d001f1eef166b99391e952e4be10982 but when I fetch the file manually it works
+08:44 < ZBZZN> Any ideas what could be wrong?
+08:45 < ZBZZN> or how can I tell it to look for the file I already have
+08:47 < Tobsn> ZBZZN, its probably because of the https
+08:47 < Tobsn> because the file exists
+08:47 < Tobsn> just try it again
+08:47 < ZBZZN> I did
+08:47 < ZBZZN> how do I set the https proxy for npm?
+08:48 < Tobsn> no clue
+08:48 < kranius> ZBZZN: via environment var
+08:48 < Tobsn> https://npmjs.org/doc/config.html
+08:48 < Tobsn> it has a https-proxy var
+08:49 < Tobsn> ZBZZN
+08:49 < Tobsn> https://github.com/isaacs/npm/issues/2719
+08:49 < Tobsn> https://github.com/isaacs/npm/issues/2462
+08:49 < Tobsn> nothing one
+08:50 < Tobsn> ZBZZN, example here https://github.com/isaacs/npm/issues/2677
+08:50 < Init--WithStyle-> Has node.js been used for any blog commenting systems yet?
+08:51 < ZBZZN> Oh thanks :)
+08:51 < ZBZZN> I did remeber it used to work
+09:00 < ZBZZN> Tobsn: Ok, looks like this fixed it: npm config set https-proxy http://web-proxy.corp.hp.com:8080
+09:00 < ZBZZN> I took it from issue 2728 (some other guy behind HP proxy had this issue)
+09:01 < Tobsn> ;)
+09:01 < mdedetrich> Init--WithStyle-: what kind of info are you looking for?
+09:02 < Init--WithStyle-> Just wondering if any blog commenting systems similar to Disqus have been created utilizing node.js
+09:02 < mdedetrich> Init--WithStyle-: I mean node.js is just basic framework, you can do anything with it
+09:03 < dr0id> and commenting systems are easy to make
+09:04 < Init--WithStyle-> yes, i'm just wondering if anyone had already done it
+09:04 < chakrit> what happened to supervisor.
+09:37 < ashnur> morning
+09:38 < ashnur> any suggestions on what static page/site generator should(or should not) I check out?
+09:45 < Tobsn> ashnur, nano
+09:51 < xico> Hello my peeps! Can someone help me with an wall I've hit with Express 3.0     and eventually Toffee view engine?
+09:51 < xico> +.+
+09:59 < ashnur> Tobsn: the editor?
+10:00 < Tobsn> ;)
+10:00 < ashnur> very funny
+10:00 < Tobsn> :P
+10:01 < ashnur> i am still laughing
+10:44 < xico> Does anyone use Toffee?
+10:45 < xico> As a view engine for Express
+12:08 < chakrit> Is it a bad idea to put 0.8.x in your package.json?
+12:08 < chakrit> Is there a best practice documented somewhere about which version to use?
+12:09 < chakrit> I find exact versioning to be more problematic than what it's worth.
+12:40 < braoru> mmmh if I want to create a rest/json service to do a checkout .. this is possible to keep it stateless ?
+12:41 < deoxxa> braoru: no
+12:41 < deoxxa> braoru: but you can put the state somewhere else, maybe
+12:42 < deoxxa> braoru: think cookies, post fields, etc
+12:42 < braoru> ok
+12:42 < braoru> will try
+12:46 < whitman> Is it possible to have node.exe on Windows not open a command prompt window?
+12:53 < PigDude> so i had a dream last night and apparently i'm supposed to be building this project using node.js?
+12:53 < dr0id> don't use it, its outdated.
+12:53 < PigDude> oh okay thanks for the heads up dr0id 
+12:54 < PigDude> are any of the postgresql ORMs any good for node?
+12:54 < PigDude> the fastlegs API looks OK but I'm put off by the name amongst other things :P
+12:57 < PigDude> i expect to use postgresql for this project
+13:13 < aandy> whitman: As opposed to what?
+13:14 < aandy> If you pass a script to node.exe it will run it and exit right after, but this will too happen in a command line. node.exe is a shell application so to speak
+13:34 < garrettwilkin> anyone else use EC2?
+13:35 < garrettwilkin> I'm thinking of signing up for it just for the learning experience of it
+13:35 < garrettwilkin> i have a linode that i use, but seems like experience with AWS is more of a job skill
+13:39 < will_uk> Has anyone experienced this error using the connect-redis session store  Express?
+13:39 < will_uk> Has anyone experienced this error using the connect-redis session store  Express?
+13:39 < will_uk> SyntaxError: Unexpected token O
+13:39 < will_uk>     at Object.parse (native)
+13:39 < will_uk>     at module.exports.RedisStore.get (/var/www/html/think-productivity/DropTask/node_modules/connect-redis/lib/connect-redis.js:98:23)
+13:39 < will_uk> This is after the request hangs in the browser for a good minute or so...
+13:43 < bmatschullat> which version of node_redis u use?
+13:44 < nmartin> garrettwilkin: I use EC2, it's expensive for what it does
+13:44 < nmartin> and as far as skills go, it's just a xen VM
+13:45 < bmatschullat> will_uk update your node_redis version to version 0.8.1 then maybe your problem was solved
+13:46 < nmartin> garrettwilkin: you can get a free micro instance to play with
+13:46 < nmartin> i run node on mine
+13:51 < horsehorse> hi!. i have a question about socet.io
+13:51 < horsehorse> *socket
+13:52 < horsehorse> where can i get /socket.io/socket.io.js for client side?
+13:52 < horsehorse> i'm trying to make example which is on the socket.io official website but i stuck
+13:52 < horsehorse> stackoverflow didn't help
+13:52 < horsehorse> hey anyone
+13:53 < `3rdEden> horsehorse socket.io serves that for you from your server
+13:54 < horsehorse> i downloaded everything and i'm using express. and it seems i can get socket.io from the server BUT in the socket.io.js i have a line with "require" and it doesn't work with the browser
+13:55 < `3rdEden> what do you mean with "downloaded" everything?
+13:55 < `3rdEden> all you need to do is npm install express, npm install socket.io
+13:55 < `3rdEden> hook those together as is done in the socket.io README.md file on github
+13:55 < `3rdEden> and go to /socket.io/socket.io.js and you will see the correct client side file
+13:56 < BronzeByte> he is probably trying require('socket.io') in the browser
+13:56 < `3rdEden> also see: https://github.com/LearnBoost/Socket.IO/wiki/How-do-I-serve-the-client
+13:56 < BronzeByte> download the static files from the github
+13:56 < horsehorse> us. i mean i took last socket.io package from the server (i used npm install socket.io) and i can use it on a server. the problem is that when i'm loading a file socket.io.js to a client it drops an error : "require is not defined"
+13:57 < BronzeByte> https://github.com/LearnBoost/socket.io-client/tree/master/dist
+13:57 < BronzeByte> you cant use require in a browser
+13:57 < BronzeByte> in a browser you use HTML
+13:57 < `3rdEden> BronzeByte i wouldn't advice using that as you might forget to update to your client files when yo uupdate socket.io
+13:58 < BronzeByte> require('socket.io'); ------> <script src="socket.io.js" ></script>
+13:58 < `3rdEden> socket.io always ships with the compatible client, you don't have that guarantee if you try to host it your self
+13:58 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+13:58 < nathan7> BronzeByte: uh uh
+13:59 < nathan7> BronzeByte: browserify
+13:59 < BronzeByte> horsehorse is clearly ro fucking lazy to read the readme/docs of how to use socket.io
+13:59 < BronzeByte> there is also a copy paste example on their website
+13:59 < nathan7> BronzeByte: socket.io includes browserify magic so require('socket.io') gets you the client if you do it in the browser with browserify
+13:59 < horsehorse> wait wait. i know how to load script . i'm using 'script' tag of course in the browser. the problem is that there is a like with 'require' inside the socket.io.js
+13:59 < BronzeByte> but he hasnt included socketio at that point in the browser
+14:00 < nathan7> BronzeByte: Go look up how Browserify works. Then come back.
+14:00 < `3rdEden> impossiibbbleee
+14:00 < BronzeByte> require is a node function, not a javascript function
+14:00 < BronzeByte> n
+14:01 < `3rdEden> BronzeByte actually the socket.io client code is full of require statements
+14:01 < `3rdEden> because the client compatible on the server and client side
+14:01 < will_uk> bmatschullat: thanks, that sorted it.
+14:01 < `3rdEden> but these statements are removed using socket.io's build system.
+14:01 < nathan7> BronzeByte: https://github.com/substack/node-browserify
+14:02 < bmatschullat> will_uk i run in the same problem now :D
+14:02 < will_uk> Though I think my understanding of how npm works may be wrong… I assumed connect-redis would be using its own version of node-redis (within its node_modules directory) rather than the one I'm declaring in my top level package.json for usage elsewhere.
+14:02 < BronzeByte> nathan7, fuck off please, require was put in node because there is no such thing as including script in node
+14:02 < horsehorse> aaaa. fuck. i work w js 1 million years i know the difference between browser and server. ok. probably the problem is that i shud use SOCKET.IO.JS from socket.io-client package and not from socket.io package
+14:02 < BronzeByte> i am not saying itis impossible, im saying its not meant to be
+14:02 < horsehorse> ????
+14:03 < nathan7> BronzeByte: Yes, but browserify is an elegant simple way to have require() in the browser
+14:03 < BronzeByte> horsehorse, that sounds like a solution
+14:03 < `3rdEden> horsehorse WTF why don't you just read the fucking docs
+14:03 < nathan7> You were saying you can't require('socket.io')
+14:03 < BronzeByte> ^  dat
+14:03 < nathan7> in the browser
+14:03 < nathan7> browserify lets you do exactly that
+14:03 < BronzeByte> i obviously meant without extra libary, use your brain
+14:03 < `3rdEden> https://github.com/LearnBoost/Socket.IO/wiki/How-do-I-serve-the-client <-- i'm pretty sure that this is written in clear english
+14:04 < BronzeByte> ^ ^ ^^^^^^^^^^^
+14:04 < BennyLava> BronzeByte--
+14:04 < BennyLava> You seem like a proper tard.
+14:04 < BennyLava> Please stop talking.
+14:04 < horsehorse> Y noone wrote it before . fuckers. i spent to much time cuz on stackoverflow and on socket.io website they didn't write it
+14:05 < nlogax> Any IRC-js users? Made a beta release of 2.0 yesterday, would be awesome if some brave souls would try it out https://github.com/gf3/IRC-js#readme
+14:05 < BronzeByte> They did on their own sebsite
+14:05 < guybrush> you guys are supposed to treat each other respectfully :>
+14:05 < BronzeByte> nlogax, irc client wrapper for nodejs?
+14:05 < `3rdEden> horsehorse you mean that big ass WIKI button on the http://socket.io website?
+14:06 < `3rdEden> yeah, it's not there, it's an imaginairy button.
+14:06 < nlogax> BronzeByte: Yeah. Easy to make bots and stuff with it.
+14:06 < BronzeByte> guybrush, sometimes it can be frustrating when somebody doesnt use his brain nor google, but what you say is true nonetheless
+14:06 < guybrush> BronzeByte: just calm down and take a break from irc then
+14:06 < BronzeByte> nlogax, woah, cool, was making a bot but had lack of time to implement protocol, im brave and will try it :>
+14:07 < BronzeByte> guybrush, dont worry, it rarely happens to me
+14:07 < horsehorse> `3rdEden : yea //// actually i meant their front page 
+14:07 < horsehorse> i dunno .it suposed to be super easy but i still have an error like ReferenceError: io is not defined [Break On This Error] 	  var socket = io.connect();
+14:08 < nlogax> BronzeByte: Great! If you are missing some features or find bugs, file issues and I'll fix
+14:08 < horsehorse> ok. the right question is . WHERE CAN I TAKE A RIGHT SOCKET.IO.JS FOR CLIENT SIDE? ??
+14:08 < BronzeByte> nlogax, Ok, I am going to make a bot then, and also, shouldnt lib be called src? :-P
+14:09 < nlogax> BronzeByte: Maybe! I'm a noob when it comes to node/npm and their conventions :)
+14:09 < BronzeByte> horsehorse, why dont you read their wiki, readme or getting started guide..?
+14:09 < rodolfocaldeira> Hi everyone, I am just starting out with Node.js and I was wondering what would be the best approach to store user specific configuration settings for a module
+14:09 < guybrush> horsehorse: socket.io is split up into 2 repos, one for server one for client
+14:10 < horsehorse> i read. man . i spent 3 hours and it doesn't work cuz they made example so simple . they didn't put any details to it. i dunno where can i get the file
+14:10 < `3rdEden> horsehorse: how about you read https://github.com/LearnBoost/Socket.IO/wiki/How-do-I-serve-the-client and if you still have that question, read it again? https://github.com/LearnBoost/Socket.IO/wiki/How-do-I-serve-the-client
+14:10 < BronzeByte> nlogax, I understand your point: as the project is just a libary, lib makes sense. Though, lib is primary for compiled libaries or code written by others but implemented in your code, I would go for "src" as folder name :-)
+14:11 < `3rdEden> or simply said, got to your browser, to your page that has socket.io running. and change the path to `/socket.io/socket.io.js` TADA YOU HAVE THE CLIENT
+14:11 < BronzeByte> haha
+14:11 < BronzeByte> so true
+14:11 < creationix> substack: sup
+14:11 < horsehorse> dude, i read https://github.com/LearnBoost/Socket.IO/wiki/How-do-I-serve-the-client . i can load the file . the problem is that it's a wrong file
+14:11 < BronzeByte> socket.io server HOSTS THE FILES FOR TOU
+14:11 < BronzeByte> *YOU
+14:11 < horsehorse> ok
+14:12 < nlogax> BronzeByte: Makes sense. That's what I am used to in cabal packages too. This started from the old IRC-js and somehow turned into a rewrite, but things like folder structure remains the same :)
+14:12 < BronzeByte> do you wrap socket.io in your express?
+14:12 < `3rdEden> horsehorse IMPOSSIBLE! (as I wrote the socket.io file serving stuff)
+14:12 < BronzeByte> nlogax, ah, I see
+14:12 < horsehorse> BronzeByte: so, it means that it shares socket.io.js for the client . i just have to get it somehow? 
+14:13 < BronzeByte> horsehorse, socket.io is a http server with support for ajax, websockets and all the fancy stuff, as its http it can serve files too
+14:14 < BronzeByte> if you use the same server for socketio as to serve the HTML with then you can use <script src="/socket.io/socket.io.js"> or something
+14:14 < creationix> I see now why Chinese devs get do much done but we hear so little from them.  Things like google, facebook, twitter, youtube, and wikipedia are all blocked
+14:15 < BronzeByte> chinas government is shit :/
+14:15 < BronzeByte> the only thig they care is their poser
+14:15 < BronzeByte> *power
+14:15 < BronzeByte> they dont care about their people
+14:16 < horsehorse> BronzeByte: ok. the thing is that to work w it i need to use client script <script src="/socket.io/socket.io.js"></script>, and i can't get it. probably cuz i use express and it blocks it somehow?
+14:16 < BronzeByte> and most companies come to china only to suck out money
+14:16 < mmalecki> creationix: it's easy to walk around
+14:16 < creationix> mmalecki: yeah, I'm in a pretty urban part of Shanghai.  There are walkways everywhere
+14:16 < mmalecki> creationix: want to know how?
+14:17 < mmalecki> creationix: no, I mean, walk around the blocked websites
+14:17 < einaros> vpn, vpn, vpn, woo
+14:17 < BronzeByte> horsehorse, do express and socket.io servers listen on a different port?
+14:17 < creationix> oh, yeah, just use a vpn or for or anything with an encrypted tunnel
+14:17 < mmalecki> einaros: I prefer SOCKS proxy with SSH
+14:17 < BronzeByte> ^  me too
+14:17 < creationix> yeah, I have several VPS boxes in Texas
+14:18 < einaros> mmalecki: well you've just rolled your own vpn, then :p
+14:18 < creationix> I'll do that if the firewall gets annoying
+14:18 < mmalecki> einaros: yeah, lol
+14:18 < yawnt> woah that must suck
+14:18 < BronzeByte> RSA encrypted, your own box' ip, no logging, and trustworthy as you own it
+14:18 < yawnt> ipredator ftw D:
+14:18 < BronzeByte> and cull speed, and not shared
+14:19 < substack> creationix: ahoy
+14:19 < creationix> substack: what are you up to, going to bed or want to hack/talk about node stuff?
+14:20 < rodolfocaldeira> Hi everyone
+14:20 < rodolfocaldeira> quick question
+14:20 < rodolfocaldeira> I am just starting out with Node.js and I was wondering what would be the best approach to store user specific configuration settings for a module? 
+14:21 < guybrush> rodolfocaldeira: you may want to take a look at https://github.com/dominictarr/rc
+14:21 < substack> creationix: pretty sleepy and none of the lights in my room even work
+14:21 < substack> I'm in 1611
+14:22 < substack> the door is propped open because it's too dark otherwise
+14:22 < rodolfocaldeira> guybrush that is exactly what I was looking for. thank you 
+14:23 < guybrush> rodolfocaldeira: you are welcome
+14:33 < BronzeByte> substack, from what country do you origin?
+14:34 < substack> .us
+14:35 < BronzeByte> and you're in china right now?
+14:36 < substack> correct
+14:36 < dr0id> tell us more
+14:37 < dr0id> are you producing node modules with "Made in China" labels ?
+14:37 < BronzeByte> LOL
+14:37 < BronzeByte> substack, holiday, trip or work?
+14:38 < chrisjaure> hujs is going on http://www.hujs.org/
+14:38 < dr0id> wow I really like it
+14:40 < BronzeByte> java conference?
+14:40 < BronzeByte> *js
+14:40 < dr0id> http://www.hujs.org/images/speaker/substack.jpg - hahahah as always ;D
+14:40 < BronzeByte> where was i with my mind :-P
+14:40 < dr0id> I wonder whether he actually looks like that irl
+14:40 < dr0id> would be interesting
+14:41 < BronzeByte> ^  dat
+14:41 < BronzeByte> *that
+14:41 < dr0id> I like it anyway, his graphics are world class.
+14:42 < BronzeByte> like 90% of microsoft is chinese
+14:42 < draginx> https://github.com/durango/trainjs Here's my attempt at making ExpressJS into MVC :) If any of you would take 5 minutes of your time to briefly take a look at it that would be awesome :D It's not suppose to replace railwayjs or anything crazy like that. Just something I was playing with :)
+14:42 < dr0id> I'll make trackjs
+14:42 < dr0id> and someone can then take a shot at stationjs
+14:44 < spion> So... threads-a-gogo seems to be dead, huh
+14:44 < BronzeByte> draginx, please put some examples in the README ;-)
+14:45 < draginx> BronzeByte: will do :) I was more referring to the overall structure  / the initial stuff -- but yeah I'll flesh it out more :)
+14:48 < bradleymeck> substack: hows shanghai?
+14:49 < substack> bradleymeck: so many people
+14:49 < substack> and police
+14:49 < substack> police are EVERYWHERE
+14:49 < substack> and lots of people in uniforms just standing around doing nothing
+14:50 < substack> wasting precious resources
+14:50 < bradleymeck> substack: i want to go someday! im not sure they have enough resources to use at a time for the population
+14:52 < ashnur> substack: most probably their definition of "wasting resources" differ from yours :)
+14:53 < bradleymeck> mikeal: do you know of a lib that persists a bufferedstream to pipe multiple times (after ice ages as isaacs would put it) rather than just the first one?
+14:54 < substack> ashnur: under my criteria about 90% of the population is just sitting around doing nothing of consequence
+14:54 < substack> we could just keep paying them but tell them to stay at home instead
+14:55 < BronzeByte> nlogax, still here?
+14:55 < bradleymeck> substack for president!
+14:57 < nlogax> BronzeByte: Yes!
+14:59 < BronzeByte> nlogax, you should return the bot when you call the connect function
+14:59 < BronzeByte> and have some kind of connected state
+15:00 < BronzeByte> node.js does it like that for network clients and servers too ;)
+15:00 < ashnur> substack: i thoughts so :D / under my criteria everything is relative. for example drinking is usually timewasting, but it's not when you are with boring people and you can't leave
+15:00 < nlogax> BronzeByte: Oh, it should return itself when connecting, I'll have a look :)
+15:00 < BronzeByte> nlogax, same for channel joining
+15:00 < BronzeByte> nlogax, i havent tried yet, was inspecting the readme :-P
+15:01 < BronzeByte> is both possible?
+15:01 < BronzeByte> *both ways
+15:01 < nlogax> BronzeByte: Yeah, connect() returns the Client, and passes it to the callback. join() returns the Channel, and passes it to the callback too
+15:02 < BronzeByte> ah, thats useful
+15:02 < substack> ashnur: I'm not against pointless timewasting, but people should be free to pointlessly waste time instead of being compelled by circumstance
+15:12 < BronzeByte> nlogax, how to listen for incoming messages, not using .match
+15:13 < BronzeByte> like, all messages from a channel
+15:15 < nathan7> substack: I like you.
+15:16 < nlogax> BronzeByte: All chan messages are PRIVMSG, so you could for example do bot.match(irc.COMMAND.PRIVMSG, function(msg) { if (msg.from.name === "#somechan") { ... } });
+15:16 < BronzeByte> ok, thanks :-)
+15:17 < nlogax> BronzeByte: If you prefer you can do match("PRIVMSG", ..), the constants are there for lazy/forgetful people like me (autocomplete!)
+15:18 < BronzeByte> Thanks
+15:20 < BronzeByte> nlogax, what is user password? notthe nickserv one, right?
+15:21 < nathan7> BronzeByte: It is, on freenode.
+15:21 < nathan7> BronzeByte: Freenode will take pass or nick:pass
+15:22 < nlogax> BronzeByte: Yeah, that. 
+15:33 < WarheadsSE> irc from scratch ?
+16:04 < BronzeByte> nlogax, what parameters are assumed shen you enter minimal config?
+16:06 < nlogax> BronzeByte: Everything should be present. Except for the "comments" of course :)
+16:14 < BronzeByte> hmmm
+16:14 < BronzeByte> mmk
+16:16 < nlogax> Now that you mention it, it would be nice to just have a Map of default options, and update it with anything in the conf file
+16:29 < mynameis> anybody can point me to a working version of a video chat application using node.js ?
+16:29 < mynameis> can anybody*
+16:31 < mscdex> mynameis: if you use webrtc then you don't even need a server! ;-)
+16:31 < zomg> mynameis: http://bit.ly/Qd3UBu
+16:31 < mynameis> zomg sorry my question was wrong
+16:31 < mynameis> I'm working with a video chat application
+16:32 < mynameis> so i subconsciously typed video
+16:32 < mynameis> i meant
+16:32 < mynameis> just chat
+16:32 < zomg> So you want me to make another LMGTFY link for you but just without the "video" word?
+16:32 < zomg> :P
+16:32 < jocafa> what exactly are you wanting to do, mynameis?
+16:33 < mynameis> i've already google it there is a bunch of tutorials for chats out there
+16:33 < mynameis> however
+16:34 < mynameis> they're all deprecated code etc
+16:34 < mynameis> or doesn't work at all
+16:34 < mynameis> i'm low level on node.js
+16:34 < strk> why would out.join("\n") output literal '\n' sequence ?
+16:34 < strk> is it expected ?
+16:36 < guor> strk do you have a test case?
+16:37 < chesles> strk: if out = ['', '']
+16:37 < mynameis> okay i might use https://github.com/aaronblohowiak/Push-It
+16:37 < mynameis> looks like it does what I want it to
+16:37 < mynameis> and its scalable
+16:38 < mynameis> even better
+16:41 < cleos_frey> need some help: everytime I install a module that uses node-waf or node-gyp I get the following error --> https://gist.github.com/172e8409ace5b2e6cd21
+16:42 < cleos_frey> it says "mach-o, but wrong architecture" on the 5th line, but I'm not sure what to do about it
+16:44 < strk> guor: testcase could not reproduce, must be something else converting back from newlines to \n
+16:48 < jocafa> i see that 0.8.9 is out, with a v8 upgrade.  any ideas what's new in v8?
+16:50 < WarheadsSE> jocafa:  http://upstream-tracker.org/changelogs/v8/3.11.10/changelog.html
+16:50 < jocafa> thanks :)
+16:50 < WarheadsSE>  "v8 3.11.10 changelog"
+16:50 < WarheadsSE> simple google ;)
+16:50 < jocafa> sorry, my caffeine hasn't kicked in yet hehe
+16:52 < guor> the v8 changelog doesn't show the difference between node 0.8.8 and 0.8.9
+16:53 < guor> both use 3.11.10, only the patch number is different
+16:53 < jocafa> good to know
+16:53 < jocafa> only idle curiosity anyway though. no big deal
+16:53 <@isaacs> guor: https://github.com/joyent/node/blob/v0.8.9/deps/v8/ChangeLog
+16:54 <@isaacs> guor: but yor'e right, i think it was very minor
+16:54 <@isaacs> guor: for more details, you'll have to look at their actual commit history
+16:54 < guor> yup, back merged bug fixes
+17:02 < WarheadsSE> guor: true, but he asked for the difference in v8 ..
+17:26 < baudehlo> isaacs: do you know if there's a way to completely disable SNI in node? I can set the servername, but doesn't seem to be a way to disable it.
+17:40 < bradleymeck> baudehlo: all i see is process.features.tls_sni = false , but that doesn't truly disable it, it would still parse
+17:40 < bradleymeck> and thats beyond undocumented
+17:41 < baudehlo> I mean for https clients, so that might work.
+17:47 < trentm> Hi. v0.6.21 should be added to http://nodejs.org/changelog.html right? (http://blog.nodejs.org/2012/08/03/node-v0-6-21-maintenance/)
+17:48 < othiym23> isaacs: you around?
+17:55 < JGAui> anybody know of a good lib to handle tunneling to my localhost?  I've tried https://github.com/shtylman/localtunnel but it's very buggy
+18:13 < whitman> What do I need to compile Node.js on Windows?
+18:13 < jcrew> EyePulp: i'd think so, it was more rhetorical than anything
+18:14 < EyePulp> jcrew - context?
+18:15 < garrettwilkin> how do you tell how many clients are connected via socket.io?
+18:15 < garrettwilkin> does socket.io maintain a count?
+18:15 < `3rdEden> garrettwilkin just check your server connections count?
+18:15 < garrettwilkin> err how?
+18:15 < `3rdEden> http://nodejs.org/api/net.html#net_server_connections
+18:15 < garrettwilkin> sweet
+18:15 < bradleymeck> whitman: python2.7 gyp and MSVS steps should still work in the wiki
+18:16 < TooTallNate> whitman: see https://github.com/joyent/node/wiki/Installation
+18:16 < TooTallNate> whitman: "Building on Windows"
+18:16 < jcrew> EyePulp: i think it was the socket.io id discussion yesterday
+18:16 < whitman> TooTallNate, ahh thanks.  I thought it would be in the Wiki but skipped the installation page thinking it would to with installation, not compiling :)
+18:17 < TooTallNate> whitman: ya I'm with you on that one; it's misplaced
+18:17 < jcrew> someone was asking why the session id between express and socketio aren't the same, i suggested he use the id and then he wanted to know why he had to send his own unique id
+18:17 < EyePulp> jcrew - I have no recollection.  But I'll take your word for it. =)
+18:17 < EyePulp> ah
+18:17 < whitman> Do I need MSVS or can I use VC Express or similar?
+18:18 < AvianFlu> whitman: the express version will work fine
+18:18 < AvianFlu> it's what I use on the windows machine that I don't like to admit I have
+18:18 < AvianFlu> OH WAIT WHOOPS
+18:18 < whitman> AvianFlu, thanks.
+18:20 < bradleymeck> AvianFlu: its ok, we all need video games sometime
+18:21 < mmalecki> I have a Windows machine too :(
+18:22 < whitman> My main machine at home runs Windows for gaming.  Got a load of Linux machines around though and main machine at work is Linux.
+18:23 < pppaul> hey peoples
+18:24 < pppaul> i'm using express to serve files
+18:24 < pppaul> one of my files is an iframe with params
+18:24 < pppaul> this is causing problems
+18:24 < garrettwilkin> `3rdEden: so socket.io is doing its communication via TCP, and therefore I can use the core net module to determine the number of connections?
+18:25 < `3rdEden> garrettwilkin the HTTP server inherits from the net.Server
+18:25 < `3rdEden> so everything that is on the net.Server is available on your regular http server
+18:25 < garrettwilkin> oh, neat
+18:25 < garrettwilkin> hmmm, I'm using flatiron.  i wonder if that exposes the HTTP server object to me
+18:25 < garrettwilkin> it must...
+18:26 < mmalecki> garrettwilkin: app.http.server I think
+18:26 < mmalecki> but double check
+18:26 < garrettwilkin> I've never used the net module :)  thanks for explaining it!
+18:26 < garrettwilkin> i learn so much in IRC ^5s all around
+18:26 < `3rdEden> mmalecki garrettwilkin it's just app.server
+18:26 < mmalecki> `3rdEden: INTERESTING
+18:27 < `3rdEden> mmalecki FOSHO
+18:33 < cpsubrian> isaacs: I'm trying to use read-package-json without any console logging.  It seems as though you allow for that through optional npmlog dependency. In the git repo, package.json looks fine, but when I install v0.1.5 npmlog is listed as a regular dep rather than an optional dep.
+18:35 < garrettwilkin> `3rdEden: so where's the list of events that you can listen to for sockets?
+18:36 < garrettwilkin>   I see that i can listen for connect…. like this         var socket = io.connect('http://localhost/');  socket.on('connect', function () {
+18:36 < garrettwilkin> but what other events can i listen to?  id there a socket.on('disconnect'?  I was just trying to research this in the library and i couldn't find the answer
+18:36 < `3rdEden> garrettwilkin yup
+18:36 < garrettwilkin> okay
+18:37 < `3rdEden> the events are also listed in the README.md files in the repo's
+18:37 < garrettwilkin> `3rdEden: really?  bah… i better find it
+18:37 < `3rdEden> garrettwilkin and the wiki: https://github.com/LearnBoost/socket.io/wiki/Exposed-events
+18:38 < garrettwilkin> `3rdEden: thanks.  why didn't I click on the wiki??? oops
+18:39 < garrettwilkin> though this seems more like a question than an answer -->  "socket.on('disconnect', function() {}) - fired when the socket disconnects? Not sure when exactly, i.e. will it only fire if client initiates disconnect or also if server initiates disconnect. Does it fire on unexpected network failure, or a mobile device losing connection?"
+18:39 < garrettwilkin> time to experiment i guess
+18:40 < `3rdEden> garrettwilkin it fires when the connection between the client & server is lost
+18:40 < `3rdEden> so network failure also triggers it
+18:41 < garrettwilkin> yea i see that there's the disconnect even on the socket object too
+18:41 < garrettwilkin> *disconnect event
+18:41 < cpsubrian> isaacs: Simple solution is obviously to just override readJson.log in my module, but was mostly just confused about the deps changing
+18:41 < garrettwilkin> seems like what i want to use
+18:55 < tnorris> bnoordhuis: sorry to bug you again, but have a sec to look at this: https://gist.github.com/3709064
+18:56 < tnorris> ah, freak. nm
+18:56 < tnorris> forgot to add the process.stdin.resume() at the top of input.js. so stdin will only go to the child processes.
+19:03 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+19:13 < diminoten> I know I asked yesterday but maybe someone new is available: how do you enable session caching for https?
+19:13 < diminoten> and no, this won't be exposed to the Internet
+19:13 < diminoten> I've read it exists on the dev mailing list
+19:13 < diminoten> but they didn't say how :(
+19:18 < astropirate> Are there any design patterns for handing application state (persisted to a database) for multiple node.js instances? The way I understand it, if I implement some IPC between the different node.js instances, the application state will be only take effect the next time the event loop starts
+19:18 < astropirate> leaving some time where the application is in limbo
+19:18 < astropirate> with different nodes in different states
+19:23 < kokotron> would you all say socket.io is the best available option for a realtime user experience and connection concurrency?
+19:23 < bradleymeck> astropirate: that is true of all distributed systems such as multi-process systems and thread-local environments too. if the state is in the database you are going to want to just query the database and account for any possible race conditions by denormalizing data into a single document able to inform your process for any request in one query
+19:23 < kokotron> i'm worried about websocket compatibility, i've read that it can trigger firewalls, virus protection clients, etc.. (i am not too concerned about browser version compatibility because i feel that issue will solve itself within a reasonable period of time)
+19:24 < kokotron> for the time being i've only been using websockets, but became concerned that i may be forced to use socket.io (or something like it) because of compatibility issues - and if that is the case, i may as well just start using socket.io sooner than later
+19:24 < bradleymeck> astropirate: its that or your run updated processes alongside old ones and kill the old ones when appropriate
+19:26 < astropirate> bradgignac, are you saying I should query the database for the state information every time I need that information. Or to simply have the node instance updating the state  inform the other instances that the state has changed and they should pull the fresher one from the database
+19:27 < bradgignac> astropirate: i think you pinged the wrong person
+19:27 < bradgignac> :)
+19:27 < astropirate> WOOPs
+19:27 < astropirate> sorry
+19:27 < astropirate> bradleymeck ^^
+19:29 < bradleymeck> astropirate it depends, i would generally use a db on the same machine if its not cross network for my own sanity unless i had to do very high perf computing in which case would have processes only be able to do map reduce queries or be handled by load balancers to allow for multiple versions to be active during propagation of state
+19:32 < garrettwilkin> what javascript libraries to you guys use for updating the DOM?
+19:32 < bradgignac> jquery
+19:32 < garrettwilkin> All I've been doing lately is working with D3.js… so I'm using that library to update a SVG 
+19:33  * jocafa pets d3
+19:33 < garrettwilkin> bradgignac: jquery is huge right?  is there a trimmed version i should use if i just want basics?
+19:34 < garrettwilkin> jocafa: huh?
+19:34 < jocafa> i've been doing a lot of stuff with d3 lately for work
+19:34 < jocafa> i *tolerate* jquery, 'cause i'm using Backbone
+19:35 < astropirate> thanks for advice bradleymeck 
+19:35 < ccowan_> I'm curious... where did all this jQuery hate come from?
+19:35 < astropirate> mordor
+19:35 < bradgignac> garrettwilkin: i guess you would have to define huge.
+19:35 < garrettwilkin> jocafa: whaaat… i would love to get paid to do d3!  here's my prototype site: http://hackerclub.jitsu
+19:35 < garrettwilkin> check out the force viz
+19:36 < bradleymeck> ccowan_: it comes from mv* attempts
+19:36 < garrettwilkin> I love the idea of combining D3 with socket.io
+19:36 < jocafa> you left out a dot ;)
+19:36 < bradgignac> garrettwilkin: it's not that huge in the scheme of thing
+19:36 < jocafa> what i've been working on with d3:  http://moneydesktop.com/finovate/  (the web interface is all backbone + d3)
+19:36 < garrettwilkin> jocafa can i use backbone instead of jquery?  
+19:37 < ccowan_> bradleymeck: you mean because people have tried creating MVC-like sites with it and failed?
+19:37 < jocafa> some of backbone's functionality requires jquery or zepto
+19:37 < ccowan_> right... 
+19:37  * jocafa shakes his fist at jquery
+19:37 < ccowan_> buy what is it about jQuery that makes you shake your fist?
+19:38  * ccowan_ can't type today
+19:38 < jocafa> garrettwilkin:  wheeee force directed layout with websockets
+19:38 < jocafa> pretty cool
+19:38 < garrettwilkin> haha yea
+19:38 < garrettwilkin> so… can i work for your company?
+19:38 < garrettwilkin> this product looks flippin sweet
+19:38 < garrettwilkin> and fun
+19:38 < jocafa> mainly that jquery is really huge and not very well designed… it kindof evolved
+19:38 < bradleymeck> ccowan_: because forcing the model into the view is pretty much how jQuery works, so ppl doing MVC or trying to separate them cry
+19:39 < jocafa> we *are* hiring
+19:39 < garrettwilkin> jocafa: yes please!
+19:39 < jocafa> we JUST presented that interface at Finovate… like an hour ago
+19:40 < jocafa> i reaaaaally wish we'd drop ie8 support
+19:40 < garrettwilkin> jocafa: okay so make me your apprentice & we will rock D3.js + Node awesomeness
+19:40 < jocafa> we don't use node for anything at the moment :(
+19:40 < garrettwilkin> yea, that must totally eff things up
+19:40 < jocafa> working on it though!
+19:41 < jocafa> yeah i have to rely on raphael for a bunch of stuff and i can't fully leverage d3's awesomeness :(
+19:41 < garrettwilkin> so… i can't really tell, is D3 totally tied to SVG? or can it work with other stuff?
+19:42 < jocafa> each bubble is an instance of a particular backbone view subclass… within each of those is a pie view of sorts.  i'm piping the results of d3's goodies over to raphael to get it to draw
+19:42 < ccowan_> bradleymeck: hum... I guess I don't see how that's the fault of jQuery. It sounds like you need a different framework that does what you want. But that doesn't change the fact that jQuery does a good job at a bunch of other things.
+19:43 < jocafa> so i can't use the cool .enter()/.exit() stuff with the pie slices, but everything else is just divs, so it works fine
+19:43 < garrettwilkin> what is raphael?
+19:43 < jocafa> http://raphaeljs.com/
+19:43 < bradleymeck> ccowan_: indeed, but that is the main reason ppl argue about jquery and global shared state pollution from plugins, but thats not on jQuery. jQuery and in particular jQueryUI make state management between DOM and JS extremely boilerplate based
+19:43 < garrettwilkin> i see the careers page is all for Utah.  I'm looking for remote work from Maine
+19:44 < jocafa> it's basically like a wrapper layer around svg and vml
+19:44 < jocafa> i'm not sure what our remoting requirements and policies are
+19:44 < jocafa> we're in utah though
+19:45  * jergason waves from Provo, UT
+19:45 < jergason> i.tv does tons of node stuff if you are interested :)
+19:46 < ccowan_> I guess the thing that seems to drive me a little nutty lately is the framework hate that is goign around. Sure I can write vanilla.js but then I have to account for the 10,000 differece between IE 8-10, Firefox, Chrome and Safari. In an ideal world we should beable to use the language exactly the same across all browsers without having to write a shit ton of edge cases.
+19:46 < jocafa> garrettwilkin:  see also: http://webmonarch.github.com/d34raphael/
+19:46 < bradleymeck> single letter domains, how long ago did they grab that… hmmm
+19:46  * jocafa waves southward toward jergason
+19:46  * wailupe2k waves from American Fork 
+19:46 < garrettwilkin> wow thats cool
+19:46 < ccowan_> a perfect example is []/indexOf
+19:46 < ccowan_> oops
+19:46 < jocafa> haha sweet
+19:46 < ccowan_> [].indexOf()
+19:46 < garrettwilkin> i noticed that D3 said that it had no compatibility layer
+19:47 < bradleymeck> ccowan_: jQuery is amazing at DOM and utilities, not so much with abstracting away from DOM
+19:47 < jocafa> i'm in riverwoods in provo
+19:47 < jergason> whoa, didn't know there were so many UT folks
+19:47  * wailupe2k working remotely for about.com / NYT from UT .. good to see UT representing ! 
+19:47 < bradleymeck> ccowan_: jQuery by far is the winner in the DOM wars
+19:47 < jocafa> garrettwilkin:  yeah, d3 doesn't support crappy browsers hehe
+19:47 < jocafa> yeah no kidding. small world hehe
+19:48 < jocafa> there's a LOT of other good stuff in d3 that i *can* use though, even in ie8
+19:48 < garrettwilkin> so people hate jquery but have to use it cause there isn't a better replacement?
+19:49 < AustinYun> so as far as testing goes, i'm kind of lost as to how to set up unit tests for a blog engine/webserver
+19:49 < garrettwilkin> jocafa: why aren't you guys using node?
+19:49 < jocafa> well i prefer mootools, or just drop IE and use standards hehe
+19:49 < garrettwilkin> seems like a perfect fit for what you're doing
+19:49 < AustinYun> my best guess right now is to run an example and use request to check things out and verify that the pieces work?
+19:49 < ccowan_> Dropping IE is awesome till the client calls and says "WTF, you page is broken!"
+19:49 < jocafa> garrettwilkin:  we're a ruby shop for the most part.  all of our services talk over protobuf, and the protobuf libs for node are not where they need to be yet… i've been working on one in-house though
+19:50 < jocafa> i can deal with ie9 though
+19:50 < garrettwilkin> oh i see
+19:50 < jocafa> it's not *entirely* garbage
+19:50 < ccowan_> yeah... IE9 is a dream compared to IE8
+19:51 < ccowan_> IE8 is piles of dog shit piled on top of piles of cat shit piled on top of vomit
+19:51 < garrettwilkin> um yuck
+19:51 < jocafa> ccowan_:  you are too kind.
+19:52 < stagas> is npm having issues?
+19:52 < ccowan_> jocafa: that was my censored version
+19:52 < BennyLava> about the same thing as failQuery then!
+19:54 < jocafa> btw utahns, come check out the local hackerspaces: TheTransistor in Provo, TheDarlington in Midvale, and MakeSLC in, well, SLC.
+19:55 < jocafa> http://thetransistor.com  http://makeslc.com  and  http://utahmakers.com
+19:55 < jocafa> :)
+19:55 < jocafa> </plug>
+19:56 < system64> I have installed socket.io as global package, still get socket.io package not found
+19:57 < garrettwilkin> no kidding… 
+19:58 < garrettwilkin> jocafa:  i organize this group : http://mainehackerclub.tumblr.com  we are gearing up (literally buying gear) to do arduino hacking).
+19:58 < bradleymeck> system64: global packages will not be found if a simple require is done, global means you want the bins not it to be available to any folder
+19:59 < jocafa> sweet :)
+20:00 < system64> bradleymeck: Do I need to install packages for every project?
+20:01 < bradleymeck> system64: that or link it, either way you really want to do that anyway for version problems
+20:01 < bradleymeck> global shared modules == updates break stuff
+20:01 < system64> Thanks, I did npm install -g socket.io So where did it install it?
+20:02 < deviantgeek> system64: in userdata
+20:02 < deviantgeek> if you are on windows
+20:02 < bradleymeck> where ever your node prefix is $NODE_PREFIX/lib/node_modules/socket.io
+20:02 < deviantgeek> if you are uninstalling make sure you use -g
+20:02 < system64> so that installation is useless?
+20:03 < bradleymeck> system64: if it didn't include a bin its useless as a global install, always
+20:03 < garrettwilkin> `3rdEden: looks like app.server.connections is 2x the number of actual clients in my situation
+20:04 < garrettwilkin> maybe the static file server is a source of connections too?
+20:08 < `3rdEden> garrettwilkin it's every connection on your server
+20:09 < garrettwilkin> gotcha
+20:09 < system64> Anyway to check all the globally installed packages?
+20:09 < garrettwilkin> `3rdEden: so i want to know the number of clients, cause i want to tell them all how many people are on the page
+20:10 < garrettwilkin> i guess i could just divide by two
+20:10 < garrettwilkin> though if this is also an HTTP API endpoint, its possible that i could have a connection for serving the API response
+20:10 < garrettwilkin> right?
+20:10 < jp232> system64: npm list -g ?
+20:11 < `3rdEden> garrettwilkin you can also do: io.sockets.clients().length
+20:11 < wailupe2k> jocafa: thanks for the link to thetransistor, looks cool. 
+20:11 < jocafa> np
+20:11 < garrettwilkin> that's more what i want
+20:11 < `3rdEden> garrettwilkin but this isn't 100% accurate either..
+20:11 < garrettwilkin> oh...
+20:11 < garrettwilkin> when is it off?
+20:11 < jocafa> tT is kinda cramped and we may be moving soon, but it's a pretty cool place
+20:12 < `3rdEden> garrettwilkin some sockets might be leaking here and there
+20:13 < mmalecki> keep alive
+20:13 < mmalecki> sockets can be keep alive
+20:13 < system64> I'm running an phonegap app that uses socket.io. I have multiple pages and each page asks user for room name to connect to.
+20:14 < context> if you are gonna use socket.io why not make the whole app single page
+20:15 < system64> I need to pass some parameters to pages
+20:15 < system64> After connecting for the first time, I'm doing socket.leave and socket.join when a person join new room
+20:16 < system64> But all the update requests are getting stacked up. I keep getting updates from the room I have left
+20:17 < system64> I'm using io.sockets.in.room(roomName) for showing updates
+20:19 < busyrich> hello Node JS world!
+20:20 < russfrank> hello
+20:21 <@isaacs> busyrich: yo
+20:21 < busyrich> what is going on in here?
+20:21 < russfrank> we are using callbacks in here
+20:22 < busyrich> message("hello node JS World!", function(status) { console.log(status); });
+20:22 < wailupe2k> russfrank: lol 
+20:32 -!- mode/#Node.js [+o bnoordhuis] by ChanServ
+20:33 -!- bnoordhuis changed the topic of #Node.js to: node.js - latest stable is v0.8.9 - http://nodejs.org/dist/v0.8.9/
+20:33 -!- mode/#Node.js [-o bnoordhuis] by bnoordhuis
+20:49 < owen1> if include node_modules in the git repo, does it mean the contributers of my project don't need to run npm install? does it also apply to native extentionss?
+20:50 < busyrich> I would think so, but your repo could get bloated
+20:50 < owen1> busyrich: yeah
+20:50 < busyrich> we dont include node_modules in our repos
+20:53 < busyrich> but any modules that require compliation will already be compiled
+20:54 < tnorris> in lib/fs.js line 34 it looks like Stream is called redundantly from the require(), if I understand the Stream object properly.
+20:54 < busyrich> as long as the OS is that same
+21:03 < diversario> Is bcrypt still (or already) most used binary module for password hashing?
+21:17 < illourr> Is there anyone making something like WAMPserver for nodejs? maybe called WEMNserver?
+21:17 < illourr> or WEN
+21:17 < BennyLava> :(
+21:17 < illourr> lol
+21:18 < guybrush> illourr: node runs on windows
+21:18 < illourr> i just like the interface wamp gives you for your projects and what not.
+21:18 < illourr> was curious
+21:18 < guybrush> define interface
+21:20 < guybrush> like require('http').createServer(require('connect').static(__dirname)).listen(3000) ?
+21:20 < illourr> the server configuration, tools, your projects, . etc page
+21:20 < illourr> the default page for localhost
+21:20 < guybrush> yes node is different
+21:20 < illourr> yes i know
+21:20 < ACK__> hey how to implement twitter follow feature in app
+21:20 < mbalho> put a bird on it
+21:21 < ACK__> buino
+21:21 < ACK__> no
+21:21 < ACK__> a real follow
+21:21 < ACK__> just like quora has
+21:21 < ACK__> user can folow question
+21:21 < ACK__> users
+21:21 < ACK__> or whatever
+21:23 < guybrush> illourr: i dont mean it like "go away with your idea, it sucks", i just want to express my opinion to everyone :p i.e. anti-framework
+21:25 < ACK__> how to follow users
+21:25 < ACK__> in app
+21:28 < Djdclarke> Hey guys. Has anyone experienced issues with any form of http.request & ENOTFOUNDs. It seems whenever I test a large batch of URLs the first few go fine and dandy - but then start giving ENOTFOUND errors. I've been scraching my head all day on this.
+21:30 < iateadonut> i've got a multi-client server - i'd like to install this just in my home directory without using sudo
+21:32 < ACK__> see here http://ruby.railstutorial.org/chapters/following-users#top -> following tutorial for rails,    but to do it in node
+21:34 < chesles> ACK__: implementing "following" is more of a database/data model issue than a language-specific issue
+21:35 < ACK__> <chesles> i had simple app in node and express how to implement Follow in app
+21:41 < draginx> how do I send a user to a 404 page with expressJS 3?
+21:41 < BennyLava> #express
+21:42 < draginx> oh i didnt evne realize there was a channel for that
+21:42 < tnorris> can anyone help me figure out the following: http://pastebin.com/3nsJ6tgK
+21:42 < tnorris> all input goes to stdout, but no data events are detected on the stream.
+21:43 < mbalho> line 49 is effed up
+21:45 < tnorris> mbalho: whoa, strange. didn't copy over correctly.
+21:45 < tnorris> here's the corrected: http://pastebin.com/5yFQQ53U
+21:46 < mbalho> do conn.on('data') and log it out
+21:47 < tnorris> mbalho: conn.on('data') correctly detects data events.
+21:51 < tnorris> mbalho: you have any ideas why this is happening?
+21:51 < mbalho> tnorris: you never connect stream
+21:52 < tnorris> mbalho: what do you mean?
+21:52 < mbalho> tnorris: stream = net.Socket({ fd : 0 }), but it never gets connected to anything
+21:53 < tnorris> mbalho: so you think I should `stream.connect(<path-to-client-socket>)`?
+21:54 < mbalho> well it depends on what you're trying to accomplish
+21:54 < mbalho> but im pretty sure that if you pipe to an unconnected stream nothing will happen
+21:55 < tnorris> the end goal is to pass the Socket stream to a child_process's stdin, but since no data events are being captured none are being sent.
+21:55 < mbalho> do conn.pipe(childprocess.stdin)
+21:55 < mbalho> or conn.pipe(process.stdout)
+21:56 < tnorris> mbalho: that does work
+21:56 < mbalho> or conn.pipe(new CustomWritableStream())
+21:57 < tnorris> i'm trying to do some crazy manipulation by creating a Socket stream and swapping it between different child processes (re-write their stdin on the fly)
+21:58 < tnorris> since you can pass a Stream object in the stdio of a child_process, and can rewrite them later, I want to see if it's possible to redirect input on the fly.
+21:59 < tnorris> mbalho: what do you mean about "CustomWritableStream"?
+21:59 < tnorris> I tried using the Stream object directly, but haven't been able to get it to work.
+22:00 < mbalho> see the XHRStream snippet http://maxogden.com/node-streams
+22:00 < mbalho> or actually the Simplified writable stream snippet
+22:11 < matbee> Anyone know how it'd be possible via websockets to click on an HTML Element, and have the same HTML Element available on another connected client
+22:11 < matbee> If the HTMLElement doesn't have an id or anything
+22:12 < sechrist> you can dump it's html on the client that clicked it and replicate that html on another client
+22:12 < sechrist> if that's what you mean
+22:12 < sechrist> css might get hairy though
+22:12 < stagas> sounds like a bad idea
+22:12 < matbee> LOL
+22:13 < matbee> Well, say I modify text in <span>fff</span> and this span exists on both clients... could it be possible to identify the "same" span on both clients
+22:13 < sechrist> oh, yea
+22:14 < sechrist> optimizely generates jquery selectors based on what you click on so I know this is possible
+22:14 < sechrist> granted not very good selectors
+22:14 < tnorris> mbalho: awesome read. still can't pipe a net connection to a Stream and detect the data events.
+22:15 < matbee> I was thinking of possibly keeping a count of the index of the htmlelement in the dom
+22:15 < matbee> and just grabbing the same element with that count
+22:15 < sechrist> IE treats text nodes as dom nodes I think so you may have hell with that
+22:15 < BennyLava> ..
+22:15 < BennyLava> Text nodes are DOM nodes, duh
+22:16 < matbee> lol
+22:16 < mbalho> tnorris: do conn.pipe(require('concat-stream')(function(err, data){}) and log it out and then go look at the source code of concat-stream to see how it works :)
+22:16 < matbee> Well I'll see if I can do it my way
+22:16 < sechrist> they're not as clearly defined in webkit inspector though -- so the index may be different
+22:16 < matbee> hmm
+22:16 < tnorris> mbalho: will do. thanks
+22:16 < matbee> I'll just ban IE then, I guess
+22:17 < sechrist> if it's your code just add in some anchor tag to use
+22:20 < matbee> Yeah, I'll figure something out
+22:56 < zweii> :)
+22:56 < badem4o> :)
+22:56 -!- mode/#Node.js [+o piscisaureus__] by ChanServ
+22:58 < mscdex> node.js rules!
+22:58 < spion> that it does
+22:59 < spion> it seems like my project to really make node work like in that wallpaper is getting closer to completion 
+23:00 < astropirate> spion, what u talkin about willis?
+23:00 < spion> astropirate, this one, http://nodejs.org/images/logos/nodejs-1024x768.png :)
+23:00 < astropirate> o_O
+23:01 < tnorris> what's the object type for child_process.stdin when you initialize with { stdio : 'pipe' }?
+23:02 < spion> tnorris, a stream?
+23:06 <@konobi> substack: what does chdir do?
+23:06 < substack> konobi: pushd .; cb(); popd
+23:07 < tnorris> spion: I thought so, but I'm getting some huge performance differences between two relatively similar methods: http://pastebin.com/EgzVvrGA
+23:07 <@konobi> substack: cool... i'm assuming it deals with multiple I/O events happening simultaneously?
+23:08 < spion> tnorris, a stupid question perhaps - are you sure its not because of setEncoding?
+23:09 < tnorris> spion: heh, i'm testing that now.
+23:09 < tnorris> also there was an error in the code. one sec
+23:09 < tnorris> spion: heh, looks like it was setEncoding....
+23:10 < tnorris> how could I have over looked that.
+23:10 < spion> happens :)
+23:11 <@konobi> substack: by which i mean you're not going to get into a strange state if you have multiple chdir calls all with different callbacks which happen at different times, etc.
+23:11 < substack> konobi: I have no idea
+23:12 <@konobi> mmm...
+23:19 < tnorris> anyone know why a child_process would self terminate when .on('end') ?
+23:21 < klaemo> hey :) any v8 gurus around?
+23:22 < blup> i'm looking to modifying the behavior of certain methods (sort of like decorators in python), mostly for checking requirements.. is there a common pattern?
+23:23 < CIA-118> node: Felix Böhm master * rf5c68b2 / benchmark/url.js : bench: add url parser benchmark - http://git.io/otlhnA
+23:23 < CIA-118> node: Ben Noordhuis master * r10ba95c / benchmark/url.js : bench: improve url parser benchmark - http://git.io/U-Au9w
+23:24 < bnoordhuis> klaemo: yes
+23:26 < klaemo> hi bnoordhuis :) when running with --trace-bailout, what does stuff like: '"SUB": call to a JavaScript runtime function' mean?
+23:27 < CIA-118> node: Bert Belder openssl-asm * rbaefd24 / (4 files in 3 dirs): openssl: use optimized asm code on x86 and x64 (+5 more commits...) - http://git.io/tOrpIQ
+23:28 < bnoordhuis> klaemo: that your js code is calling something that's implemented in c++
+23:28 < bnoordhuis> v8 doesn't know how to optimize that
+23:29 < klaemo> ok, that's what i thought. but what is "ADD" and "MUL" for example? i guess, addition and multiplication, but why would v8 bail out on that?
+23:31 < bnoordhuis> klaemo: you probably have a 'foo = bar() - baz()` expression somewhere where either bar or baz is a c++ function
+23:32 < tnorris> anyone know why a child_process would terminate when it receives a process.stdin.on('end')?
+23:32 < klaemo> bnoordhuis: interesting! thanks :) and "SUB"?
+23:33 < bnoordhuis> klaemo: subtraction, i.e. a - b
+23:34 < klaemo> bnoordhuis: *facepalm* of course
+23:34 < bnoordhuis> :)
+23:34 < klaemo> bnoordhuis: can I bug with one more thing?
+23:34 < bnoordhuis> klaemo: sure
+23:39 < klaemo> bnoordhuis: i noticed that one of my methods gets deoptimized for some inputs -> https://gist.github.com/3710789 what could be the reason?
+23:40 < bnoordhuis> klaemo: at a guess, either num, decimals or this.precision is not what v8 expects it to be
+23:41 < bnoordhuis> klaemo: that could happen if, for example, this is an object that you mutate (i.e. extend with new properties)
+23:42 < bnoordhuis> klaemo: v8 adds a kind of implicit (typeof(this) === 'internal-class-1337') check at the top of your function
+23:42 < Djdclarke> Grr. Fracking enotfound error. I have no idea why DNS is failing this much :(
+23:42 < bnoordhuis> if it turns out that typeof(this) is something else, it'll deoptimize your function
+23:43 < klaemo> bnoordhuis: i see, the object itself doesn't change, i don't think. the input num could be some crazy float every once in a while
+23:44 < bnoordhuis> klaemo: yep, that would trigger it too
+23:44 <@konobi> there's also bigint/bignum npm libraries that might help
+23:47 < klaemo> bnoordhuis: does ";;; Deferred code @40: number-tag-d" tell us anything?
+23:47 < CIA-118> libuv: saghul master * r3f2479e / (4 files): unix: remove __read_mostly macro - http://git.io/QLIcgw
+23:48 < CIA-118> libuv: Saúl Ibarra Corretgé master * rb7047d6 / (4 files): unix: remove __read_mostly macro - http://git.io/MGLZ9Q
+23:50 < Djdclarke> Hey guys. Has anyone experienced issues with any form of http.request & ENOTFOUNDs. It seems whenever I test a large batch of URLs the first few go fine and dandy - but then start giving ENOTFOUND errors. I've been scraching my head all day on this.
+23:50 < bnoordhuis> klaemo: that's a 'is double?' check
+23:51 < Djdclarke> About 200 out of 2000 sites I'm loading fail with ENOTFOUND, but they load fine in Curl and ping fine
+23:51 < CIA-118> node: Bert Belder openssl-asm * r5c79a82 / (4 files in 3 dirs): openssl: use optimized asm code on x86 and x64 - http://git.io/HwPfbw
+23:52 < klaemo> bnoordhuis: alright, thanks a lot. :) now i know i'm on the right track and have something to play with until i fall asleep ;)
+23:52 < bnoordhuis> klaemo: happy to help, have fun :)
+23:56 < Djdclarke> Hmm. Near jumping of a bridge with this one! :P {[Error: queryA ENOTFOUND] code: 'ENOTFOUND', errno: 'ENOTFOUND', syscall: 'queryA' } 
+23:56 < Djdclarke> But the URL loads fine in curl
+23:57 < bnoordhuis> Djdclarke: you're probably talking to a flaky dns server
+23:57 < tnorris> bnoordhuis: mind helping me with one last thing, line 24: https://gist.github.com/3710674
+23:57 < spion> here is my slightly quirky but hopefully neat project to make node usage look like its wallpaper, https://github.com/spion/stractory :)
+23:58 < bnoordhuis> tnorris: what's the issue?
+23:58 < Djdclarke> bnoor, that is what I thought - but I tried even google dns and opendns - obviously I spose the next stage is to try setup a BIND and see if that helps
+23:59 < tnorris> bnoordhuis: I thought I'd be able to create a single stream, pipe to it, and pass it between processes.
+23:59 < tnorris> doesn't seem to be working that way.
+23:59 < spion> its still alpha (the core mostly works, but there are no convenience stragent-creation functions and a couple of convenience getter functions are also missing)
+23:59 < tnorris> when I pass the stream to a new process, it uses it to create another stream that works differently.
+--- Log closed Thu Sep 13 00:00:07 2012

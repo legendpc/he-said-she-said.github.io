@@ -34,7 +34,7 @@ module.exports = function() {
     shell.mkdir(options.logdir);
   }
 
-  urls.slice(0, 84).forEach(function(url) {
+  urls.slice(0, 90).forEach(function(url) {
     if (!shell.test('-f', fname(url))) {
       console.log('fetching', url);
       q.push(url);
