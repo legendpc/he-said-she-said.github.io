@@ -1,0 +1,1646 @@
+--- Log opened Thu Sep 20 00:00:20 2012
+--- Day changed Thu Sep 20 2012
+00:00 < context> ehevutov: uhh js has regex built in
+00:00 < LouisT> Anyone here use node-mongodb-native? I'm reading a file line by line and converting it to an object, then using collection.update() to store it, but when update is called it seems to keep everything in memory. I don't have near enough RAM to do all the files I need because of this, is there something or does someone have any ideas on how to fix this issue?
+00:01 < EhevuTov> context, yes, but I need to interact with a csv file and I'm also lazy
+00:04 < dmachi> LouisT what is kept in memory? is the object that you read from the file a single document in mongo or is it an array object that you turn into individual docs?
+00:05 < LouisT> dmachi: it's not an array, I use a fd to read each line when I need it, the only time memory seems to be used up is when i make the collection.update() call
+00:05 < AAA_awright> draginx: How much module development do you do?
+00:05 < EhevuTov> LouisT, I'd do a batch update if you can
+00:05 < draginx> AAA_awright: as of recently, a significant amount :/ why whats up?
+00:06 < dmachi> LousT: each line is a single object then?
+00:06 < dmachi> can you pastebin that loop?
+00:06 < LouisT> dmachi: yes, but i don't think it's the objects that are doing it
+00:06 < LouisT> sec, i'll run it without the collection.update() call
+00:07 < EhevuTov> LouisT, is there a batch_commit that you can do?
+00:07 < LouisT> EhevuTov: not that i can see
+00:07 < dmachi> just curious as to how you were iterating over and what you were sending
+00:07 < EhevuTov> curious too
+00:07 < dmachi> you can do a batch
+00:07 < LouisT> dmachi: using the update call?
+00:07 < EhevuTov> preferable to do a batch of a certain size
+00:09 < EhevuTov> LouisT, post your code. I'm wondering if you're updating everything to just one big document, rather than individual docs
+00:09 < dmachi> inserts or updates here?
+00:11 < LouisT> EhevuTov, dmachi http://thepb.in/505a5ee088b0853b23000004
+00:13 < EhevuTov> LouisT, what process is using your memory resources when you do this
+00:13 < LouisT> EhevuTov: what do you mean?
+00:14 < EhevuTov> LouisT, I thought you mentioned that some process is using a lot of memory
+00:14 < LouisT> node is
+00:15 < LouisT> Mem:           512        501         10          0          0          0
+00:15 < LouisT> -/+ buffers/cache:        501         10
+00:15 < LouisT> I recently had it on a server with 8GB of ram, with reading 4 files it used 2.5GB of that..
+00:16 < EhevuTov> instead of `var line` in your while loop, maybe place it outside. I could be wrong, but you're making a new line variable on foreach line
+00:16 < EhevuTov> and you don't delete it. I'm not sure if the scope of Javascript cleans that up or not
+00:17 < CoverSlide> no, actually you're not creating a new variable each loop
+00:17 < EhevuTov> LouisT, does that make sense? I'm not a JS expert though
+00:17 < dmachi> LouisT is that FileReader class you are using really reading the file at that point or is it just spitting out the next line from a buffered stream?
+00:18 < EhevuTov> CoverSlide, is that because JS is function scope?
+00:18 < LouisT> dmachi: moment
+00:18 < CoverSlide> yes
+00:18 < LouisT> dmachi: http://thepb.in/505a60ae88b0853c23000001
+00:19 < timtim> ciao a tutti
+00:19 < timtim> !list
+00:22 < LouisT> dmachi: i've done tests without the collection.update() call and it uses hardly any memory compared to with it
+00:22 < EhevuTov> LouisT, i have to go, but good luck with that. If you ever see me again, I'd enjoy knowing how you fix it
+00:22 < ChrisPartridge> LouisT: how big are the files?
+00:23 < EhevuTov> good call. Maybe the parser is loading the files in mem instead of streaming?
+00:23 < LouisT> i don't see why it would
+00:23 < LouisT> also one of the files is 26078380 -- but as i said, if i remove the collection.update() part and leave just the reader, hardly any memory is used
+00:25 < dmachi> i don't think it would buffer them based on the way this looks to work.  Though fs.readSync() doesn't look to have the correct function signature or maybe its an older version of node
+00:25 < wilornel> Guys, does nayone know what a GET http://192.168.0.108/socket.io/1/?t=1348100660571 404 (Not Found)  means? If I check in the code, it says: "xhr.send(null);"
+00:27 < LouisT> http://thepb.in/505a62bb88b0853b23000005
+00:28 < wilornel> Actually nevermind what I just said
+00:28 < LouisT> that's using --trace-gc without a collection.update() call
+00:29 < LouisT> http://thepb.in/505a631c88b0853b23000006 with collection.update() =/
+00:29 < dmachi> so just no pause/resume or what?
+00:29 < dmachi> oh, didnt' get that fast enough :)
+00:30 < LouisT> dmachi: no, i commented out the collection.update(), so it just reads the file and creates the objects
+00:32 < dmachi> LouisT: I'm not sure, but I'm guessing that the Collection object is caching documents or something like that. I've used it before, but I never noticed that part in particular.
+00:33 < LouisT> dmachi: yea i've been thinking that same thing, but i have no idea how to clear them or of it's at all possible =/
+00:36 < dmachi> LouisT: checkout https://github.com/christkv/node-mongodb-native/blob/master/docs/database.md  and see that reaper….maybe thats to clean up its internal cache (just a gues though)
+00:41 < LouisT> dmachi: tried it, doesn't seem to effect anything..
+00:41 < dmachi> yeah, i looked in the code
+00:42 < LouisT> man, i wish there was an option to just not read anything from the server on a call or something
+00:42 < dmachi> i'm skeptical that is what the issue is
+00:43 < LouisT> you sure? because i've not found anything else that could cause the issue
+00:44 < dmachi> well i mean i don't know that its the results that actually do it vs something else related to that call.  I don't see any caching in the code.
+00:44 < dmachi> is it any different doing an insert instead of the upsert?
+00:44 < LouisT> no
+00:49 < LouisT> dmachi: i did some tests with insert instead of update and it uses up ram just the same
+00:50 < ChrisPartridge> LouisT: Stab in the dark here, it's not because of the pausing/resuming of the stream?
+00:50 < dmachi> I did notice you are checking for err and logging err instead of e in your collecn.update() call, though I don't think that is related to any of this.
+00:50 < LouisT> dmachi: yea i noticed that as well, fixed it
+00:50 < LouisT> but that wasn't the issue
+00:50 < LouisT> ChrisPartridge: no, i added that trying to fix the issue
+00:52 < ChrisPartridge> LouisT: using node-mongodb-native I presume?
+00:52 < LouisT> ChrisPartridge: yes
+00:53 < dmachi> it is kind of wierd, but mine more or less does the same thing though I used a buffer and did an event based setup to trigger the upsert on each record)
+00:54 < ang3lfir3> meh ram is cheap" /sarcasm .... :p 
+00:54 < LouisT> someone in the mongodb channel linked me to this https://github.com/mongodb/node-mongodb-native/issues/526 but that didn't really fix anything
+00:55 < ChrisPartridge> So you've got native_parser: false ?
+00:55 < LouisT> ChrisPartridge: yes i tried it with false and true, tried it with reaper, etc. etc. nothing seems to do it =/
+00:56 < ChrisPartridge> what about wrapping in process.nextTick ?
+00:56 < ChrisPartridge> That probably definately describes what you're experiencing
+00:56 < ChrisPartridge> probably=problem
+00:59 < LouisT> ChrisPartridge: according to that page nextTick didn't fix anything for anyone
+01:00 < dmachi> LouseT replace your update with something liek this: http://pastebin.com/ETzGHXTM as a test
+01:02 < dmachi> LouisT: Slso I don't see where anything actually pauses or where the while loop would check to see whether things are paused….if that is the case then i can see memory growing because you're reading and queueing upt the upserts until they complete.
+01:02 < LouisT> dmachi: oh, good call, totally forgot to insert the pause check -.-
+01:02 < LouisT> i can't believe i didn't notice that
+01:03 < LouisT> if that was the issue, i
+01:03 < LouisT> 'm going to be pissed
+01:03 < dmachi> i'd guess that is it, because that loop will keep on reading much faster than the upserts are happening
+01:04 < dmachi> pause needs to abort the loop and resume needs to make it continue again too :)
+01:05 < LouisT> dmachi: what would that function replace be?
+01:05 < LouisT> the pastebin link, what would that actually do?
+01:06 < dmachi> well it would have kept pause/resume in indepdentently of the update call to isolate where things were going wrong
+01:07 < dmachi> yeah actually parser.resume is probably not going to work the way that its written now, because nothing is going to make htat while loop continue.
+01:07 < LouisT> dmachi: yea, trying to think of a way to fix that now
+01:07 < dmachi> (its not a synchronous pause as the code in parseFile() reads)
+01:07 < LouisT> any ideas?
+01:08 < dmachi> need to separate that while loop out  as a function of its own and call it to start and then again on resume.
+01:08 < dmachi> (or as a resumption method)
+01:08 < LouisT> can you make me a quick example? =/
+01:14 < dmachi> LouisT: not sure this will work right of, but should give you the idea
+01:14 < dmachi> LouisT: http://thepb.in/505a6d9b88b0853723000000
+01:16 < dmachi> probably don't really even need pause/resume now that I look at it….read one line, do the upsert and make its callback read the next line.
+01:17 < LouisT> dmachi: i got it to run, but the ram still continues to climb =/
+01:19 < dmachi> is it actually stopping between?
+01:19 < LouisT> not sure
+01:19 < LouisT> sec
+01:20 < dmachi> debug that loop and make sure it only reads oneline until the commit callback happens.  I'm pretty sure thats the issue you were having.
+01:27 < Guest68510> node
+01:27 < LouisT> blah, dmachi, still uses all the ram =/
+01:36 < dmachi> LouisT: I'm not sure, here is a slightly different version with no pause/resume.  If you can't get it to work, I'd personally look at using the node csv module to do this and then fire off updates as the rows are read. 
+01:36 < LouisT> oh my god, i got it dmachi!
+01:36 < LouisT> thanks so much for your help, this is driving me crazy! -.-
+01:37 < dmachi> http://thepb.in/505a730188b0853b23000008
+01:37 < dmachi> ok
+01:37 < LouisT> at least it looks like i got it... the database seems to be filling and i don't see memory usage going up
+01:37 < dmachi> what'd you change?
+01:37 < LouisT> i removed the while loop
+01:37 < LouisT> and used an if instead, then moved the callback(true); to be within the update function
+01:37 < dmachi> yeah, same thing that last paste did
+01:38 < LouisT> yea, similar to that
+01:38 < LouisT> it's sitting around 14MB memory usage, which i can live with
+01:39 < LouisT> far better than the 2.5GB it was hitting
+01:40 < dmachi> should also get rid of that sync i/o in the parser :P, but good deal in any case :)
+01:40 < LouisT> i would if i knew how heh
+01:41 < dmachi> its pretty similar to what we just did
+01:42 < LouisT> wow this is much slower -- i assume it'll be faster when it runs on a local server to the mongodb instance
+01:42 < dmachi> just need to do the work in the callbacks, though i guess since youre more or less pausing and doing one row at a time, it doesn't matter
+01:42 < dmachi> yeah, because you run one insert wait for it to get back before reading.
+01:43 < LouisT> yea
+01:43 < LouisT> > db.conquers_en1.count()
+01:43 < LouisT> 9217
+01:43 < LouisT> at least it's working
+01:44 < LouisT> oh boy..
+01:44 < LouisT> $ cat en1 | wc
+01:44 < LouisT>  919756  919756 26078380
+01:44 < LouisT> heh
+01:44 < dmachi> in practice you can probably just ignore the and keep reading firing off requests…if the native client doesn't queue that up behing the connection pool, then you'd ahve to limit it, but i'd try it with no limits first 
+01:45 < LouisT> what?
+01:46 < dmachi> do a loop of reading line and sending upsert.  Don't wait for the response to the upsert.
+01:46 < LouisT> thats what i was doing originally, it murdered ram
+01:47 < dmachi> right, so the 'inbetween' is to let X happen at once
+01:49 < dmachi> LouisT: something liek http://thepb.in/505a75cb88b0853c23000002 will almost work (need to remove that client.close() and importFiles() and trigger them when all the different processRecords are finished calling
+01:57 < jtomasrl> i dont think this is a node related question but, whats the better way of saving JSON objects, relational databases or noSQL?
+02:02 < tonymilne> jtomasrl nosql - mongodb
+02:08 < jtomasrl> tonymilne: even if some data is related?
+02:43 < brianc> TehShrike: you there?
+02:44 < Tobsn> jtomasrl, mongodb, def.
+03:32 < brianc> hi
+03:33 < chilts> afternoon :)
+04:36 < monokrome> Hey. Anyone have ideas regarding speech recognition in node?
+04:41 < SomeoneWeird> monokrome, would probably have to wrap an external lib
+04:41 < monokrome> that works
+04:41 < monokrome> not sure what to use, though
+05:06 < gavin_huang> hi guys, I have a general js question, think I will just ask here: after overwriting the prototype property of a function, is it nesssary to reassign prototype.constructor? by not doing so, what code (other than directly accessing obj.constructor) might break? I thought instanceof might not work, but it turns out that's not the case.
+05:39 < scruz> hello.
+06:41 < TehShrike|Work> gavin_huang: you ask "is it necessary" - is it necessary for what?  What is your goal?
+06:43 < gavin_huang> TehShrike|Work, i don't have a particular goal here, just wondering if I leave constructor overriden, will I more likely to introduce bug or alike?
+06:43 < TehShrike|Work> your_object.constructor is not a thing you should probably be touching https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Object/constructor
+06:44 < TehShrike|Work> Are you just working your way into prototypal inheritance?
+06:44 < TehShrike|Work> If you haven't used it before, it can seem pretty wacky.
+06:44 < mdedetrich> does anyone know if there is a node.js library
+06:44 < TehShrike|Work> mdedetrich: oh hellz yes there is! :-D
+06:44 < gavin_huang> but I contently do myFn.prototype = {}, which overrides myObj.constructor
+06:44 < mdedetrich> which can either watermark images or slightly scramble their contents
+06:45 < TehShrike|Work> Oh, I don't know about that >_<
+06:45 < mdedetrich> TehShrike|Work: holy shit
+06:45 < mdedetrich> there is a node.js library
+06:45 < mdedetrich> *slaps his face*
+06:45 < TehShrike|Work> THERE ARE SO MANY LIBRARIES
+06:45 < TehShrike|Work> IT'S CRAZY
+06:45 < mdedetrich> OMG OMG
+06:45 < TehShrike|Work> ...but I haven't heard of that one before.
+06:45 < TehShrike|Work> Though it could exist.
+06:45 < TehShrike|Work> People have implemented the craziest shit in JS
+06:45 < TehShrike|Work> I found a JS script that could parse barcodes out of images once
+06:45 < TehShrike|Work> I couldn't understand any of it
+06:46 < SomeoneWeird> mdedetrich, lol what lib?
+06:46 < Lorentz> Haven't you seen the virtual machine written in JS?
+06:46 < mdedetrich> i have made a watermark.js
+06:46 < Lorentz> It runs linux
+06:46 < mdedetrich> bgut its client side
+06:46 < TehShrike|Work> Lorentz: YES!
+06:46 < mdedetrich> *but
+06:46 < TehShrike|Work> Lorentz: I saw that
+06:46 < mdedetrich> which is fuken stupid
+06:46 < TehShrike|Work> My mind was blown
+06:46 < mdedetrich> *i have seen watermark.js
+06:46 < mdedetrich> not made
+06:46 < TehShrike|Work> Did you see the GBC emulator in JS?
+06:46 < Lorentz> I believe I have
+06:46 < Lorentz> I think
+06:47 < Lorentz> Ah, yes, I have
+06:47 < TehShrike|Work> There wasn't much to do about that
+06:47 < TehShrike|Work> Except to start a slow clap
+06:47 < TehShrike|Work> And then keep clapping
+06:47 < mdedetrich> hmm
+06:47 < mdedetrich> maybe imagemagick can do that
+06:47 < SomeoneWeird> convert watermark.js to node?
+06:47 < TehShrike|Work> gavin_huang: that... doesn't sound like a thing that should happen (changing the prototype causing the constructor property to change)
+06:48 < mdedetrich> bleh
+06:48 < mdedetrich> whats the term of putting a non visible watermark inside an  image
+06:48 < mdedetrich> like a crc or something
+06:48 < TehShrike|Work> Tracking people who use your images?
+06:48 < TehShrike|Work> Did y'all hear about Blizzard's invisible screenshot watermarking?
+06:48 < SomeoneWeird> ya
+06:48 < mdedetrich> TehShrike|Work: nah
+06:49 < mdedetrich> its actually a quiz
+06:49 < mdedetrich> like a where is waldo
+06:49 < SomeoneWeird> lol
+06:49 < mdedetrich> and to make it unhackable
+06:49 < Lorentz> Some kind of steganography
+06:49 < TehShrike|Work> Any quiz that involves making something "unhackable" is a trick question ;-P
+06:49 < mdedetrich> every time someone makes a quiz
+06:49 < mdedetrich> you make a new image
+06:49 < mdedetrich> and watermark it
+06:49 < mdedetrich> with some unique id
+06:49 < mdedetrich> and you do all the logic server side
+06:49 < TehShrike|Work> Check this shit out http://www.ownedcore.com/forums/world-of-warcraft/world-of-warcraft-general/375573-looking-inside-your-screenshots.html
+06:50 < gavin_huang> TehShrike|Work, I can elabrate. myObj = new myFn, that will cause myObj.contructor to be myFn.prototype.constructor, and which is now Object, not myFn, I'm wondering if that's ok?
+06:50 < mdedetrich> TehShrike|Work: well yeah, I need something similar
+06:50 < mdedetrich> something that puts a secret code inside the image
+06:50 < mdedetrich> without actually changing the image that much
+06:50 < TehShrike|Work> gavin_huang: I would expect myObj = new myFn() to result in myObj.constructor = myFn
+06:50 < mdedetrich> there is a technical term for it
+06:50 < mdedetrich> forgot what its called
+06:51 < TehShrike|Work> mdedetrich: most images have plenty of metadata fields you could fill out
+06:51 < pyrotechnick> steganography
+06:51 < gavin_huang> if you didn't do myFn.prototype = {}, that would be the case
+06:51 < TehShrike|Work> jpgs let you fill in some spots with whatever data you want
+06:51 < mdedetrich> TehShrike|Work: it can't be metadata
+06:51 < mdedetrich> TehShrike|Work: thats way too easy to hack
+06:51 < TehShrike|Work> hack = see?
+06:51 < mdedetrich> TehShrike|Work: it needs to be actually in the image
+06:51 < TehShrike|Work> In the visual part of the image?
+06:51 < pyrotechnick> steganography
+06:51 < gavin_huang> but the question is, if prototype is overriden, should constructor be restored?
+06:52 < mdedetrich> TehShrike|Work: read that
+06:52 < mdedetrich> TehShrike|Work: http://en.wikipedia.org/wiki/Steganography
+06:52 < TehShrike|Work> Yeah, I think I read something interesting about that a little bit back
+06:52 < mdedetrich> its putting a hidden message inside the actual image by making a trivial change to the actual image
+06:52 < TehShrike|Work> Probably something by Schneier
+06:52 < mdedetrich> humans won't see the difference
+06:52 < pyrotechnick> you would be SHOCKED to know how prevalent steganography is
+06:52 < mdedetrich> but you have an algorithm which reads that message
+06:52 < TehShrike|Work> pyrotechnick: interested, yes.  Shocked, probably not >_<
+06:53 < pyrotechnick> http://i.imgur.com/4TmVH.jpg
+06:53 < pyrotechnick> http://img89.imageshack.us/img89/883/outputk.png
+06:53 < pyrotechnick> WoW screenshots for example
+06:53 < TehShrike|Work> Indeed.
+06:53 < TehShrike|Work> I linked to that forum post a bit higher up
+06:53 < TehShrike|Work> I found it an interesting read
+06:53 < mdedetrich> ah
+06:53 < mdedetrich> I found it
+06:53 < pyrotechnick> also warden is a botnet
+06:53 < pyrotechnick> as is punkbuster
+06:53 < pyrotechnick> and friends
+06:54 < TehShrike|Work> mdedetrich: so you're looking for a JavaScript steganography library?
+06:54 < pyrotechnick> do not trust game companies
+06:54 < mdedetrich> TehShrike|Work: yes
+06:54 < TehShrike|Work> That would be very cool.
+06:54 < mdedetrich> I found one, but it encodes an image within another image
+06:54 < TehShrike|Work> How do you mean?
+06:54 < mdedetrich> I just want to encode a string inside an image
+06:54 < TehShrike|Work> aaaah
+06:54 < TehShrike|Work> right
+06:54 < mdedetrich> or "text"
+06:54 < TehShrike|Work> Of course
+06:55 < TehShrike|Work> So it seems like what you really need is a text->image library then?
+06:55 < pyrotechnick> also be careful what country you're in
+06:55 < TehShrike|Work> And then you can use that other library
+06:55 < pyrotechnick> you'll find it's illegal
+06:55 < pyrotechnick> unless you're a corp
+06:55 < mdedetrich> pyrotechnick: what is illegal?
+06:55 < pyrotechnick> steganography
+06:55 < TehShrike|Work> Yeah, I wouldn't put my real name on a library like that unless my balls were feeling particularly large :-\
+06:56 < SomeoneWeird> pfft
+06:56 < SomeoneWeird> not illegal in any first world country
+06:56 < mdedetrich> I never heard of steganography being illegal
+06:56 < pyrotechnick> it's a shortcut to getting on the watchlists
+06:56 < TehShrike|Work> It's probably safe if you're the US, at least for now
+06:56 < pyrotechnick> guess again SomeoneWeird
+06:56 < SomeoneWeird> which country then pyrotechnick ?
+06:56 < mdedetrich> pyrotechnick: you have some evidence of this
+06:56 < pyrotechnick> anything under the crown
+06:56 < SomeoneWeird> pfft
+06:56 < TehShrike|Work> A lot of European countries have pretty strict regulations about encryption
+06:57 < mdedetrich> yeah but nothing on the grounds of "you cannot encrypt or put your messages inside a photo"
+06:57 < SomeoneWeird> "You will be sent to jail for refusing to give up encryption keys, regardless of whether you have them or not. "
+06:58 < SomeoneWeird> its not illegal
+06:58 < SomeoneWeird> its just illegal not to give up the keys
+06:58 < pyrotechnick> guess again
+06:58 < TehShrike|Work> The ability to hide things and find them again, digitally, is quite regulated in some places
+06:58 < TehShrike|Work> http://en.wikipedia.org/wiki/Pretty_Good_Privacy#Criminal_investigation
+06:59 < TehShrike|Work> "Cryptosystems using keys larger than 40 bits were then considered munitions within the definition of the US export regulations"
+06:59 < SomeoneWeird> lucky I don't live in one of those places then.
+06:59 < pyrotechnick> for now.
+06:59 < TehShrike|Work> It is not safe territory
+06:59 < TehShrike|Work> But it is territory that I want well-explored
+06:59 < TehShrike|Work> And were I capable, I would risk a bit of myself
+07:00 < mdedetrich> look, this is just meant to be an online quiz
+07:00 < mdedetrich> and steganography is just used so people can't create a table with image -> location
+07:01 < TehShrike|Work> I don't really know much about image manipulation with JS
+07:02 < mdedetrich> beh I will just forget about it now, or write a library later
+07:02 < Lorentz> I've seen someone render video with js
+07:02 < Lorentz> onto canvas
+07:02 < Lorentz> from a completely ordinary mkv? Some kind of usual video format
+07:03 < Lorentz> and did per-pixel post processing too, in real time
+07:03 < mdedetrich> eh I can probably write a library
+07:03 < TehShrike|Work> Lorentz: did you read about Apple's hack to play video from images, without <canvas>/<video>?
+07:03 < Lorentz> eh
+07:03 < pyrotechnick> on the iphone 5 website?
+07:03 < Lorentz> no I haven't read it yet
+07:03 < TehShrike|Work> It made me wince
+07:04 < mdedetrich> TehShrike|Work: what is this?
+07:04 < TehShrike|Work> https://docs.google.com/document/pub?id=1GWTMLjqQsQS45FWwqNG9ztQTdGF48hQYpjQHR_d1WsI
+07:05 < pyrotechnick> this is the most retarded crap http://en.wikipedia.org/wiki/EURion_constellation
+07:05 < pyrotechnick> being this paranoid they must be soiling their pants about bitcoin and friends
+07:07 < SomeoneWeird> nice
+07:08 < pyrotechnick> designed by the http://en.wikipedia.org/wiki/Central_Bank_Counterfeit_Deterrence_Group and supplied to companies such ashttp://en.wikipedia.org/wiki/Adobe_Systems as a binary module.
+07:09 < mdedetrich> TehShrike|Work: that is actually quite neat, what apple did
+07:09 < TehShrike|Work> It's impressive
+07:09 < SomeoneWeird> it  is
+07:09 < TehShrike|Work> I wouldn't have thought of anything that efficient
+07:09 < TehShrike|Work> Or at least, probably wouldn't have gotten it implemented
+07:09 < mdedetrich> well your link describes why its effecient
+07:10 < mdedetrich> at least in terms of bandwidth
+07:10 < mdedetrich> I mean its nothing new, essentially its getting compressed frames
+07:10 < mdedetrich> and playing it as a video on client side
+07:10 < mdedetrich> so its like a client side video player
+07:10 < TehShrike|Work> Yeah, getting that many frames to the client in such an efficient manner is pretty good
+07:10 < pyrotechnick> this is heresy
+07:10 < TehShrike|Work> It's cool.  Apple's engineers can do cool things.
+07:11 < TehShrike|Work> But it still feels like a hack.
+07:11 < TehShrike|Work> Why didn't they allow inline video on the iPhone?
+07:11 < TehShrike|Work> Oh, maybe because THINGS MOVING IN A WEB PAGE ARE FUCKING OBNOXIOUS
+07:11 < TehShrike|Work> >:-|
+07:11 <@Nexxy> settle
+07:11 < TehShrike|Work> >_<
+07:11 < TehShrike|Work> But then they go and engineer a really cool hack around their system.
+07:12 < TehShrike|Work> Which is impressive.
+07:12 < mdedetrich> well, they reason is obvious
+07:12 < nathan7> man
+07:12 < mdedetrich> they don't want it to look like a video palyer
+07:12 < nathan7> If I want to view a website
+07:12 < mdedetrich> if you embed a video player
+07:12 < nathan7> and it includes useful video
+07:12 < nathan7> I need to go to a PC to watch it
+07:12 < mdedetrich> its going to have a border around the video
+07:12 < TehShrike|Work> I like watching videos on my iPad
+07:12 < TehShrike|Work> I do it quite a bit
+07:12 < nathan7> or pray that there is a website-specific app
+07:12 < mdedetrich> and you can't really control playback
+07:12 < TehShrike|Work> That's the thing
+07:13 < TehShrike|Work> Once anybody can play a video in the middle of a web page without any user intervention
+07:13 < TehShrike|Work> You have really annoying ads
+07:13 < TehShrike|Work> Safari Mobile doesn't facilitate this easily
+07:13 < TehShrike|Work> However, Apple has pulled it off, for their own purposes
+07:13 < mdedetrich> well any library can do it
+07:13 < mdedetrich> I mean anyone can do it
+07:13 < TehShrike|Work> Sure
+07:13 < mdedetrich> with a library
+07:13 < TehShrike|Work> But most don'
+07:13 < TehShrike|Work> t
+07:14 < TehShrike|Work> Apple did, and it feels like a hack around their own system
+07:14 < TehShrike|Work> Technically impressive
+07:14 < mdedetrich> look
+07:14 < mdedetrich> I wouldn't class it
+07:14 < mdedetrich> as a hack
+07:14 < TehShrike|Work> But did they really leave themselves no better way to show something animated in a web page in their own browser?
+07:14 < mdedetrich> they are using a vector library
+07:14 < mdedetrich> to play a video
+07:14 < mdedetrich> with frames
+07:15 < mdedetrich> thats not really a hack, canvas is intended to do such things (among others)
+07:15 < TehShrike|Work> Yeah, you're right.
+07:15 < TehShrike|Work> I'm just having trouble resolving these conflicting "that's so cool"/"wtf" emotions.
+07:15 < mdedetrich> oh its def cool
+07:16 < TehShrike|Work> I would love to hang out with Apple's web engineers for a couple weeks
+07:16 < TehShrike|Work> Just listening to them talk about their work
+07:17 < pyrotechnick> i'd like to talk to HR
+07:17 < TehShrike|Work> I remember reading about their hack/whatever that would load up retina-display images for appropriate browsers once they released the iPad 3
+07:17 < TehShrike|Work> I was all 8-|
+07:17 < mdedetrich> i'd like to throw a pie in their face
+07:18 < TehShrike|Work> lol
+07:18 < mdedetrich> apple do some cool things, they also do a lot of shit
+07:19 < TehShrike|Work> I'm not an Apple fan, and I never have been.
+07:19 < SomeoneWeird> same
+07:19 < TehShrike|Work> However, I would dearly love to listen to their web engineers talk about what they do.
+07:19 < SomeoneWeird> 1/50th of the stuff they dev is awesome
+07:20 < TehShrike|Work> I am not an Apple fan, but I acknowledge that they are the only ones pushing mobile forward, and I am very grateful for that.
+07:20 < TehShrike|Work> The iPad 3 screen was the biggest jump forward in consumer technology in at least a decade, I think
+07:21 < TehShrike|Work> I can't think of the last time I such such a huge incremental improvement in a technology that was immediately available to consumers
+07:21 < mdedetrich> TehShrike|Work: a lot of companies are pushing mobile forward
+07:21 < TehShrike|Work> It's true
+07:21 < mdedetrich> in fact google have been doing it
+07:21 < mdedetrich> far more
+07:21 < mdedetrich> than apple
+07:21 < TehShrike|Work> How so?
+07:21 < mdedetrich> (arguably)
+07:21 < TehShrike|Work> I'm open to that argument
+07:21 < mdedetrich> in terms of web technologies
+07:21 < TehShrike|Work> Continue!
+07:22 < TehShrike|Work> I mean, I love Chrome to bits
+07:22 < TehShrike|Work> Chrome started the JS speed wars
+07:22 < TehShrike|Work> And that's just been win-win-win for me
+07:22 < pyrotechnick> guys i think we should rename the internet
+07:22 < mdedetrich> all of googles technology stack is basically web based
+07:22 < mdedetrich> thats why the introduced chromeOS
+07:23 < SomeoneWeird> yeah
+07:23 < TehShrike|Work> Wait, define its technology stack
+07:23 < pyrotechnick> it's exclusionary to extra-terrestrials
+07:23 < SomeoneWeird> google have been owning lately
+07:23 < mdedetrich> apple still emphasizes the mindset, that each website should have its equivalent app
+07:23 < nathan7> mhm
+07:23 < mdedetrich> like you have a New York Times app instead of visiting the New Your Times website
+07:23 < mdedetrich> the app just reads data from the website
+07:23 < TehShrike|Work> On the one hand, that's true
+07:23 < nathan7> It's an excellent method of lock-in
+07:24 < nathan7> Developing an app is expensive and the iPhone market share is huge
+07:24 < TehShrike|Work> On the other hand, iOS has better CSS effect acceleration than every competitor
+07:24 < mdedetrich> TehShrike|Work: actually
+07:24 < mdedetrich> IE9
+07:24 < mdedetrich> has the best CSS acceleration
+07:24 < TehShrike|Work> On what mobile device?
+07:24 < mdedetrich> well you didn't say that did you?
+07:24 < mdedetrich> lol
+07:24 < mdedetrich> I thought you meant in general
+07:24 < TehShrike|Work> I'm sorry, you were talking about mobile web sites and apps
+07:24 < mdedetrich> IE9 is the best performing in animations on desktop
+07:25 < mdedetrich> since it uses GPU acceleration (all animations, JS or CSS, are done through directx)
+07:25 < SomeoneWeird> lolll thats funny
+07:25 < TehShrike|Work> That may well be true, but I don't consider Safari Mobile a competitor in that arena
+07:25 < [AD]Turbo> hi there
+07:25 < TehShrike|Work> We're talking about web vs app, specifically on iOS
+07:25 < mdedetrich> oh right
+07:25 < SomeoneWeird> ie9 isn't even a webbrowser in my world :p
+07:25 < mdedetrich> eh
+07:25 < mdedetrich> Im not sure how accurately
+07:26 < TehShrike|Work> And iOS looks like it's pushing both forward, at least to me
+07:26 < mdedetrich> you can measure CSS acceleration
+07:26 < mdedetrich> on mobile devices
+07:26 < mdedetrich> due to things like different CPU's
+07:26 < mdedetrich> and other such things
+07:26 < mdedetrich> benchmarks are really weird and often stupid when comparing different mobile devices
+07:26 < mdedetrich> for such reasons
+07:26 < TehShrike|Work> Sure
+07:26 < TehShrike|Work> I'm just saying, as someone who's tried to build a few mobile sites
+07:27 < TehShrike|Work> They mostly didn't suck in Safari Mobile
+07:27 < TehShrike|Work> They mostly sucked on other things
+07:27 < mdedetrich> well most mobile browsers suck in general
+07:27 < mdedetrich> jelly bean would probably be much better since it uses chrome
+07:27 < TehShrike|Work> Sure, thus the "mostly"s ;-P
+07:27 < mdedetrich> however what is most likely happening is safari uses the GPU for acceleration on IOS
+07:27 < TehShrike|Work> Yes.
+07:27 < TehShrike|Work> Definitely.
+07:27 < mdedetrich> where as most other browsers still do animations on the CPU
+07:27 < TehShrike|Work> No question about that.
+07:28 < TehShrike|Work> There is no doubt in my mind.
+07:28 < TehShrike|Work> That is where Safari Mobile gains the advantage
+07:28 < mdedetrich> I would say the impact of such a thing is minimal
+07:29 < mdedetrich> in the grand scheme of things
+07:30 < mdedetrich> chrome is working on GPU acceleration
+07:30 < mdedetrich> I don't think its considered stable yet
+07:30 < mdedetrich> and IE10 will have it in windows 8
+07:30 < mdedetrich> since IE9 has it already
+07:30 < mdedetrich> and Windows 8 has DirectX
+07:30 < SomeoneWeird> yeah but noone will use win8 :p
+07:30 < pyrotechnick> where as most other browsers still do animations on the CPU
+07:31 < mdedetrich> I am getting a nokia 920
+07:31 < pyrotechnick> no no no
+07:31 < mdedetrich> W8 market share will grow quite heavily, trust me ;)
+07:31 < SomeoneWeird> unfortunately
+07:32 < mdedetrich> why so much hate
+07:32 < mdedetrich> did windows 8 like rape your children or something
+07:33 < SomeoneWeird> hehe
+07:33 < SomeoneWeird> i just hate on windows
+07:34 < TehShrike|Work> I want W8 to be awesome and win at stuff
+07:34 < nkuttler> they say hate is disappointed love
+07:34 < mdedetrich> nkuttler: nice one
+07:34 < TehShrike|Work> mdedetrich: I don't think the impact is minimal
+07:35 < TehShrike|Work> I think that having one mobile browser able to deliver on effects in the browser is pushing other mobile browsers forward
+07:35 < TehShrike|Work> Same as Chrome's fast JavaScript pushed all the other browsers forward
+07:35 < BennyLava> lmao
+07:35 < nkuttler> like in the 90s
+07:35 < mdedetrich> yeah but js is used for ALL client side scriping
+07:35 < BennyLava> yeah it wasn't firefox and apple who stsrted that race at all, TehShrike|Work
+07:35 < mdedetrich> css animations is something specific
+07:35  * BennyLava facepalm
+07:35  * BennyLava facepalms
+07:36 < TehShrike|Work> I don't remember seeing quite so many blog posts about JavaScript benchmarks before Chrome started showing up on the winning side of all of them
+07:36 < TehShrike|Work> (talking desktop, not mobile)
+07:36 < BennyLava> cool story bro, but you clearly have no idea what you're talking about
+07:37 < nkuttler> he doesn't know what he saw?
+07:37 < BennyLava> nkuttler--
+07:37 < nkuttler> aaw
+07:37 < TehShrike|Work> \:-|
+07:38 < TehShrike|Work> I'm not really sure what point BennyLava is trying to make here
+07:38 < BennyLava> I don't care what he saw, I'm just saying "Same as Chrome's fast JavaScript pushed all the other browsers forward" is bs as apple and moz were already in that 'race' before chrome.
+07:38 < BennyLava> Chrome just joined that race.
+07:38 < mdedetrich> BennyLava: I think you are making a strawman
+07:39 < TehShrike|Work> You don't think there was ever a point where Chrome's JS benchmarks were noticably better than the other browsers?
+07:39 < TehShrike|Work> I'll just go with mdedetrich and skip out of this one I think
+07:39 < BennyLava> TehShrike|Work: I didn't say that, now did I?
+07:39 < BennyLava> You really suck at simple logic
+07:39 < mdedetrich> BennyLava: Chromes insane speed with javascript is what pushed the web forward with very JS intensive client apps
+07:39 < SomeoneWeird> girls, girls
+07:39 < BennyLava> mdedetrich: lmao
+07:39 < BennyLava> again
+07:39 < BennyLava> not making sense
+07:40 < TehShrike|Work> Why do I recognize this username
+07:40 < mdedetrich> the other browsers did not see raw js speed as such an important
+07:40 < mdedetrich> *importance
+07:40 < BennyLava> yes they did
+07:40 < mdedetrich> until then
+07:40 < BennyLava> hence why they were in that race before chrome showed up
+07:40 < mdedetrich> what race
+07:40 < BennyLava> the speed race..
+07:40 < BennyLava> wow
+07:40 < mdedetrich> there is always a speed race
+07:41 < mdedetrich> its god damn computing
+07:41 < BennyLava> you rreally weren't actually around & paying attention at the time, were you?
+07:41 < SomeoneWeird> i agree with mdedetrich 
+07:41 < mdedetrich> people compare benchmarks all the time
+07:41 < BennyLava> mdedetrich: wrong!
+07:41 < TehShrike|Work> Oh yeah!
+07:41 < TehShrike|Work> I've seen BennyLava trolling in ##javascript before!
+07:41 < SomeoneWeird> sure there was a "race", but when chrome came along it boosted it forward massively
+07:41 < BennyLava> I'm talking about pushing eachother forward, and making crazy leaps forward
+07:41 < pyrotechnick> CALL THE INTERNET POLICE
+07:41 < pyrotechnick> THERE IS A TROLL
+07:41 < mdedetrich> just because people compare benchmarks doesn't mean they see speed as a priority
+07:41 < BennyLava> *that* started well before chrome
+07:41 < pyrotechnick> SEND OUT THE IRC GUY
+07:41 < BennyLava> FACT
+07:41 < pyrotechnick> CAPTAIN
+07:41 < TehShrike|Work> 8-|
+07:41 < mdedetrich> benchmarks about ruby are put forward all the time
+07:42 < mdedetrich> however ruby's priority is hardly about speed
+07:42 < BennyLava> Now bugger off and go learn some facts for yourself before making shitty fanboy arguments
+07:42 < BennyLava> Dumbasses
+07:42 < mdedetrich> in fact its arguably their least priority
+07:42 < pyrotechnick> BennyLava++
+07:42 < pyrotechnick> BennyLava for President 2012
+07:42  * BennyLava bows
+07:42 < mdedetrich> BennyLava: and you don't know what you are arguing about
+07:42 < BennyLava> ty ty
+07:42 < pyrotechnick> even though you guys wont be having one
+07:42 < TehShrike|Work> If ops are around, I would recommend banning BennyLava for peace and love
+07:42 <@Nexxy> you guys
+07:42 <@Nexxy> lol
+07:42 < BennyLava> mdedetrich: clearly
+07:42 <@Nexxy> get over yourselves
+07:42 < TehShrike|Work> I have chatlogs of his conversations in other rooms :-P
+07:42 < BennyLava> some serious dumb shits here
+07:42 < pyrotechnick> OMFG
+07:42 < pyrotechnick> HE HAS CHATLOGS
+07:42 -!- BennyLava was kicked from #Node.js by Nexxy [BennyLava]
+07:42 <@Nexxy> be respectful plz
+07:42 < TehShrike|Work> SO MANY LOGS
+07:42 < BennyLava> Nexxy: Cool.
+07:42 < pyrotechnick> he's like a fucking disciple
+07:42 < mdedetrich> BennyLava: using your logic, if benchmarks of something exists, it means what they are benchmarking is automatically their top priority
+07:42 < BennyLava> Story.
+07:43 < BennyLava> Bro.
+07:43 < BennyLava> mdedetrich: zzzzzz
+07:43 < mdedetrich> I should make a benchmark of actionscript
+07:43 < pyrotechnick> TehShrike|Work has the gospel of BennyLava
+07:43 < mdedetrich> to show that the priority for flash is all about speed
+07:43 <@Nexxy> ITC: trolls trolling trolls
+07:43 < BennyLava> Nexxy: I heard absusing ops was something cool 13 years olds do! Confirm/deny?
+07:43 < mdedetrich> BennyLava: that is your argument
+07:43 < TehShrike|Work> pyrotechnick: nah, I mostly just have logs from ##javascript ;-P
+07:43 < pyrotechnick> dude the vatican wants it now
+07:43 -!- mode/#Node.js [+b *!*colin@pdpc/supporter/professional/riven] by Nexxy
+07:43 -!- BennyLava was kicked from #Node.js by Nexxy [BennyLava]
+07:44 < TehShrike|Work> rotfl
+07:44 < TehShrike|Work> Man, I was about to make a witty comeback to him
+07:44 <@Nexxy> confirm
+07:44 < TehShrike|Work> THANK GOODNESS YOU SAVED ME FROM THAT
+07:44 -!- mode/#Node.js [-b *!*colin@pdpc/supporter/professional/riven] by Nexxy
+07:44 < TehShrike|Work> Where were we before I got stupid and there were trolls and stuff
+07:44 < TehShrike|Work> Something about mobile browsers and CSS getting better
+07:44 < mdedetrich> dancing
+07:44 < mdedetrich> thats where we were
+07:44 < TehShrike|Work> ooh
+07:44 < TehShrike|Work> Dancing is fun
+07:44 < mdedetrich> dancing
+07:45 < TehShrike|Work> I like dancing
+07:45 < pyrotechnick> i like turtles
+07:45 <@Nexxy> be nice to each other please
+07:45 < pyrotechnick> nexxy i love you
+07:45 <@Nexxy> <3
+07:45 < TehShrike|Work> Also, dudes
+07:45 < TehShrike|Work> Mobile browers keep getting better
+07:45 < TehShrike|Work> And that is fucking awesome
+07:45 < pyrotechnick> i'm just going to put it out there you can take it or throw it back
+07:45 < pyrotechnick> i want to be on you
+07:45 < TehShrike|Work> >_<
+07:45 < _Tristan> sweet
+07:45 < TehShrike|Work> I want to be on pyrotechnick
+07:45 < TehShrike|Work> Like
+07:45 < TehShrike|Work> Somewhere on the pile
+07:45 < pyrotechnick> everyone be on all the things
+07:45 < _Tristan> is there any sort of dependency management for connect/express middleware?
+07:46 < TehShrike|Work> _Tristan: you're imagining some sort of npm, but for connect/express?
+07:46 < _Tristan> no, I'm imagining effortlessly neglecting to load cookies whenever they're not being explicitly asked for
+07:47 < pyrotechnick> _Tristan: i have a little helper module i call expresser
+07:47 < pyrotechnick> but it's not that bright
+07:47 < TehShrike|Work> I'm not sure I get it
+07:47 < _Tristan> right now if you want sessions you must ask for cookies, then sessions
+07:48 < mdedetrich> its actually an interesting question
+07:48 < _Tristan> simple if you just want cookies and sessions, but a pain in the ass if you want to write a dozen varieties of middleware
+07:48 < mdedetrich> regarding the problem with browser's specifically on android
+07:48 < mdedetrich> because google doesn't specify a nice api for a combination of html render + javascript
+07:49 < mdedetrich> they can't ensure good global performance like IOS can
+07:49 < mdedetrich> browsers use and implement their own engines, of which all of them still do animation rendering on CPU
+07:49 < TehShrike|Work> Wait, was _Tristan asking about sessions, or cookies?
+07:49 < mdedetrich> which makes quite an impact on mobile browsing
+07:49 < _Tristan> TehShrike|Work: both, sort of
+07:50 < TehShrike|Work> I haven't used jQuery Mobile in some months, but I find myself extremely interested with every one of their blog posts
+07:50 < TehShrike|Work> Those guys are doing some admirable work
+07:50 < TehShrike|Work> They care about so many mobile browsers
+07:51 < mdedetrich> what is query  mobile
+07:51 < mdedetrich> *jquery
+07:51 < SoulRaven> hello, i get this error, This inspection reports instances of JavaScript this expression occuring outside of object literals or constructor bodies. Such this expressions are legal JavaScript, and reference the top-level "global" JavaScript object, but are largely useless.
+07:51 < SoulRaven> http://jsfiddle.net/bauM3/
+07:52 < TehShrike|Work> mdedetrich: http://jquerymobile.com/
+07:52 < SoulRaven> any ideea way, and how i workout this?
+07:52 < mdedetrich> TehShrike|Work: oh nice
+07:52 < mdedetrich> TehShrike|Work: is the api still the same?
+07:52 < TehShrike|Work> Same as what?
+07:52 < mdedetrich> jquery?
+07:52 < TehShrike|Work> jQuery doesn't come with much UI stuff - jQuery UI is its own project
+07:52 < mdedetrich> or does it just add stuff
+07:53 < TehShrike|Work> I'm not familiar with jQuery UI that much
+07:53 < mdedetrich> yeah i know query ui
+07:53 < TehShrike|Work> But I've used jQuery Mobile a bit
+07:53 < mdedetrich> well what does query mobile actually provide
+07:53 < mdedetrich> is it just events for mobile devices
+07:53 < mdedetrich> or more?
+07:53 < TehShrike|Work> And the devs are very sensitive to the performance issues across a ton of mobile browsers
+07:53 < TehShrike|Work> It's a theming kit
+07:53 < TehShrike|Work> It's a giant theming/control kit
+07:54 < TehShrike|Work> Where the devs work hard to make your webapp not suck on mobile browsers
+07:54 < TehShrike|Work> Like I said, they do impressive work
+07:54 < mdedetrich> oh, so it is actual UI framework
+07:54 < TehShrike|Work> Yes
+07:55 < TehShrike|Work> They do also wrap up some jQuery functions
+07:55 < TehShrike|Work> But its main purpose (that I've seen) is to abstract away UI issues
+07:55 < pyrotechnick> anyone know something like this that's still maintained http://en.wikipedia.org/wiki/ShiftSpace
+07:56 < TehShrike|Work> pyrotechnick: what do you want to do with it?
+07:56 < pyrotechnick> feed it into my skynet
+07:56 < TehShrike|Work> Can you feed me into your skynet?
+07:56 < pyrotechnick> you are already
+07:56 < pyrotechnick> :)
+07:56 < TehShrike|Work> Booyah!
+07:56 < TehShrike|Work> SUCK FIRE, HUMANS
+07:56 < TehShrike|Work> Wait
+07:57 < TehShrike|Work> Why are you all still not on fire
+07:57 < pyrotechnick> you were deceived
+07:57 < TehShrike|Work> AAAH
+07:57 < mdedetrich> Im always on fire
+07:57 < mdedetrich> baby
+07:57 < pyrotechnick> TWSS
+07:58 < SoulRaven> anyone?
+07:59 < TehShrike|Work> SoulRaven: I'm sorry, what error do you get, exactly?
+07:59 < SoulRaven> This inspection reports instances of JavaScript this expression occuring outside of object literals or constructor bodies. Such this expressions are legal JavaScript, and reference the top-level "global" JavaScript object, but are largely useless.
+07:59 < TehShrike|Work> That jsfiddle doesn't help much?
+08:00 < SoulRaven> i get an error from jshint
+08:00 < SoulRaven> from "this" keyword
+08:00 < mdedetrich> does anyone know if there is a way to detect if a js function exists
+08:00 < mdedetrich> like check if a jsplugin is loaded
+08:01 < SoulRaven> is posible to use "this" inside an anonymus function on nodejs scope?
+08:01 < TehShrike|Work> mdedetrich: beyond seeing if typeof jqueryWhatever.functionName === 'function' ?
+08:01 < TehShrike|Work> SoulRaven: you can always use "this"
+08:01 < TehShrike|Work> "this" will always refer to the object upon which your function is being called as a method
+08:02 < SoulRaven> but the error above what is means?
+08:02 < jaeckel> lo
+08:02 < TehShrike|Work> l?
+08:03 < TehShrike|Work> SoulRaven: I don't know what it means
+08:03 < TehShrike|Work> Where did it come from?
+08:03 < deoxxa> TehShrike|Work: no it won't
+08:04 < SoulRaven> from phpStorm and nodejs plugin
+08:04 < deoxxa> TehShrike|Work: .bind, .apply, etc
+08:04 < SomeoneWeird> heh, ignore it
+08:04 < TehShrike|Work> deoxxa: don't those things just change the object upon which your function is being called as a method?
+08:04 < deoxxa> i... guess that's one way to look at it
+08:04 < TehShrike|Work> That's how I was looking at it :-x
+08:05 < deoxxa> but you could, for example, do `herp.derp = lol.wut.bind(lol);'
+08:05 < TehShrike|Work> I didn't say "'this' will always refer to the object that your function is a property of"
+08:05 < deoxxa> true
+08:05 < TehShrike|Work> I think I said the correct thing
+08:05 < TehShrike|Work> It may seem confusing, but I don't think that's my fault
+08:05 < deoxxa> no, no, you're right
+08:05 < deoxxa> just different terms
+08:05 < TehShrike|Work> Do you have a better way to say it?
+08:06 < TehShrike|Work> Because I would honestly love to know a better way to explain it
+08:06 < deoxxa> i'd probably use the word "context" somewhere
+08:06 < TehShrike|Work> hmm
+08:07 < chovy> how do i pass a parameter to my module?
+08:07 < pyrotechnick> ahh githubbook
+08:07 < mdedetrich> TehShrike|Work: that doesn't work
+08:07 < TehShrike|Work> I'm very interested in finding the most obvious way to explain that, because it tripped me up for about forever, and I've tried to explain it to other people a good number of times
+08:07 < ljharb> from the ##javascript bot:
+08:07 < ljharb> If a function is called on an object, object.y(), then `this` within `y` refers to `object`. If called directly: y(), `this` refers to the global object - for browsers it's `window`. `this` can be set explicitly by using y.call(thisArg, argument1, argument2, ...), or with  .apply() and .bind().  For further explanation, see: http://killdream.github.com/blog/2011/10/understanding-javascript-oop/#sec-2-2
+08:07 < TehShrike|Work> That's probably about as good as you could do
+08:08 < mdedetrich> like there is a text shadow plugin
+08:08 < mdedetrich> which is $("#rawr").textshadow()
+08:08 < mdedetrich> how do I detect if that text shadow exists
+08:08 < mdedetrich> *textshadow
+08:08 < ljharb> mdedetrich: that's a #jquery question, but the answer is $.isFunction($.fn.textshadow)
+08:09 < TehShrike|Work> you'd probably have to ask somebody in #jquery :-x I'm not solid on how jquery plugins work
+08:09 < TehShrike|Work> ljharb++
+08:09 < mdedetrich> ljharb: i love you
+08:11 < mdedetrich> honestly Modernizr should provide this
+08:11 < TehShrike|Work> That reminds me of a question
+08:11 < TehShrike|Work> How many of y'all use Twitter Bootstrap?
+08:11 < SomeoneWeird> ido
+08:12 < mdedetrich> nope
+08:12 < ljharb> mdedetrich: why would modernizr provide information about third-party jquery plugins??
+08:12 < mdedetrich> ljharb: modernizer should let you execute some JS code if a test fails
+08:12 < TehShrike|Work> For the people who have tried Twitter Bootstrap, have you found it to be a net win?  What has been bad/good for you?
+08:12 < ljharb> mdedetrich: actually modernizr uses something called yepnope, that exactly lets you do that.
+08:12 < SomeoneWeird> TehShrike, its awesome for prototyping
+08:13 < ljharb> mdedetrich: so charade you are
+08:13 < mdedetrich> ljharb: yes, but thats loading js code from a file, not executing arbitrary js code
+08:13 < TehShrike|Work> Do people have a grid system that they prefer to the one that comes with Bootstrap, and if so, why?
+08:13 < mdedetrich> ljharb: i need to do both
+08:13 < SomeoneWeird> something like http://cjdns.info/
+08:13 < TehShrike|Work> I'm a noob at grid systems but I'm desperately in love with the idea
+08:13 < ljharb> mdedetrich: it's easy. if (condition) { } else { }
+08:13 < TehShrike|Work> SomeoneWeird: nice
+08:13 < mdedetrich> ljharb: yeah, hence thats what I am doing
+08:14 < ljharb> well yeah. why would you want a library or framework to do what's built into the language?
+08:14 < mdedetrich> ljharb: just seems obvious that it should let you execute a js function if a test fails, as well as loading the library
+08:14 < ljharb> thats like saying you want something for string concatenation
+08:14 < mdedetrich> ljharb: instead of just loading the js files
+08:15 < ljharb> mdedetrich: if the JS file for your plugin patches $.fn (as jquery plugins do) then yeah, you'd use yepnope to load it if the condition above fails.
+08:15 < ljharb> mdedetrich: alternatively, just load it twice, because any properly written plugin won't overwrite itself.
+08:15 < mdedetrich> I'm just arguing semantics at this point, the if condition works fine using complete :)
+08:15 < ljharb> lol k
+08:16 < mdedetrich> I wonder what all the hype of twitter bootstrap is
+08:17 < TehShrike|Work> There's hype?
+08:18 < mbalho> bootstrap handles big data at petabyte scale
+08:18 < TehShrike|Work> All I know is 1. reset script that doesn't fuck you over, and 2. Grid system that seems functional
+08:18 < mbalho> duh
+08:18 < TehShrike|Work> I like both of the things that I said there
+08:18 < SomeoneWeird> yeah
+08:18 < TehShrike|Work> There could be other things
+08:18 < TehShrike|Work> I'm not sure
+08:18 < SomeoneWeird> bootstrap is awesome
+08:19 < SomeoneWeird> all the css is already done, and you can modify it however you want
+08:19 < SomeoneWeird> for me (who hates/cant write css) its good, because i can easily prototype sites and stuff
+08:19 < mdedetrich> meh
+08:19 < TehShrike|Work> Yes.  I'm a fan of Bootstrap's goal, and I haven't found any problems with the implementation yet.
+08:19 < mdedetrich> just another UI library
+08:19 < TehShrike|Work> It's not a UI library
+08:20 < TehShrike|Work> That's why I like it
+08:20 < TehShrike|Work> Every time I try to drop a UI library into one of my sites, it sucks
+08:20 < SomeoneWeird> yeah i was skeptical
+08:20 < mdedetrich> so what is it then
+08:21 < mdedetrich> how does it manage a grid system without providing UI functionality
+08:21 < TehShrike|Work> It might be a lot of things.  But to me, it's a reset script that doesn't suck, and a simple grid system.
+08:21 < TehShrike|Work> mdedetrich: a grid is alignment - what the things look like, is up to you
+08:21 < mdedetrich> TehShrike|Work: what is reset script
+08:21 < TehShrike|Work> Bear in mind, I'm a stupid person who is not awesome at CSS
+08:22 < mdedetrich> also
+08:22 < mdedetrich> other UI libraries
+08:22 < mdedetrich> let you them their UI as well
+08:22 < TehShrike|Work> A reset script is a CSS file that explicitly zeros out every single setting that could be different between browsers
+08:22 < mdedetrich> *theme
+08:22 < TehShrike|Work> But Bootstrap doesn't give you a true reset script
+08:22 < TehShrike|Work> Instead of setting everything to some "zero" value, it sets it explicitly to a value that you could consider reasonable
+08:23 < mdedetrich> why are we setting things to zero
+08:23 < TehShrike|Work> Because IE7 might assume that the margin of a div is 1, and IE8 might assume that the margin of a div is 2 by default
+08:23 < SomeoneWeird> because things have difference default values between browsers
+08:23 < TehShrike|Work> So a reset script would just set it to 0 and let you overwrite it
+08:23 < mdedetrich> right, so this seems like cross browser UI library
+08:23 < TehShrike|Work> But Bootstrap just sets it to 2, or something reasonable
+08:26 < mdedetrich> eh I will look at it another time
+08:27 < TehShrike|Work> I've used other reset scripts, and they were annoying
+08:28 < TehShrike|Work> I haven't used other grid systems yet (I probably should) but Bootstrap's has been simple and sensible
+08:31 < mdedetrich> TehShrike|Work: what is the bootstrap component
+08:31 < mdedetrich> TehShrike|Work: for an input line
+08:32 < TehShrike|Work> eh?  An input line? Like, a text input?
+08:32 < mdedetrich> TehShrike|Work: yeah
+08:32 < TehShrike|Work> Iiiiiiii don't know of anything special to do about text inputs.
+08:32 < TehShrike|Work> There may be.
+08:32 < TehShrike|Work> But I'm not a Bootstrap pwner.
+08:33 < SomeoneWeird> <input type='text'> 
+08:33 < SomeoneWeird> exactly the same as usual
+08:33 < TehShrike|Work> I think everything is normal
+08:33 < SomeoneWeird> it is
+08:33 < mdedetrich> SomeoneWeird: and it themes the elements I assume
+08:33 < TehShrike|Work> Except you can say "let this thing take up 2 sideways units"
+08:33 < SomeoneWeird> yes mdedetrich 
+08:33 < SomeoneWeird> if you want it to
+08:34 < TehShrike|Work> Or "let this thing be 6 units, and also wrap easily" or whatever
+08:35 < mdedetrich> bah
+08:35 < mdedetrich> theming is not universal
+08:35 < TehShrike|Work> Themes suck
+08:35 < mdedetrich> across browsers
+08:35 < TehShrike|Work> Fuck themes, just get your controls to show up in the right place
+08:35 < mdedetrich> I mean that the input fields look different in other browsers
+08:36 < TehShrike|Work> yup
+08:36 < TehShrike|Work> iOS especially
+08:36 < mdedetrich> I think jquery mobile
+08:37 < mdedetrich> may fix that
+08:37 < TehShrike|Work> I don't know what you're trying to fixe
+08:37 < TehShrike|Work> but jQuery Mobile very well may fix it
+08:37 < TehShrike|Work> Because they work hard to fix a very large number of things
+08:38 < mdedetrich> I'm actually interested in a library that provides consistent UI elements
+08:38 < mdedetrich> across all browsers
+08:38 < TehShrike|Work> So that raises an interesting question
+08:38 < TehShrike|Work> Consistent in what way?
+08:38 < mdedetrich> look the same
+08:38 < TehShrike|Work> The way they look?  They way they are aligned on the page?
+08:38 < mdedetrich> the way they look
+08:38 < TehShrike|Work> The way they act when the user interacts with them?
+08:39 < mdedetrich> the way they look
+08:39 < TehShrike|Work> I think jQuery UI/jQuery Mobile are supposed to provide consistent UI across different browsers
+08:40 < mdedetrich> jquery mobile
+08:40 < mdedetrich> doesn't work on ie8
+08:40 < TehShrike|Work> Really?  That surprises me
+08:40 < TehShrike|Work> What doesn't work?
+08:40 < mdedetrich> their website
+08:41 < TehShrike|Work> It... kills your children when you try to view it?
+08:41 < mdedetrich> it has js errors and doesn't load
+08:41 < mdedetrich> so I can't even test it
+08:41 < TehShrike|Work> In... that one browser?
+08:41 < TehShrike|Work> Interesting
+08:42 < TehShrike|Work> I wonder if it works in IE7
+08:43 < mdedetrich> I'm pretty damn sure there is a UI library that allows consistent themes across browers
+08:43 < mdedetrich> with things like input field
+08:44 < TehShrike|Work> If X is a UI library
+08:44 < TehShrike|Work> And Y is a browser in which library X does not work
+08:44 < TehShrike|Work> Then for every X, I will guarantee you that there is at least one Y
+08:45 < TehShrike|Work> And I would bet huge amounts of money that there would be at least dozens of Ys per X
+08:45 < mdedetrich> You can easily implement an input field
+08:45 < mdedetrich> which looks the same across browers
+08:45 < TehShrike|Work> I recently implemented a text field that I am ashamed of
+08:47 < TehShrike|Work> http://hastebin.com/tapedewuyo.js
+08:47 < mdedetrich> Eh
+08:48 < mdedetrich> I can just use an image
+08:48 < mdedetrich> currently doing a website for a client, hence why I was asking
+08:48 < mdedetrich> lucky the elements are static width
+08:48 < mdedetrich> and height
+08:55 < TehShrike|Work> Your points are valid.
+08:56 < TehShrike|Work> I can only respond:
+08:56 < TehShrike|Work> Butts.
+09:00 < mdedetrich> I can remember there was a plugin
+09:00 < mdedetrich> dammit
+09:00 < mdedetrich> for this
+09:01 < SomeoneWeird> <mdedetrich> lucky the elements are static width< ew
+09:01 < mdedetrich> that
+09:01 < mdedetrich> didn't work
+09:01 < mdedetrich> I tried to do the opacity trick
+09:01 < mdedetrich> then I remembered that you actually need to see the text
+09:04 < mdedetrich> uh found it
+09:04 < mdedetrich> uniform.js
+09:05 < mdedetrich> *aah
+09:06 < mdedetrich> TehShrike|Work: http://uniformjs.com/#intro
+09:07 < mdedetrich> oh god dammit
+09:07 < mdedetrich> that doesn't work for text inputs
+09:08 < SomeoneWeird> what are you trying todo?
+09:08 < mdedetrich> text inputs that look the same
+09:08 < mdedetrich> across all browers
+09:09 < mdedetrich> in regards to style
+09:22 < aandy> hi, i'm parsing a small fire hose (that is, lot of random data -> my node script), and want to listen with regexes similar to Hubot. as per robot.coffee it simply iterates over a regex-based object array, letting the object flag a msg to mark "stop iterating". i'd really prefer to make it "regex with best fit". does anyone have any thoughts on this?
+09:22 < mdedetrich> even holy fuken shitballs
+09:22 < mdedetrich> this works ini IE6
+09:23 < mdedetrich> SomeoneWeird: don't worry, managed to figure it out
+09:23 < aandy> as in, for example, assigning a value representing how "well" it matched, thus first iterating over all listeners, and then executing the best one after. or would this be way too heavy/bad?
+09:24 < SomeoneWeird> how can a regex be the "best fit"
+09:24 < aandy> right, that's a difficult value to assign, but in my use case something along the lines of length would suffice
+09:25 < aandy> as in, the regex[0] that is the longest
+09:25 < aandy> i think precedence is out of the question (with the array being a list of objects, order might be a pain)
+09:26 < aandy> but perhabs it would be better to make all regexes unique, and in cases where two share the similar base, make a listener which then differentiates between the two?
+09:26 < nsm> aandy: why do you want 'best fit', the actual outcome might allow some other approach
+09:27 < aandy> i was thinking in terms of "location" blocks from nginx, if you're familiar? e.g. /something, if that doesn't fit, then /. if both fit (which /something would), then use the first
+09:28 < aandy> i mean, precedence is an obvious solution, i'm just wondering if it's how i should do it
+09:28 < nsm> yes, but is this so that on an 'ambiguous' expression, multiple plugins don't react?
+09:28 < nsm> or you want a certain order of responses?
+09:28 < aandy> yes
+09:28 < aandy> the former
+09:29 < nsm> because i wouldn't bother with putting the responsibility on the core, rather i'd just trigger all plugins whose regex matched, and let the regex clear up the ambguity
+09:29 < nsm> s/regex/plugin
+09:29 < aandy> okay, thanks :)
+09:30 < nsm> :) no problem
+09:30 < aandy> i should stop being ambiguous ;)
+09:45 < FunkySkunk>  
+09:49 < mdedetrich> FunkySkunk: wise words young man
+10:24 < evelyette> hi, I'm wondering what does this do:
+10:24 < evelyette> var app = express()
+10:24 < evelyette>   , http = require('http')
+10:24 < rounce> divides by zero
+10:24 < evelyette> why is there a ',' at the beginning of a line ?
+10:25 < shanse> evelyette: style
+10:25 < rounce> instead of saying var app = express(); var http = require('http');
+10:25 < evelyette> aha okay, thank you
+10:25 < rounce> basically
+10:25 < shanse> or var app = express(), require('http')
+10:25 < rounce> err
+10:25 < shanse> err
+10:25 < rounce> shanse, no
+10:25 < rounce> lol
+10:25 < shanse> + http=
+10:25 < rounce> yus
+10:25 < rounce> =D
+10:32 < borekb> Hi, what's the difference between Windows x86 and x64 installers? They both install to c:\program files (x86) so it seems that Node is really just a 32bit application. Is that true? If so, what's the diff between those two installers?
+10:32 < RLa> isn't that called comma-operator?
+10:51 < Cogito_Ergo_Sum> hi
+10:53 < Cogito_Ergo_Sum> i'd like to ask, is it possible to use libuv in a C/C++ project ( VS ) as an abstraction layer for IOCP ? if yes, the exposed interfaces are the same as node.js or at a lower level? for example for creating a tcp server
+10:56 < rounce> http://howtonode.org/hello-node/hello-tcp.js
+10:57 < Cogito_Ergo_Sum> rounce, that's not what i meant, i know how to use node, I'm just asking if i can directly use libuv inside a C++ project
+10:58 < rounce> oh
+10:59 < rounce> I should think so yes
+11:00 < rounce> I've only experimented a little with this
+11:00 < rounce> ("this" as in writing C++ modules for node)
+11:00 < Cogito_Ergo_Sum> ok
+11:06 < efbeka> Please someone explain me this limitation "when streams are emitted as the subject of an EventEmitter event you cannot perform IO operations in your handler"
+11:12 < maneulyori> Hello, I'm having hard time to hot swap modules. I cannot find how to unload loaded module through require(<module_file_name_here>). Is there any way to do it? (p.s. sorry for poor grammer)
+11:12 < danheberden> efbeka: if your EE is working with a stream, that would tie up the process from doing stdio stuff 
+11:13 < danheberden> maneulyori: it's an assigned var. var http = require( 'http' ); http = null; would make it get caught in the garbage collector
+11:13 < danheberden> efbeka: though you should be able to create a new child_process to do stdio operations in
+11:16 < RLa> uh, github profile pages have been changed
+11:16 < yawnt> yeah
+11:16 < maneulyori> danheberden, I removed loaded module from variable, but when I reload module (with modified code), its change didn't applied. What can I do for it?
+11:17 < RLa> yawnt, new one seems less friendly for devices with small width
+11:17 < RLa> because of two column layout
+11:17 < RLa> and it's not responsive
+11:17 < yawnt> yea
+11:17 < yawnt> but still
+11:17 < yawnt> i don't like it in the desktop
+11:17 < yawnt> (btw i think it's better on mobile than the previous version)
+11:19 < RLa> yeah, fonts are bigger
+11:19 < danheberden> RLa: i'm still trying to find out how to post a status update to it
+11:20 < RLa> hm
+11:20 < evelyette> hi, is there any reason to use socket.io with express (both on same port) rather than listening on two ports (one for express and the other for socket.io) ?
+11:22 < mbalho> because most websites use port 80/443
+11:22 < danheberden> evelyette: well, depending on the environment, you could upstream express in nginx to take advantage of better file serving and leave socket.io to do its thing
+11:23 < danheberden> which would require express to be a separate port
+11:23 < edoardo> Hello!
+11:23 < evelyette> let's leave nginx out of it for now ... the reason to use one port is exactly that: to use one port rather than multiple ?
+11:24 < evelyette> but there are no other advantages ... maybe the authentication thing as well (if authenticated against express, then I'm authenticated against socket.io as well)
+11:24 < evelyette> but if using two ports this wouldn't be the same
+11:24 < evelyette> same ==case
+11:25 < danheberden> if you're using socket.io to communicate with your express application, i don't see the need for different ports
+11:25 < edoardo> Question: I created a server with the 'net' module which writes a stream of data to a UNIX socket - then I connected to it with another app using net.createClient. The amounts of data are big, and I noticed that the nodejs client process keeps growing in memory as it reads from the stream, till it exhausts system memory. Can I fix it??
+11:25 < `3rdEden> evelyette most people deploy real-time systems on a different port than 80 because virus scanners are extra agressive on that port number
+11:25 < mbalho> whaaat
+11:25 < evelyette> danheberden, I'm asking what the difference to use socket.io bundled with express, rather than using it alone ... 
+11:26 < `3rdEden> evelyette to acheive the most connectivity I would suggest just running Express on port 80 and Socket.IO as HTTPS server on 443
+11:26 < mbalho> evelyette: when socket.io 'attaches' itself to express it basically inserts itself in the request handler chain
+11:26 < mbalho> evelyette: it checks of the request is a websocket upgrade or if it matches one of the socket.io static file routes (usually at /socket.io/*)
+11:27 < edoardo> Anybody know the answer to my question? Why does net.createClient keep growing memory??
+11:28 < mbalho> edoardo: its hard to find memory leaks unless all the code is viewable
+11:28 < evelyette> mbalho, okay, but what if I'm using express on port 80 and socket.io in port 8080 ... 
+11:28 < mbalho> evelyette: why do you want to use different ports?
+11:29 < evelyette> mbalho, I'm not sure ... I'm just asking what's the difference
+11:29 < edoardo> mbalho: literally it's this line on the client
+11:29 < edoardo> var client = net.createConnection ( { 'path' : '/tmp/streaming-api.sock' } );
+11:29 < edoardo> As soon as it's connected the client memory never stops growing
+11:29 < edoardo> The emitting server keeps working peacefully at a stable 35Mb ram
+11:29 < edoardo> I don't get it
+11:30 < edoardo> It's like the client buffer just keeps growing
+11:31 < mbalho> evelyette: there isnt really a difference other than how confusing you want your architecture to be
+11:31 < mbalho> evelyette: if you have to remember special ports for things for the client to connect to it can get confusing
+11:31 < evelyette> mbalho, can you check out this code: http://dpaste.com/803515/ ... when running it in the web browser, it doesn't do anything, any ideas ?
+11:31 < evelyette> mbalho, that's what I thought and hoped for ... okay that's cleared then :)
+11:32 < dominictarr> isaacs, hey, I'm trying to figure out what 'downloads' means on npmjs.org 
+11:33 < dominictarr> I'm guessing that it's not the number of times a module is installed, because of caching.
+11:34 < rounce> new installs I suspect
+11:34 < dominictarr> but I'm a little confused, because I'd expect dependencies to have a similar number as a dependent module.
+11:35 < dominictarr> hmm, it's not broken down by version. that would change things.
+11:41 < edoardo> Hello again!
+11:41 < edoardo> http://pastebin.com/rQhemuzr
+11:41 < edoardo> Could u take a look at that?
+11:42 < edoardo> I run that simple node app and the memory usage grows, relentless
+11:42 < edoardo> Why isn't the read buffer cleared?
+11:44 < edoardo> :(
+11:44 < edoardo> No Ideas?
+11:49 < edoardo> Jezz guys - alright, I'll figure it out by myself
+11:52 < CIA-118> libuv: Fedor Indutny master * r73cf360 / src/unix/fsevents.c : darwin: fsevents: emit UV_CHANGE on metadata change - http://git.io/g7nAnQ
+11:54 < edoardo> But seriously
+11:54 < edoardo> Nobody noticed that opening a socket client to read from a stream makes memory grow to the infinity?
+11:54 < edoardo> And u guys use node regularly?
+12:03 < Cogito_Ergo_Sum> socket.on("data", onSocketData);
+12:03 < Cogito_Ergo_Sum> function onSocketData(data) { socket.write(socket.name + "> " + data + "\r\n"); }
+12:03 < Cogito_Ergo_Sum> am i doing something wrong here?
+12:04 < Cogito_Ergo_Sum> it says socket is not defined
+12:06 < zomg> Cogito_Ergo_Sum: where is 'socket' defined?
+12:07 < dominictarr> I presume this is inside net.createServer(function (socket) { .... })
+12:08 < Cogito_Ergo_Sum> let me pastebin it
+12:10 < Cogito_Ergo_Sum> http://pastebin.com/9yTD6cWq
+12:10 < Cogito_Ergo_Sum> dominictarr yes
+12:10 < SomeoneWeird> socket isn't defined in that scope
+12:11 < Cogito_Ergo_Sum> i tried function onSocketData(socket, data) but the same
+12:11 < SomeoneWeird> you won't be able todo it like that, afaik
+12:12 < Cogito_Ergo_Sum> but why socket is recognized within the onNewConnection
+12:12 < Cogito_Ergo_Sum> and not below it
+12:13 < zomg> Cogito_Ergo_Sum: because it's a parameter on the onNewConnection function?
+12:14 < SomeoneWeird> because you're passing the socket variable to onNewConnection and initSocket, its just the event doesn't pass the socket when it emits 'data'
+12:14 < dominictarr> Cogito_Ergo_Sum, you prob just have a typo. post your whole code.
+12:14 < Cogito_Ergo_Sum> ah so on the on the 'data' event the socket doesn't pass
+12:15 < SomeoneWeird> yes
+12:15 < SomeoneWeird> no his mixing his scope dominictarr 
+12:15 < SomeoneWeird> Cogito_Ergo_Sum, yeah, you don't have access to 'socket' inside of onSocketData
+12:15 < SomeoneWeird> just the data from it
+12:15 < Cogito_Ergo_Sum> socket.on("data", function(data) {onSocketData(socket, data);})
+12:15 < Cogito_Ergo_Sum> i got it working this way
+12:16 < SomeoneWeird> yep
+12:16 < Cogito_Ergo_Sum> but just didn't like that i have to write function() {blablah}
+12:16 < Cogito_Ergo_Sum> and thought everything passes
+12:19 < Cogito_Ergo_Sum> thanks
+12:21 < dominictarr> Cogito_Ergo_Sum, most people would just do it like this http://pastebin.com/UXQk7Jih
+12:23 < Cogito_Ergo_Sum> yeah i know but it's not very clean
+12:23 < Cogito_Ergo_Sum> here is the final version
+12:23 < SomeoneWeird> cleaner than yours >.>
+12:23 < SomeoneWeird> <.<
+12:23 < SomeoneWeird> >.>
+12:24 < Cogito_Ergo_Sum> http://pastebin.com/9LEN6zQF
+12:24 < Cogito_Ergo_Sum> well
+12:24 < Cogito_Ergo_Sum> i meant more structured
+12:24 < SomeoneWeird> just depends how you like/want to structure/read it
+12:25 < Cogito_Ergo_Sum> yes
+12:27 < deoxxa> ha wow, i completely forgot about fs.open
+12:27 < deoxxa> streams <3
+12:30 < strk> is there a RegExp parameter to force "literal" interpretation of the pattern ?
+12:30 < strk> same as escaping each and every character in it...
+12:30 < BennyLava> wat
+12:30 < substack> strk: there's no \Q\E if that's what you mean
+12:30 < substack> nor quotemeta
+12:30 < zomg> strk: you could put it in a string and just do a replace on it to add \ before everything
+12:30 < zomg> :D
+12:31 < strk> \t\o\ \b\e\ \s\u\r\e\ \+\ \o\r\ \*\ \e\t\c\ \d\o\ \n\o\ \h\a\r\m
+12:31 < strk> right
+12:31 < strk> so much effort for a replaceAll :)
+12:31 < deoxxa> \t != t
+12:31 < substack> I almost published a quotemeta module once
+12:31 < substack> almost
+12:31 < zomg> Well I'd imagine there's a lib or such to escape regexes in js though
+12:31 < BennyLava> lib lol
+12:32 < strk> split().join('\\) ?
+12:32 < BennyLava> str.replace /[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'
+12:32 < substack> bah quotemeta needs to exist
+12:32 < substack> one sec
+12:32 < substack> how is that not on npm already come on
+12:34 < substack> looks like perl's quotemeta is just str.replace(/(\W)/g, '\\$1')
+12:34 < strk> right what I was looking for
+12:34 < SomeoneWeird> substack, how u make project images?!
+12:34 < SomeoneWeird> :p
+12:34 < substack> SomeoneWeird: http://inkscape.org/
+12:34 <@konobi> is there a pcre addon?
+12:34 < strk> how's the backref in js ?
+12:35 < substack> strk: str.replace(/(\W)/g, '\\$1')
+12:35 < SomeoneWeird> haha so you do them by hand?
+12:35 < substack> SomeoneWeird: as opposed to?
+12:36 <@konobi> i've seen some mentions on the lists about pcre addons
+12:36 < SomeoneWeird> heh, right
+12:37 < strk> console.log('ciao'.replace(/./,'$1')) --> $1iao
+12:38 < strk> ?!
+12:38 < BennyLava> ..
+12:38 <@konobi> /(\W)/
+12:38 < BennyLava> >> 'ciao'.replace(/(.)/,'$1')
+12:38 < purr> BennyLava: (string) 'ciao'
+12:39 < strk> ah, missing ()
+12:39 <@konobi> don't forget your flags
+12:40 < strk> grr
+12:40 < strk> 'ciao'.replace(/(.)/g,'\\$1')
+12:40 < strk> '\\c\\i\\a\\o'
+12:40 < strk> 'ciao'.replace(/(.)/g,'\$1')
+12:40 < strk> 'ciao'
+12:40 <@konobi> strk: you'll need 3
+12:41 < strk> same as 2
+12:41 < strk> something must be broken (node-0.4.10)
+12:41 < strk> but maybe is just the printout which omits them
+12:41 < SomeoneWeird> y u use old node
+12:42 < substack> http://www.readwriteweb.com/cloud/2012/03/googles-go-programming-languag.php
+12:42 <@konobi> strk: \\c is correct
+12:43 < substack> According to distinguished Google Engineer Rob Pike, the co-designer of the Go programming language, it's designed for "big software."
+12:43 < substack> ^^^ first mistake
+12:43 <@konobi> otherwise it's be a control character
+12:43 < substack> I like to think that node is designed for small software
+12:47 < mbalho> hehe
+12:49 < strk> bah, \c\i\a\o doesn't match ciao, maybe node-0.4 is really broken
+12:50 <@konobi> >> '\\c\\i\\a\\o' == 'ciao'
+12:50 < purr> konobi: (boolean) false
+12:50 <@konobi> >> "\\c\\i\\a\\o" == 'ciao'
+12:50 < purr> konobi: (boolean) false
+12:50 <@konobi> bah
+12:50 < SomeoneWeird> that won't even work
+12:50 < SomeoneWeird> ll
+12:50 < BennyLava> ..
+12:50 < SomeoneWeird> lol
+12:50 < BennyLava> wat
+12:53 < kuplatupsu> So i forked node and added couple of functions there to make it embeddable
+12:54 < SomeoneWeird> nice
+12:55 < strk> I'll try subject. split(oldstring).join(newstring)
+12:56 < strk> should be quick and is elegant (if it works)
+12:58 < deoxxa> kuplatupsu: link?
+13:02 < kuplatupsu> deoxxa: https://github.com/tonttu/node/commits/master
+13:02 < kuplatupsu> also made ev mainloop polling time to be configurable, by default it blocks until it gets next event
+13:03 < kuplatupsu> so in my application I just set it to 0 so it doesn't wait at all, and everything works nice with my main loop
+13:04 < deoxxa> ah yep
+13:06 < phrearch> hey
+13:06 < phrearch> how do i make sure that _retval returns the result from an inner callback like http://pastie.org/4759819 
+13:06 < phrearch> ?
+13:07 < SomeoneWeird> huh phrearch 
+13:08 < phrearch> i think the var doesnt have a value when it returns. not sure
+13:10 < phrearch> not really sure how to handle this async
+13:10 < phrearch> if you got a function which is supposed to return a value, but the value comes from another async function within that function
+13:11 < phrearch> what pattern can i use to handle such a case
+13:11 < SomeoneWeird> https://github.com/caolan/async
+13:11 < SomeoneWeird> use waterfall
+13:12 < phrearch> SomeoneWeird: thanks!, ill check that out
+13:24 < boozedog> hi there can anyone point me to docs on how to install linux binary version of node? I'm hoping to skip the build and just deploy the binary to my server ...
+13:25 < phrearch> boozedog: no repo version?
+13:25 < phrearch> most distros have node.js in their repository
+13:25 < boozedog> phrearch: in the past I've always downloaded the source and done the make thing ...
+13:25 < Connorhd> boozedog: what flavour of linux?
+13:26 < boozedog> ubuntu 64-bit
+13:26 < Connorhd> "apt-get install nodejs" should do it then
+13:26 < RLa> boozedog, anyway, untar it somewhere and softlink bin/node and bin/npm and bin/node-waf to /usr/local/bin
+13:27 < boozedog> ok thank u guys
+13:27 < RLa> i think that was how i installed it last time from binary
+13:27 < boozedog> anybody know what version the ubuntu repo has presently?
+13:28 < Connorhd> http://packages.ubuntu.com/precise/nodejs
+13:28 < boozedog> thx connor. so if i want to stay bleeding edge then i guess repo ain't the way to go?
+13:30 < aMoniker> I've just set up nginx to proxy to node. Now when I update a node file and restart node, I don't see the change until I also restart nginx.
+13:30 < aMoniker> wtf
+13:31 < SomeoneWeird> nginx is probably caching it aMoniker 
+13:32 < aMoniker> looked into that but I don't see a cache anywhere… and I read it's not enabled by default
+13:32 < SomeoneWeird> maybe your browser is caching it?
+13:33 < aMoniker> shouldn't be, I tend to force-refresh
+13:35 < aMoniker> well.. can't replicate it now, so I'm probably just being stupid
+13:36 < phrearch> hm async.waterfall works fine if you have two functions next to each other, but i fail to understand how that works with two functions, where one function is inside the other, like http://pastie.org/4760077
+13:37 < aMoniker> On a quasi-unrelated subject… can anyone recommend a good templating engine? 
+13:37 < superjoe> aMoniker, client side, angularjs, server-side, ejs
+13:38 < phrearch> aMoniker: handlebars?
+13:38 < aMoniker> superjoe: server-side is what I'm looking for, thanks
+13:38 < superjoe> aMoniker, there are a bunch of server side templating engines built into express
+13:39 < aMoniker> superjoe, cool, this is a small project so I just need something basic - any recommendations from the built-ins?
+13:39 < superjoe> aMoniker, if it's a small project, definitely use express. use ejs
+13:40 < aMoniker> superjoe, using express (for the first time) - I'll check out els, thanks
+13:40 < aMoniker> *ejs
+13:41 < phrearch> any other webframeworks for node.js that are used a lot?
+13:42 < substack> use modules
+13:42 < substack> tiny ones
+13:43 < substack> framework is just a placeholder for "the things that I need to build an app"
+13:44 < substack> but all those things are probably on npm as separate individual modules
+13:46 < SomeoneWeird> anyone know how I can get the response headers of a HTTP request?
+13:47 < substack> SomeoneWeird: res.headers
+13:47 < SomeoneWeird> yeah I didn't know whether I had todo a proper get request or not
+14:14 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+14:15 < context> deoxxa: im a person not a word ;)
+14:16 < deoxxa> my apologies, good sir!
+14:16 < deoxxa> i didn't mean to put you in a...
+14:16 < deoxxa> bind()
+14:16  * deoxxa sunglasses
+14:20 < CIA-118> libuv: Bert Belder master * r46bd5fb / include/uv.h : Rearrange struct layouts to make FFI bindings easier - http://git.io/IGE2XA
+14:20  * SomeoneWeird glares at deoxxa 
+14:20 < deoxxa> you're right
+14:20 < deoxxa> i'm not even sure you could call() that a joke
+14:20 < deoxxa> i mean humour doesn't even apply() there
+14:20 < evelyette> hi, does anybody have an idea how can I connect to the redis pub/sub queue in every client connection ... I can't just connect to it with redis.createClient(6379, "0.0.0.0"); becuse that would spawn too many connections
+14:21 < evelyette> I would much rather use something else ... any ideas ?
+14:21  * SomeoneWeird glares at deoxxa 
+14:22 < deoxxa> i really shouldn't construct such awful puns
+14:22 < deoxxa> every instance is terrible
+14:22 < SomeoneWeird> -.-
+14:30 < jcoglan> quick question: is there some way I can run `touch` on a directory in node?
+14:32 < jcoglan> using the 'touch' module, I get "EISDIR, illegal operation on a directory"
+14:32 < rounce1> the technical term for that is a "bad touch"
+14:32 < SomeoneWeird> http://nodejs.org/api/child_process.html
+14:33 < BennyLava> bad touch… like touching people in inappropriate places
+14:33 < jcoglan> there's no way to do it aside from shelling out?
+14:33 < SomeoneWeird> the modules would just be wrapping a process anyway
+14:34 < jcoglan> really? I thought they'd be wrapping system calls (not that I know much about how the fs interface works)
+14:34 < SomeoneWeird> dunno, have a look at the source :p
+14:34 < jcoglan> i.e. calling into the C++ code
+14:35 < xico> Is there a module for mapping a project's folder structure?
+14:35 < xico> So I can either get an absolute or relative path for a given folder 
+14:35 < xico> of my need, from anywhere in my project
+14:35 < jcoglan> xico: fs.readdir + recursion, or the 'walk' library
+14:35 < xico> Anything already made by someone?
+14:36 < deedubs> substack: so bouncy randomly crashes out with https://gist.github.com/3755888 on 0.8.9
+14:37 < cody--> hey
+14:40 < SomeoneWeird> elllo
+14:43 < xico> Hi all. Any already made module for calculating paths to a given folder in our project, from anywhere, without caring about the location at calculation time?
+14:44 <@konobi> xico: path
+14:45 < bradleymeck> xico: path.resolve(base, relativePath) ?
+14:51 < cnd> is there an easy way in express to take a request, then create a new request to a separate server, and transparently send the response back to the original client?
+14:51 < cnd> I have objects in aws s3
+14:51 < SomeoneWeird> wat
+14:51 < cnd> and I'd like to transparently send them through my node server
+14:51 < SomeoneWeird> oh, sure
+14:51 < xico> bradleymeck: I want to be able to get either absolute or relative paths
+14:51 < bradleymeck> xico: read the docs on path.resolve
+14:52 < xico> I already gave took them for a spin
+14:52 < xico> but I'll check them out again
+14:52 < SomeoneWeird> cnd, http://pastie.org/4760671
+14:52 < cnd> SomeoneWeird: great, thanks!
+14:52 < jergason> cnd: you could also just use pipe
+14:53 < cnd> jergason: pipe?
+14:53 < jergason> cnd: do you know about linux pipes?
+14:53 < cnd> jergason: yeah
+14:53 < jergason> node has a sortof-similar idea
+14:53 < jergason> stream output of one thing to something else
+14:53 < cnd> jergason: if you can point me to where it would be in the docs?
+14:54 < jergason> There aren't great docs for them.
+14:54 < cnd> my problem with express is that it just isn't well documented from an api point of view
+14:54 < jergason> http://dailyjs.com/2012/03/08/unix-node-pipes/ is okay-ish
+14:54 < cnd> at least, not that I have found yet
+14:54 < jergason> https://github.com/mikeal/request is the best http library
+14:54 < jergason> and it supports pipes
+14:54 < shanse> cnd: well, most of express is connect
+14:54 < jergason> has some examples
+14:54 < cnd> shanse: good point
+14:55  * cnd goes to look at the connect docs
+14:55 < jergason> yeah, but for some reason they deleted most of the docs with the new site upgrade
+14:55 < jergason> express-specific stuff used to be much better documented
+14:56 < jergason> cnd: so if you want to use streams and pipes, just do request.get('http://somes3url.com/somefile').pipe(res);
+14:56 < jergason> obviously need to do s3 authentication stuff, but I think the s3 libraries also return streams.
+14:57 < jergason> so data that comes back from the http request gets streamed out to the client as it comes in, instead of all buffered in to memory before it gets sent back otu
+14:57 < cnd> jergason: so if I can get a stream from my s3 lib, I can do: request.get("myurl").pipe(<stream from s3>)?
+14:57 < cnd> sorry, that was just wrong
+14:57 < cnd> let me try again :)
+14:57 < cnd> <stream>.pipe(res); is all I need
+14:57 < cnd> great
+14:58 < cnd> thanks a ton guys!
+14:58 < jergason> cnd: yeah
+14:58 < jergason> http://pastie.org/4760715
+14:58 < jergason> assuming the lib returns streams
+14:58 < cnd> yeah
+14:58 < cnd> I'm sure there's an s3 lib out there that does
+14:59 < cnd> I've been looking into knox
+14:59 < aMoniker> knox is nice
+15:06 < eldios> am I the only one who uses node as a calculator in here? :)
+15:08 < aMoniker> I use the javascript console in my browser sometimes
+15:11 < zackiv31> anyone have a recommendation for something like handlebars.js but with a little bit more logic?
+15:13 < BennyLava> templates should have less logic, not more
+15:13 < brianc> zackiv31: i think dust is kinda similar but with more logic
+15:14 < brianc> zackiv31: though I'm not sure it's still active
+15:16 < zackiv31> yah I was just reading: http://engineering.linkedin.com/frontend/client-side-templating-throwdown-mustache-handlebars-dustjs-and-more
+15:18 < mscdex> another day, another github layout change
+15:18 < nlf> true story
+15:19 < zackiv31> BennyLava: yes I can understand that, but ya never know when you might need just a little bit of logic... i haven't even got into exploring partials yet
+15:19 < Nilbus> mscdex, what's new today?
+15:20 < Nilbus> eldios, I always use python. Same thing though :)
+15:20 < eldios> Nilbus, I used to use the py console
+15:20 < eldios> then I switched to the node one =)
+15:21 < Nilbus> I'll have to try it
+15:21 < kuplatupsu> Didn't remember that developing on windows is such a pain. It seems that nodejs configure-script (and also some msvc project generators inside gyp) use PROCESSOR_ARCHITECTURE -environment variable to test if the cpu/os is x64 or ia32
+15:22 < kuplatupsu> of course, that environment variable doesn't actually provide that information
+15:22 < kuplatupsu> it only tells if you are running the configure/gyp with 64 or 32 bit version of python...
+15:23 < mscdex> Nilbus: at least the user dashboard layout changed
+15:23 < chrisjaure> profile pages too
+15:24 < Nilbus> mscdex, chrisjaure: ooh, nice. I like it
+15:24 < mscdex> i can just imagine a bunch of idle developers sitting around discussing what they're going to change that week
+15:25 < diegoviola> pfft... windows can't even fork processes right?
+15:25 < diegoviola> fork()
+15:25 < Nilbus> hm. It github doesn't show blue in the activity bars anymore. 
+15:25 < mscdex> diegoviola: probably not, because it's not *nix ;-)
+15:25 < bradleymeck> diegoviola: it should be able to?
+15:26 < diegoviola> windows is crap
+15:26 < BennyLava> mindless ms hate just because, mscdex--
+15:26 < BennyLava> scrub
+15:26 < bradleymeck> kuplatupsu: well kernel and the arch version dont always match when you are running things
+15:27 < bradleymeck> you do not want a 64bit node if everything else is 32bit
+15:27 < nathan7> Hey bradleymeck 
+15:28 < bradleymeck> yo
+15:28 < janmower> diegoviola: fork() is posix, windows probably needs SpawnSubProcesswithUUID (or some nonsense)
+15:28 < nathan7> mscdex: I noticed the layout change, loving the organisation layout 
+15:28 < kuplatupsu> bradleymeck: well there are two issues now. First issue is that PROCESSOR_ARCHITECTURE env variable has a very confusing name, since it doesn't tell the architecture of the processor or even OS. The second issue is that node and gyp both use that to detect if the host OS is 32/64 bit
+15:28 < nathan7> More focus on repositories
+15:28 < kuplatupsu> I think there is other env variables for that
+15:29 < diegoviola> janmower: right
+15:29 < bradleymeck> kuplatupsu: well that variable is what ive always used in MSVC++ days since windows doesn't provide easy ways at that without dropping to ASM
+15:29 < kuplatupsu> bradleymeck: there seems to be TARGET_CPU
+15:30 < kuplatupsu> or TARGET_ARCH, something like that
+15:30 < kuplatupsu> but now things seem to work better when I installed 64 bit python
+15:30 < mscdex> nathan7: i've pretty much stopped caring anymore and would rather them just stick to a layout for longer than a few months
+15:31 < nathan7> mscdex: So you prefer a permanent layout over a better layout
+15:31 < mscdex> nathan7: i prefer them to make up their mind :-)
+15:31 < nathan7> Do you get everything you do right in one go?
+15:32 < bradleymeck> I just want Jits to work on ARM, cause that support nightmare is going to be fun for ppl
+15:32 < nathan7> ARM++
+15:33 < bradleymeck> why doesn't firefox, chrome, or opera work anymore on arm? "oh JITs are not supported except .Net" ...
+15:34 < gildean> bradleymeck: ?
+15:34 < nathan7> bradleymeck: that's awful
+15:34 < cody-> what's aweful?
+15:34 < gildean> bradleymeck: i'm running ff and chromium on ubuntu on my arm-based computers
+15:34 < garrettwilkin> socket.io question:  I want to emit an event on an interval
+15:35 < gildean> i've got a few here
+15:35 < bradleymeck> gildean: windows rt
+15:35 < garrettwilkin> but i don't want it to be inside the io.sockets.on('connection' … event.. cause then the interval is set every time a client connects and that is bad.  too many intervals.  I only want one interval
+15:35 < gildean> bradleymeck: that's windows's fault, nothing to do with the arch
+15:35 < kuplatupsu> this configure-script also gives -Lpath -parameters to linker, even though visual studio linker doesn't accept that syntax
+15:35 < garrettwilkin> but to emit an event, i have to call "socket.emit"
+15:36 < garrettwilkin> so… how do i do that when I'm not inside one of the io.sockets.on(  events?
+15:36 < garrettwilkin> or do i just need to use an event other than connection?
+15:36 < bradleymeck> gildean: i was referring to my previous message in that
+15:38 < nathan7> garrettwilkin: Err, keep the return value from the interval?
+15:38 < nathan7> garrettwilkin: also, you know of setInterval?
+15:39 < garrettwilkin> nathan7: yea i thought about doing clearInterval
+15:39 < garrettwilkin> maybe I'm just having a hard time cause i think this should work my way… and it works in a different way :)
+15:39 < gildean> bradleymeck: well you should've said windows on arm, i haven't had any devices which have an arm-soc and windows so i presumed you were talking about linux
+15:40 < bradleymeck> gildean: context implied, could have been more specific i guess, but generally wont if context is implied from previous clause
+15:42 < gildean> bradleymeck: it's irc and your previous line was in the scrollback and i'm lazy
+15:42 < bradleymeck> we both are :)
+15:42 < shlevy> Hmm, getting "Assertion `out_value != __null' failed" when trying to encrypt something
+15:45 < shlevy> Ah, I think I see my problem
+15:51 <@isaacs> dominictarr: it's the number of times that a request for the tarball gets a 200 response.
+15:52 < dominictarr> isaacs, right. so it's basically the number of time anyone installs a fresh version.
+15:58 <@isaacs> dominictarr: yes.  it's a pretty worthless metric
+15:58 <@isaacs> but people REALLY want it
+15:58 <@isaacs> and never stopped asking about it
+15:58 <@isaacs> so i gave it to them
+15:58 <@isaacs> like, you'd be amazed how much people want it
+15:59 < dominictarr> you just need a hockey stick graph that is labeled "WOW, EVERYONE LOVES YOUR CODE!!!"
+15:59 < dominictarr> s/CODE/CODEZ
+15:59 < ag4ve> nah, "COOKIES FOR EVERYONE"
+16:01 < dominictarr> hmm, and since the tarball is more likely to return a 200 when you patch it, and it isn't broken down per version, it's actually kinda misleading...
+16:02 < ag4ve> also most distros now have a package
+16:04 < johnmclear> Hey guys, anyone can please help me w/ a migration from Express 2.x to 3.x?  The Wiki is confusing me :(  
+16:04 < ag4ve> it's not misleading, the figure doesn't mean shit. it's like a polling firm saying "they've getting 100% of the vode", "how many people did you ask", "five", how many were present", "i don't know"
+16:06 < cnd> if an express app needs to save something for global state, is it generally advised to add the item to the app itself using app.set()?
+16:07 < bradgignac> cnd: is it okay if you lose the state when the process crashes?
+16:07 < RLa> cnd, i would put in the module that uses the state
+16:07 < cnd> yeah
+16:08 < cnd> the problem is that it's stuff that is used in multiple modules
+16:08 < RLa> otherwise app becomes too big object
+16:08 < bradgignac> create a module for storing that state?
+16:08 < RLa> yeah
+16:08 < cnd> hmm… ok
+16:08 < bradgignac> the downside is that you can't share it between processes if you need to
+16:09 < bradgignac> i generally recommend against storing state in process for that reason
+16:09 < cnd> that's ok
+16:09 < RLa> if it's in a separate module you could easily make it use redis backend for example
+16:09 < bradgignac> RLa: true
+16:09 < cnd> this is just per-process state
+16:21 < cody--> anyone having problems with github pull requests?
+16:23 < bradleymeck> isaacs: when using other registries do you ever see funny stuff from the _token section in .npmrc, i sometimes seem to need to clear it manually when doing login
+16:25 < plato> why is the hook.io github repo 404'ing?
+16:25 < plato> did they rename or move the project?
+16:25 < plato> johnmclear: did you read https://github.com/visionmedia/express/wiki/Migrating-from-2.x-to-3.x
+16:27 < jonno11> Hi guys, does anybody know if require() returns a singleton instance or creates a new object?
+16:27 < bradleymeck> plato: could have been marak since its his stuff idk
+16:29 < addisonj> jonno11: http://nodejs.org/docs/latest/api/modules.html#modules_caching
+16:34 < jonno11> cheers
+16:39 < cnd> when using express/connect, how do I properly get an object into a route callback?
+16:39 < cnd> I've got some things, like a handle to an aws s3 connection, that I need to access inside the route callback
+16:39 < cnd> I've created a module to initialize and hold these things in one object
+16:40 < cnd> but I don't know how to properly get that object into the route callback
+16:42 < plato> cnd: i use a kinda funky hack. i define a few files eg. routes_auth; these are: module.exports=function(app, dbmodule){ app.get('*'...) };
+16:42 < plato> cnd: in my app.js, i do: require('./routes_auth.js')(app,dbmodule);
+16:43 < cnd> hrm...
+16:43 < plato> my understanding is that if I don't directly pass the dbmodule object into that external js file, the external js file has no way of finding it
+16:44 < SomeoneWeird> that's what I do too plato 
+16:44 < SomeoneWeird> nothing wrong with it
+16:44 < plato> feels a lot cleaner that filling up app.js with hundreds of routes
+16:45 < SomeoneWeird> yep
+16:50 < etcetera> plato: see I wish it was easy to find out whether I am passing the app or dbmodule by reference to the external js files.
+16:50 < etcetera> and when those modules actually get unloaded.
+16:53 < Almindor> is it possible to call console.log() with an arguments object somehow? (say I got my own logger function and I want to pass all the arguments along)
+16:54 < rounce> console.log(arguments)
+16:54 < rounce> ?
+16:54 < Almindor> that prints the object
+16:55 < rounce> console.dir()
+16:55 < stagas> Almindor: console.log.apply(console, args)
+16:55 < rounce> stagas: thanks, never occured to me =/
+16:55 < Almindor> stagas: thanks that's it
+17:05 < plato> etcetera: my understanding is that objects are always passed by reference
+17:05 < plato> i have no idea when they are unloaded
+17:05 < etcetera> in module exports or in javascript
+17:06 < plato> oh, i see, you're asking what happens if you require external js twice, if the module.exports are the same object
+17:06 < plato> i dunno sorry
+17:06 < plato> the app and dbmodule should be references to the existing object, but the returned function object from the external js? not sure
+17:07 < plato> 09:28 < addisonj> jonno11: http://nodejs.org/docs/latest/api/modules.html#modules_caching
+17:07 < plato> Modules are cached after the first time they are loaded. This means (among other things) that every call to require('foo') will get exactly the same object returned, if it would resolve to the same file
+17:12 < soldair> hey im getting an ECONNREFUSED connecting over tcp from one node client to a node server, but i can connect to my server with telnet from the client  no problem. anyone have any ideas? i did check that the ip and port in my node client script are correct.
+17:16 < jcoglan> is there an API in Node for discovering an open TCP port? like how in ruby you can do TCPServer.new(0).addr[1]
+17:18 < jcoglan> sorry, I probably mean 'available' rather than open. i.e. a socket I can bind a new server to
+17:19 < jcoglan> s/socket/port/
+17:19 < mscdex> jcoglan: yep, just use port 0
+17:20 < jcoglan> as in, http.createServer().listen(0) ?
+17:20 < SomeoneWeird> really? neat
+17:21 < jcoglan> how do you find out which port it was assigned?
+17:21 < mscdex> jcoglan: var srv = net.createServer(); srv.listen(0, function() { console.log(srv.address().port); });
+17:21 < mscdex> http://nodejs.org/docs/v0.8.9/api/net.html#net_server_address
+17:23 < jcoglan> great, thanks :)
+17:29 < soldair> my ECONNREFUSED was due to differences in behavior for net.connect in 0.6 as to 0.8 where i developed it. time to update node =)
+17:39 < jlongster> hey guys, I just released a new jinja2-inspired templating system. thought some of you might be interested: http://nunjucks.jlongster.com/
+17:43  * nkuttler really needs to add timestamps to the logs...
+18:15 < aMoniker> So, how would I use ejs + express to render dynamic subtemplates
+18:15 < aMoniker> the documentation does not seem very good
+18:24 < mscdex> aMoniker: set the view engine for yoru app and then use res.render()
+18:24 < mscdex> s/yoru/your
+18:25 < aMoniker> right, but then how do I pass my rendered template a dynamic list of other templates to include?
+18:25 < therealkoopa> Are there any libraries for mocking a require('..') response? When running tests, I'd like any require('db') to return a different module. 
+18:26 < mscdex> aMoniker: you can do includes inside templates with ejs and/or you can pass in the template names as template variables
+18:27 < aMoniker> include interprets things literally
+18:27 < mscdex> aMoniker: not according to the ejs docs: https://github.com/visionmedia/ejs#includes
+18:28 < mscdex> wait, what were you expecting?
+18:28 < aMoniker> e.g. <% include things[i] %> will literally try to include "things[i]"
+18:28 < aMoniker> within a loop
+18:30 < mscdex> aMoniker: ok, so use a template variable that is an array of template names and include each of them in a for loop in the template ?
+18:31 < mscdex> :S
+18:32 < aMoniker> and like I just said, include will not handle a variable
+18:32 < scruz> hello. are there any frameworks/modules for testing client-side code within a node environment? specifically, i'm interested in something that can make xhr calls and receive xhr calls. in the browser, sinon.js has fakeServer and i can use jquery.
+18:32 < cpsubrian> Lets say multiple modules in an app require() the same parent module.  Inside that parent module what is `module.parent`?  Is it the first module who required it?
+18:32 < john3909> TooTallNate: ping
+18:32 < mscdex> aMoniker: it should pass in any local variables that the current template has access to
+18:32 < scruz> but i'd like to, say, run jasmine-node or a similar tool and run tests from the command line.
+18:32 < TooTallNate> john3909: pon
+18:32 < TooTallNate> g
+18:33 < john3909> I finally managed to get cloud9 working on the Beagle-xM. I updated my Cloud9 git branch this morning and vola, everything seems to be working. I'm using your pi branch of https://github.com/TooTallNate/node.git for my Nodejs
+18:33 < aMoniker> mscdex - you're not understanding. include will not handle a variable argument
+18:33 < aMoniker> it will literally try to process the name of the variable
+18:33 < TooTallNate> john3909: nice :)
+18:33 < john3909> TooTallNate: Thanks for all your help. 
+18:33 < TooTallNate> john3909: fwiw, my pi branch has been merged into node v0.8 branch, so vanilla v0.8.10 should compile fine
+18:34 < TooTallNate> (once it's released)
+18:34 < TooTallNate> john3909: and you're welcome :) happy coding
+18:34 < john3909> TooTallNate: Nice to know
+18:34 < bradleymeck> scruz: look at grunt/phantomjs
+18:35 < mscdex> aMoniker: *shrug* create an issue on the ejs gh page
+18:35 < aMoniker> there already is one
+18:38 < context> getbuckyballs.com - everything is $5
+18:39 < scruz> oh dear.
+18:42 < efbeka> need help, someone?
+18:42 < mansoor-s> i need professional help
+18:48 < plato> don't we all
+18:48 < plato> efbeka: how can we help without questions!?!?
+18:49 < nkuttler> plato: don't be so lazy and get your crystal ball..
+18:54 < aMoniker> ok, ejs is pretty shitty
+18:54 < aMoniker> jade doesn't look much better
+18:54 < zomg> ejs is ok I think
+18:55 < therealkoopa> do you think it's best to use something like proxyquire or to have a db module that returns a test instance if NODE_ENV=test/testing? I can see both ways. I don't like putting 'test' code in production stuff, meaning I don't really like: if (mode == test) {} 
+18:55 < zomg> supports doing things you'd want without forcing you to jump through extra hoops like some do
+18:56 < aMoniker> doesn't support the very basic thing that I want to do
+18:57 < EhevuTov> I really enjoy using Jade
+18:58 < EhevuTov> aMoniker, if you're doing a lot of logic inside your view, I recommend doing it outside your view, first
+18:58 < gildean> i also have grown to like jade
+18:58 < aMoniker> EhevuTov, it's very little logic. I simply want to pass an array of template names and have ejs include them
+18:59 < efbeka> plato: look at this https://gist.github.com/3757644
+18:59 < EhevuTov> aMoniker, I'm pretty sure Jade can do that
+18:59 < aMoniker> EhevuTov, do you happen to know of a good example?
+18:59 < EhevuTov> there are a few. Have you read the documentation? It has good examples
+19:00 < EhevuTov> I don't have one personally
+19:00 <@konobi> therealkoopa: mocked
+19:00 < plato> EhevuTov: for templateName in locals.templateNames \n h1=templateName
+19:00 < zomg> aMoniker: I think it's just a matter of giving the render function to the template so it can be called from there
+19:00 < EhevuTov> what plato said
+19:00 < zomg> aMoniker: I mean with EJS
+19:00 < therealkoopa> konobi: Thanks. Do you use proxyquire?
+19:01 < aMoniker> zomg: I'll try that
+19:01 <@konobi> therealkoopa: just mocked... since i wanted something really basic
+19:02 < plato> efbeka: are you intending to overwrite the stream.write function with your own?
+19:02 < aMoniker> zomg: wait, no - what are you saying exactly?
+19:02 < zomg> aMoniker: I mean if you just make the ejs.render function available in the template so you can then just do <%= render(whatever); %>
+19:03 < zomg> Shouldn't be too tricky to do that I think, maybe by just setting the helpers if you're using express
+19:03 < aMoniker> zomg: ok, thought so… will be using ejs.renderFile in this case
+19:04 < efbeka> plato: yes. If i give { end: true } as options, the output is "2190 bytes written" (without s.end('--');)
+19:04 <@konobi> therealkoopa: seems a little verboses to me
+19:04 < efbeka> plato: but here the output is "2 bytes ..."
+19:05 < efbeka> plato: i expected "2192 bytes ..."
+19:05 < therealkoopa> konobi: I totally agree. Looks like it's a pain. However, if I have some module that does a require('db') I want it to always return require('test-db') for instance
+19:06 <@konobi> therealkoopa: yeah, mocked will give you that (pretty much)
+19:07 <@konobi> therealkoopa: the only place you need to change code, is in test scripts
+19:07 < plato> efbeka: i havent used streams. i just know that you are overwriting the Stream.write and Stream.end functions that node provides with your own stuff. you might instead want to put your logic in events that fire upon data and end
+19:07 < therealkoopa> konobi: I'll try it
+19:10 <@konobi> therealkoopa: lemme know if you have trouble
+19:10 < efbeka> plato: btw thks
+19:11 < plato> gl efbeka 
+19:14 < therealkoopa> konobi: Seems to be working. Thanks a lot!
+19:14 < aMoniker> zomg: works, but encodes the html in the subtemplates, so it literally appears on the page
+19:14 <@konobi> therealkoopa: sweet
+19:14 <@konobi> it's an interesting little "hack"
+19:14 < zomg> aMoniker: ah, use <%- %> instead of <%= %>
+19:15 < aMoniker> zomg: is that the only difference between those two?
+19:15 < zomg> Yeah, with - it doesn't escape
+19:15 < aMoniker> perfect, thanks for defusing my premature hatred ;)
+19:16 < zomg> lol np
+19:16 < zomg> sounded like you were having a similar experience as I was when I started with ejs :P
+19:16 < therealkoopa> konobi: I think a sweet feature would be the ability to do a: mocked(mock, ['db']), rather than a directory
+19:16 < zomg> There's apparently some other project called ejs, which is similar enough to be confused with this, but different enough to be... well, shit.
+19:17 < context> wow dumper.io is expensive as all hell
+19:17 < zomg> So I confused the two and thought the one in express was the shitty one =)
+19:17 < aMoniker> this one: http://embeddedjs.com/ ?
+19:18 < aMoniker> with the express version being on github maybe? https://github.com/visionmedia/ejs
+19:18 < aMoniker> how is visionmedia so insanely productive
+19:21 < plato> lol they were complaining in #express that they have hit their limit of repos allowed on github
+19:22 <@konobi> therealkoopa: maybe... though i'd have reservations since it wouldn't be a full module object
+19:22 < zomg> aMoniker: yep those are the two =) visionmedia is the correct one
+19:28 < brainproxy> if any of the #Node.js folks have arrived in St. Louis a bit early, leading up to the Strange Loop conference, come hang out tonight at STLJS!
+19:28 < brainproxy> free food, lots of local devs, pub downstairs, good times
+19:28 < brainproxy> http://www.stljs.org/events/68051712/
+19:30 <@konobi> therealkoopa: there's also DRY to think of
+19:31 < therealkoopa> konobi: I don't know if this is going to work for me. I creates a mocks/db/index.js where it is a module that requires mongoose and returns a test mongoose connection. mocked seems to try and look for a mongodb when mongoose requires it.
+19:32 <@konobi> therealkoopa: oh, you're wanting environment switching rather than mocking
+19:34 < therealkoopa> konobi: Yea, in a way. If I'm testing a module called foo and it has a require('db'), I want the require('db') to return what require('test-db') would return...
+19:34 <@konobi> therealkoopa: or do you actually want mocked('...', ['mongoose']) ?
+19:35 < larryapplegate> hello, i'm new to freenode.net and node.js
+19:36 < aMoniker> larryapplegate, what is your one true wish?
+19:36 < therealkoopa> konobi: No, I don't think I want ['mongoose'] 
+19:37 < larryapplegate> to learn this command line stuff. I'm an experience Mac OS and IOS developer
+19:37 < plato> welcome larryapplegate 
+19:37 < larryapplegate> thanks plato!
+19:37 < aMoniker> heh, I wish I knew OS/iOS devopment
+19:37 < aMoniker> *development
+19:38 <@konobi> therealkoopa: mkay... not sure if i understand what you're after or if this is XY
+19:38 < plato> when you say 'this command line stuff' do you mean unix command line?
+19:38 < larryapplegate> i've been working a long time on an iOS app that now uses Parse.com
+19:38 < larryapplegate> would like to switch to node, as it is more efficient
+19:39 < plato> larryapplegate: so, you want to use node for server side stuff? and interface with it from your iOS apps?
+19:40 < larryapplegate> yes, i have used it over the years, but only occasionally lately
+19:40 < larryapplegate> yes. I have a large alpha app, but will start fresh with mostly just the server side stuff
+19:41 < larryapplegate> using http etc. from IOS
+19:41 < larryapplegate> with a simpler version of the iOS app
+19:42 < larryapplegate> i've watched the Ryan Dahl node video, and several others
+19:42 < larryapplegate> i have node installed on my laptoop
+19:43 < aMoniker> it sounds like you are precisely 67% of the way there
+19:44 < Cogito_Ergo_Sum> SomeoneWeird it is possible after all 
+19:44 < larryapplegate> aMoniker, how to you grok that?
+19:45 < Cogito_Ergo_Sum> i just need to write: this.write(blahblah) instead of socket.write(blahblah)
+19:45 < aMoniker> larryapplegate: you called my bluff, I grok nothing
+19:46 < larryapplegate> who is interested in collaborating on what i think are some new ideas?
+19:46 < larryapplegate> or just helping me get started on writing simple test code first
+19:52 < larryapplegate> any iOS developers here?
+19:53 < nkuttler> larryapplegate: depends what you mean?
+19:53  * nkuttler doesn't work at apple
+19:53 < larryapplegate> anyone wanting to connect iOS to node
+19:54 < nkuttler> on the os level? app level? browser level?
+19:54 < larryapplegate> i have an iOS app that uses the parse framework to store its database
+19:55 < larryapplegate> it's purpose is to collaborate in realtime with multiple ipads
+19:55 < BennyLava> its*
+19:56 < shlevy> Are there any libraries for reading passwords securly from stdin or some such?
+19:57 < larryapplegate> an earlier iteration used CouchDB
+19:58 < larryapplegate> must leave for an appointment
+20:17 < machadogj> any know any modules for canonizing XML?
+20:18 <@konobi> machadogj: straight into the sun!
+20:21 < etcetera> I suppose I should ask again just in case anyone is around.
+20:21 < etcetera> when do modules get disposed?
+20:21 < chapel> disposed?
+20:21 < machadogj> canonizing xml even in other languages?
+20:22 < plato> etcetera: dunno but here is a way to manually unload them http://stackoverflow.com/questions/6676612/unloading-code-modules
+20:23 < etcetera> plato: but the default behavior in that case seems that they do not get unloaded.
+20:23 < plato> that's my guess, yes
+20:23 < etcetera> so that's super interesting.
+20:23 < etcetera> lesson learned: don't be a jerk and keep additive state in modules.
+20:24 < plato> additive state?
+20:24 < plato> oh well they should get unloaded when you kill the node process
+20:25 < etcetera> heh.
+20:25 < etcetera> does your node app actually spawn a process?
+20:25 < etcetera> or is it just a thread?
+20:27 < plato> oh idk. i just run node app.js. i doube i coult tell you the difference between process and thread
+20:28 < draginx> Does anyone have a light/fast way of adding decimals to every 3 digits? so 100000 becomes 100,000 ?
+20:28 < draginx> http://phpjs.org/functions/number_format:481 i was just going to use this.. but was wondering if there was a better way
+20:31 < chapel> draginx: decimals, or commas?
+20:31 < RLa> wow, php functions in js
+20:31 < draginx> commas
+20:31 < draginx> but i mean decimals are cool too :)
+20:31 < draginx> i was just going to do a .toFixed(2)
+20:31 < draginx> for decimals
+20:31 < plato> draginx: gotta be a regex for that
+20:31 < draginx> yeah
+20:33 < chapel> draginx: http://josscrowcroft.github.com/accounting.js/
+20:33 < draginx> ty
+20:33 < plato> easy and slow way would be '1000000'.match(/(.*)([0-9]{3})$/)
+20:34 < plato> eh. not quite. that gets the last three digits
+20:34 < plato> and presumably fucks up on numbers that are two digits or less
+20:34 < drudge> draginx: https://gist.github.com/7da7631e7b8dda2c800a
+20:34 < draginx> ty
+20:35 < RLa> there seems to be lot of formatting packages in npm
+20:36 < plato> for(i=0;i<Math.floor(inputstr.length/3);i++){...
+20:38 < plato> leftoffset=inputstr%length; inputstr.slice(0,letoffset); inputstr.slice(leftoffset, leftoffset+3)
+20:38 < plato> or, yeah, pick a module any module :D
+20:54 < vicapow> anyone have suggestions on screencast apps for os x?
+20:56 < TooTallNate> vicapow: screenflow is pretty good
+20:56 < vicapow> TooTallNate: thanks. i'll check out
+21:09 < elliottcabl3> o7 all. Any way to have the debugger descend into something you run *in the debugger REPL*?
+21:09 < elliottcabl3> I'm deep into a debugging cycle, found a bug in a function that just finished running right before the debugger was initiated; but it's idempotent enough that I can run it again right where I am, and watch the functioning this time
+21:09 < elliottcabl3> but I'd rather not progress through everything the debugger's been through already to set up the environment to its' current state.
+21:13 < elliottcabl3> ericelliott: Oh my, there's another Elliott in *my* #Node.js? I feel replaced. ;)
+21:15 < benatkin> I know another Elliot who does node too
+21:16 < CoverSlide> there can be only one
+21:16 < CoverSlide> i propose a deathmatch
+21:51 < CIA-118> libuv: Bert Belder master * r45931f8 / README.md : Add mailing list to readme - http://git.io/l7DiKw
+21:52 < owen1> what's an easy way to get the 2 out of this url: 0.0.0.0:3000/merges/2    
+21:53 < LouisT> owen1: will the url always be that format? I would just use regex if it is.
+21:53 < owen1> LouisT: i can use /merges?id=2    do u think it's a better api?
+21:53 < owen1> and than url.parse ond the url will work
+21:54 < LouisT> that would work as well, probably be simpler to do
+21:54 < owen1> LouisT: ok. i'll do it with ?id thanks
+22:06 < elliottcabl3> When is this deathmatch?
+22:06 < elliottcabl3> CoverSlide: mind you, it's just between myself and ericelliott, and possibly that dude on Freenode who goes by something-elliott as well and always triggers my hilights in #Haskell
+22:07 < elliottcabl3> only elliotts with two T's. That is, ones who trigger my global hilights and thus make my phone beep annoyingly and unnecessarily. Those, I'd kill. ;)
+22:08 < nathan7> elliottcabl3: Man, I feel your pain.
+22:09 < nathan7> elliottcabl3: I have to murder like three nathans
+22:09 < nathan7> elliottcabl3: among them mr Fillion
+22:20 < djazz> i get this error when calling os.cpus() on v0.8.9 on the raspberry pi: *** glibc detected *** node: free(): invalid next size (fast): 0x0153ae50 ***
+22:21 < djazz> anyone got a clue?
+22:27 < elliottcabl3> nathan7: I'll assist you. Let's band together.
+22:28 < elliottcabl3> We'll be the only Nathans or Elliotts on all of the Internet! *insert increasingly unbalanced, maniacal laugh*
+22:28 < elliottcabl3> nathan7: Planning for our takeover will happen in ##Hat. Because hat.
+22:33 < kuebk> hello
+22:43 < othiym23> modules do such vile things to the HTTP module
+22:44 < othiym23> it makes it hard for me to do the vile things *I* want to do to the HTTP module
+22:52 < LouisT> is there a way to bind to an IPv6 address with net.Socket?
+22:55 < CIA-118> libuv: Luigi Grilli master * r5bfb7c9 / (common.gypi gyp_uv uv.gyp vcbuild.bat): windows: build system improvements - http://git.io/z7e9Ug
+22:59 < tnorris> LouisT: check out http://nodejs.org/api/net.html#net_class_net_socket, you can set the type to tcp6.
+22:59 < LouisT> tnorris: i know i can use it to connect from IPv6, but apparently I can't bind to it as if it were IPv4
+23:00 < LouisT> for IPv4 i'd use {handle:net._createServerHandle('127.0.0.1')} but it fails if I try IPv6
+23:05 < LouisT> tnorris: when I attempt to bind I get EAFNOSUPPORT =/
+23:08 < othiym23> does anybody know how to run mocha suites in isolation from each other?
+23:09 < othiym23> need to be running tests against both Express and Restify and Express just starts cramming functions willy-nilly onto HTTPResponse's prototype
+23:09 < othiym23> that Restify wants to use as non-functions
+23:09 < othiym23> and I'm pretty sure people aren't going to want to have Express and Restify running at the same time, so it doesn't make sense to file as a bug
+23:11 < chapel> othiym23: you can do before and after I believe
+23:12 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+23:12 < chapel> like beforeEach
+23:12 < chapel> afterEach
+23:12 < othiym23> chapel: yeah, but by that point the HTTP library is already tainted
+23:12 < chapel> well
+23:12 < chapel> you could reinitialize it
+23:12 < othiym23> but you're right, I could flush the module from the cache in the after clause
+23:13 < othiym23> also, does anyone know what the suggested replacement for using the HTTPResponse 'finish' listener is in node >= 0.9.x?
+23:18 < mscdex> someone should register nodejsrul.es and point it to nodejs.org
+23:18 < mscdex> :-D
+23:42 < sente> how can I make things in /public cached?
+23:42 < sente> my settings are messed up somewhere
+23:42 < sente> http://i.imgur.com/jyXbb.png
+23:53 < othiym23> awesome, looks like it's time to convert my integration tests from mocha to tap or whiskey
+23:53 < othiym23> by which I mean tap, but I wish its testing DSL were a little higher-level
+23:54 < CIA-118> node: Bryan Cantrill master * rcc1b09d / (3 files): test: add tests for postmortem and DTrace support - http://git.io/hAsG6Q
+23:55 < CIA-118> node: isaacs v8-3.13.7.1 * r3411a03 / (381 files in 23 dirs): V8: Upgrade to 3.13.7.1 - http://git.io/gBGPIQ
+23:55 < CIA-118> node: isaacs v8-3.13.7.1 * rd77c24d / (deps/v8/build/common.gypi deps/v8/tools/gyp/v8.gyp): V8: reapply floating patches - http://git.io/ntaXCg
+23:55 < CIA-118> node: Bryan Cantrill v8-3.13.7.1 * rbd0e45b / deps/v8/src/platform-posix.cc : Loosen artificial mmap constraint - http://git.io/rCCVWg
+23:55 < CIA-118> node: Bryan Cantrill v8-3.13.7.1 * r2796068 / deps/v8/tools/gen-postmortem-metadata.py : v8: fix postmortem metadata generation - http://git.io/yMtkKg
+23:58 < drudge> othiym23: why is it time
+--- Log closed Fri Sep 21 00:00:23 2012

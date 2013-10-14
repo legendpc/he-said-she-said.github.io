@@ -1,0 +1,1267 @@
+--- Log opened Fri Sep 21 00:00:23 2012
+--- Day changed Fri Sep 21 2012
+00:00 < othiym23> drudge: have two test cases
+00:00 < othiym23> one requires Express, which shoves all its crud onto the HTTPResponse object
+00:01 < othiym23> the other requires Restify, which then has a namespace collision with some of the functions that Express puts onto HTTPResponse
+00:01 < othiym23> I'm testing instrumentation code, so I don't expect production users to need both Restify and Express
+00:01 < othiym23> but I need those tests to run without affecting each other
+00:02 < othiym23> something that could only be done with mocha if I wrote some Makefile magic to have it run each of the integration test suites under separate invocations of Mocha
+00:02 < othiym23> or I could just use tap, which has a runner that runs each test file in a separate child process
+00:03 < othiym23> if I wanted to get super fancy, I could use whiskey and have it run all of the integration tests concurrently, but I don't want to get super fancy
+00:03 < othiym23> I want my tests to be simple and consistent
+00:04 < efbeka> -
+00:10 < luckysmack> im trying to use require('pkginfo')(module) but it doesnt seem to be importing the info from my package.json. such as, in there my version is '0.0.0' but the output of the require shows '0.2.3'
+00:15 < TooTallNate> luckysmack: these days you can just "require('./package.json')"
+00:15 < TooTallNate> require('./package.json').version
+00:15 < luckysmack> oh and it will still work?
+00:16 < luckysmack> cool
+00:16 < AAA_awright> IF your package.json is in the same file as your module
+00:16 < AAA_awright> You might need to use ../package.json
+00:16 < AAA_awright> er, in the same directory as your module
+00:16 < luckysmack> i realized when i require pkginfo, i get the data from it in module.exports
+00:17 < AAA_awright> I think that's intentional so it exposes the package data to other modules
+00:17 < AAA_awright> I've never seen the pkginfo module before, though
+00:18 < luckysmack> https://github.com/indexzero/node-pkginfo 
+00:18 < luckysmack> i noticed it when starting to use flatiron
+00:19 < AAA_awright> luckysmack: I don't think indexzero/node-pkginfo does what you want it to. Why do you need to import that data, anyways?
+00:20 < luckysmack> im not sure, to be honest. im learning and playing around with it.
+00:21 < AAA_awright> Well, if you need to, require() works with JSON files as of some Node.js version I forget... but generally you shouldn't need to. package.json is for package data, your local module should have module data, and they generally shouldn't mingle
+00:21 < AAA_awright> (at runtime)
+00:22 < AAA_awright> Node.js shouldn't have any notion of packages at all I think, I don't even like the fact it looks around for the package.json file
+00:23 < luckysmack> oh ok. well with my package, i will have a cli command i can run. so i want to be able to do 'myApp -v' to echo the version. 
+00:23 < luckysmack> i think that was the reason for pkginfo. so that data can easily be accessed in code.
+00:23 < luckysmack> probably from the cli mostly, i presume
+00:24 < AAA_awright> That might be a legitimate reason, hm. Generally installing executables is a complex topic, you can't rely on the existance of the other files being in their relative locations. Most Linux distros are pretty strict about executables go in /usr/bin, data goes in /var/lib, etc (and rightfully so)
+00:24 < CIA-118> node: isaacs master * r3411a03 / (381 files in 23 dirs): V8: Upgrade to 3.13.7.1 - http://git.io/gBGPIQ
+00:24 < CIA-118> node: isaacs master * rd77c24d / (deps/v8/build/common.gypi deps/v8/tools/gyp/v8.gyp): V8: reapply floating patches - http://git.io/ntaXCg
+00:24 < CIA-118> node: Bryan Cantrill master * r017009f / deps/v8/tools/gen-postmortem-metadata.py : v8: fix postmortem metadata generation - http://git.io/cI7wXw
+00:25 < luckysmack> well this would just be a simple cli. so when i do 'npm install myApp -g' i then have the ability to do 'myApp -v' from anywhere.
+00:26 < AAA_awright> You still don't have any guarentees that'll work in any particular way, though
+00:26 < luckysmack> yea i know i may have to account for things like windows vs linux at some point. such as file paths.
+00:29 < spionL> Doesn't __dirname always output the location of the running script? var package = require(path.join(__dirname, '..', 'package.json'))
+00:31 < spionL> that is provided you're doing that from a  bin or lib subdirectory. ofc, if you're doing it from index.js - without the '..' argument :P
+00:34 < spionL> though i believe that require that starts with . is guaranteed to be relative to the script dir, so thats all probably unneeded
+00:35 < AAA_awright> spionL: require() is always specified relative to __dirname so that's extraneous
+00:36 < spionL> ah. so the presence of package.json in a particular directory is not guaranteed.
+00:38 < spionL> in the sense that for all we know in the future npm might store it in a database or something... right?
+00:39  * spionL tries to look this up in the docs
+00:41 < AAA_awright> spionL: Indeed, I don't store any package.json file in my Git repository
+00:41 < AAA_awright> I *think* npm currently guarentees that a package.json file will be unpacked at install-time, but there's no guarentee of that into the future
+00:49 < someguy123_> redis, redis-client, or redis-node ...
+00:56 < someguy123_> redis, redis-client, or redis-node ...
+00:58 < insin> npm install redis
+00:58 < someguy123_> insin: ok
+00:59 < insin> ooh, new minor verson landed recently. "Pure JavaScript reply parser that is usually faster than hiredis"
+00:59 < mastermind2> hello
+01:14 < othiym23> are any of you handy with node-tap?
+01:14 < othiym23> having a bit of a time trying to figure out how to get it to deal with tests of event emitters
+01:15 < othiym23> test.end() doesn't appear to be, y'know, ending the test
+01:16 < chilts> othiym23: are you calling that inside one of the event handlers? are you sure it's being fired?
+01:16 < chilts> (gist the test if you can)
+01:16 < chilts> so we can see it
+01:16 < othiym23> one sec
+01:19 < othiym23> chilts: https://gist.github.com/910f1a81cc566c400469
+01:19 < othiym23> I can see from the output that all of the asserts are passing, but after the inner handler fires, it just hangs around like a dope
+01:19 < chilts> does it pass all three tests, but just not complete?
+01:19 < othiym23> chilts: indeed
+01:19 < chilts> ok
+01:20 < chilts> are there tests after this one, or does it just hang at this stage?
+01:20 < superjoe> it sucks to go back to thread-per-request-based ruby web apps after using node.js
+01:20 < othiym23> this is the only test so far, invoked with 'tap test/integration/connection.tap.js'
+01:21 < othiym23> a test almost identical to this works just fine in Mocha, using its provided done callback
+01:22 < chilts> try it without t.plan(3) ... I'm guessing
+01:22 < chilts> maybe it's the agent hanging around for something, not the test
+01:22 < chilts> though you said it works with mocha
+01:23 < Jona> Hello, Everyone I am new to Node JS
+01:23 < chilts> Jona: wahoo! :)
+01:23 < othiym23> chilts: yeah, I went in with the debugger, and I can see it going into t.end() and doing a bunch of cleanup, but then it just hangs around
+01:23 < chilts> hmm, weird
+01:24 < chilts> sorry, I have no suggestions at the moment
+01:24 < Jona> :-)
+01:24 < othiym23> chilts: thanks for taking a look anyway
+01:25 < Jona> I just got an internship with a company that does web development. They told me to look into node JS.
+01:25 < othiym23> commenting out t.plan didn't change anything
+01:25 < mscdex> node.js rules!
+01:25 < Jona> mscdex: glad to hear that
+01:25 < mscdex> :-D
+01:26 < chilts> mscdex: I love how you keep saying it
+01:26 < othiym23> chilts: one last semi-interesting data point: running 'node test/integration/connection.tap.js' directly gives me the raw TAP output with all of the tests checking out, but it too hangs
+01:26 < jnylen> anyone know of a library that can do web requests over http/https, follow redirects, store cookies, etc.?
+01:26 < chilts> everytime I not to myself :D
+01:26 < Jona> Can someone give me an overview of what this chat room ?
+01:26 < othiym23> I'll try sending it SIGUSR1 and see what it thinks it's doing
+01:26 < chilts> s/not/nod/
+01:27 < Jona> ... Chat room is intended for
+01:27 < othiym23> jnylen: github.com/mikeal/request should do most of that
+01:27 < othiym23> don't know how much session tracking it has out of the box, though
+01:27 < mscdex> chilts: i'm waiting for someone to register nodejsrul.es and redirect to nodejs.org or something :->
+01:27 < chilts> Jona: anything related to Node.js :)
+01:27 < chilts> heh, nice
+01:27 < Jona> Cool
+01:27 < chilts> the .js tld would be nice :D
+01:28 < mscdex> you can register for that if you got the moolah
+01:28 < chilts> Jona: there are more specific rooms around the place related to Node.js, but here is pretty much whatever you want
+01:28 < chilts> mscdex: yeah, saw that :)
+01:28 < chilts> not too worried at the moment
+01:28 -!- mode/#Node.js [+o piscisaureus__] by ChanServ
+01:28 < Jona> Then I come to the right place. 
+01:28 < chilts> indeed
+01:28 < jnylen> othiym23: i was looking at superagent, but also was hoping for digest auth support
+01:31 < othiym23> jnylen: if you want all-singing, all-dancing, you might take a look at zombie.js
+01:31 < othiym23> it's kind of overkill for most things, but it should do most all the stuff you're talking about
+01:32 < Jona> ---I believe I have successfully installed node JS to my Mac. When I tried to run a simple script and the error message comes up saying: ReferenceError: server is not defined. --- what should I do?
+01:35 < mscdex> Jona: you're likely not defining `server` somewhere :-)
+01:36 < Jona> mscdex: How do I do that? Do I need to install a server? 
+01:36 < mscdex> Jona: can you post your code to gist.github.com ?
+01:36 < chilts> Jona: you need a 'var server;' somewhere to pop it into existance
+01:36 < chilts> yeah, paste your code :)
+01:36 < Jona> let me see
+01:37 < cody--> anyone have any idea why this is blowing up https://gist.github.com/4e4f0729e4ba87f94316
+01:38 < chilts> cody--: you are doing require('express')()
+01:38 < chilts> static is on require('express')
+01:39 < chilts> essentially
+01:39 < chilts> I'd not put that extra on the require line, then create your app on a separate line
+01:39 < chilts> so that you can get access to both the app and express
+01:39 < Jona> here is the code 	git://gist.github.com/3759315.git
+01:39 < chilts> in your case, you only have the app
+01:39 < jnylen> othiym23: that definitely looks like overkill
+01:40 < jnylen> I was looking for a library like curl
+01:40 < mscdex> Jona: i don't see `server` anywhere in there :S
+01:40 < jnylen> superagent seems to be pretty close, so I'm going to try to add digest support to it
+01:40 < mscdex> Jona: how are you trying to run that script?
+01:40 < mscdex> Jona: `node server.js` should do it
+01:40 < Jona> That is how I'm running it
+01:41 < mscdex> oh wait
+01:41 < cody--> thanks chilts
+01:41 < mscdex> you have syntax errors
+01:41 < chilts> Jona: take the ) off the end of line 3
+01:41 < chilts> then try again :)
+01:42 < mscdex> line 2
+01:43 < Jona> Do I need to save my script in a certain folder?
+01:43 < chilts> Jona: no
+01:43 < Jona> Now it just displays " ... "
+01:44 < chilts> are you in the repl?
+01:44 < chilts> you just need to call 'node server.js'
+01:46 < mscdex> Jona: make sure you are typing `node server.js` at your terminal's shell prompt
+01:48 < Leo_> is anybody using http://expressjs.com/?
+01:49 < Jona> I really am . I even tried a different ways see http://www.tinyuploads.com/gallery/view/Fdu0H6
+01:50 < mscdex> Jona: it should look like this: Jonathans-Macbook-Pro:home jona$ node server.js
+01:51 < jnylen> Jona: you're in the node REPL, which is expecting you to type javascript code
+01:51 < mscdex> Jona: when you just use `node` it starts a REPL
+01:51 < jnylen> go back to the shell then try again
+01:51 < jnylen> (hit ctrl+d to exit)
+01:51 < jnylen> then from the shell, type node server.js
+01:55 < Jona> Okay, I think we're getting there. I have my server.JS file saved in documents/nodejs    ... How do I navigate to that folder with the terminal shell?
+01:55 < jnylen> cd Doc<tab>
+01:55 < jnylen> cd node<tab>
+01:56 < jnylen> (use tab to make the shell complete the rest of the folder name, which also helps to make sure you're in the right place)
+01:56 < TooTallNate> Leo_: lots of people use express
+01:57 < mastermind2> any reliable headless browser for node.js?
+01:57 < Jona> jnylen: -bash: cd: doc: No such file or directory 
+01:57 < jnylen> D not d
+01:58 < octane--> what's the best module for creating PDFs (with SVG support)?
+01:59 < mscdex> octane--: there's pdkfit
+01:59 < mscdex> not sure about svg support
+01:59 < octane--> yeah it's pretty crappy
+01:59 < octane--> that's what we're using :)
+01:59 < mscdex> i don't know of any other pdf creation libraries atm
+01:59 < Jona> jnylen: these are all the ways I have tried http://www.tinyuploads.com/gallery/view/Xuh8wx
+02:00 < jnylen> try typing it out all the way: cd Documents
+02:01 < mscdex> octane--: if worst comes to worst, spin up a child process
+02:01 < jnylen> Jona: if that doesn't work, do an ls and post the output
+02:02 < Jona> jnylen: there is no output after typing ls
+02:02 < jnylen> Jona: how about pwd
+02:03 < Jona> jnylen: /home
+02:03 < jnylen> how did you get in there? anyway try just cd
+02:04 < jnylen> that should put you back in your home directory
+02:04 < jnylen> then try cd Documents again
+02:04 < Jona> idk
+02:04 < Jona> okay now iam back to my home directory I believe
+02:05 < mscdex> home again home again!
+02:05 < Jona> jynlen: Jonathans-MacBook-Pro:Documents jona$  
+02:05 < jnylen> Jona: you want to get into your Documents/nodejs directory, right?
+02:06 < jnylen> so first, try cd Documents
+02:06 < Jona> yes
+02:06 < jnylen> hopefully cd Doc<tab> will also work here, since a Documents directory exists in the current directory
+02:07 < Jona> Whenever I tab the key tab . Nothing happens I just hear a small noise from my speakers
+02:08 < jnylen> are you in the Documents folder
+02:08 < jnylen> (to check: pwd)
+02:08 < Jona> yes
+02:08 < jnylen> now change to the nodejs subdirectory
+02:08 < jnylen> then you can run node server.js
+02:08 < Jona>  ... /Users/jona/Documents 
+02:09 < Jona> after typing pwd
+02:11 < Jona> jnylen: I finally got it!!
+02:11 < jnylen> Jona: good
+02:11 < Jona> Server Running at http://127.0.0.1:3000/ 
+02:11 < jnylen> you should probably read up on how to use a terminal / shell
+02:11 < jnylen> stuff like navigating directories, where it looks for files you tell it to use, etc.
+02:12 < Jona> jnylen: thanks I really appreciate it I am a newbie as you can tell. I do need to look up Shell tutorials
+02:12 < jnylen> no problem, I am pretty new to node.js as well, have fun!
+02:12 < Jona> I will thanks again
+02:19 < othiym23> isaacs: are you around?
+02:19 < othiym23> tap is being a pain in my ass and I can't tell if it's my fault or not
+02:59 < mrFrog> say i'm using npm, is it generally expected to gitignore dependencies, since they can easily be installed via npm install? and as far as deployment, is there a command that starts node and installs any  dependencies first? or do you just "npm install && npm start" or something?
+03:07 < n2liquid> halp
+03:07 < n2liquid> anybady?
+03:07 < HacDan> you haven't asked anything. 
+03:09 < n2liquid> If I have installed a module such as jade using npm, and I want to use jade on the client-side without using browserify or some such, what should I do to serve the jade.js file inside node_modules/jade/? How do people usually do that?
+03:12 < n2liquid> Is it normal to serve libraries inside node_modules? Should I use a symlink? Should I copy the file?
+03:14 < n2liquid> At least when I don't actually ask anything somebody answers :D
+03:15 < AAA_awright> n2liquid: That depends on the module, they aren't usually loadable browser-side
+03:15 < Guest_1448> is it possible to fs.open() a file for reading and writing without truncating if it already exists or erroring out if it does?
+03:15 < n2liquid> AAA_awright, yeah, I know, but Jade exports to window
+03:16 < AAA_awright> For Jade in particular I think you can, you just need to load it up somewhere
+03:16 < AAA_awright> THrow it up somewhere
+03:16 < n2liquid> Hmkay
+03:23 < n2liquid> I've got another question, why is it that Connect's "static" server doesn't allow me to define a prefix for the URL? So that I can have a folder called js/, another one called css/, and serve them both under http://domain.com/static/ or something like that?
+03:23 < Guest_1448> http://nodejs.org/api/fs.html#fs_fs_open_path_flags_mode_callback
+03:24 < Guest_1448> it says "See open(2)"
+03:24 < Guest_1448> where is thatr
+03:26 < Guest_1448> n2liquid: are you using express
+03:31 < n2liquid> Guest_1448, yes, why?
+03:31 < Guest_1448> n2liquid: http://expressjs.com/faq.html#static-prefix
+03:32 < n2liquid> Guest_1448, my, my! I can't believe I missed that, thanks so much!
+03:33 < n2liquid> Guest_1448, well, static used to be mentioned in the Guide, I'm not sure why they removed it; I didn't even bothered looking in the FAQ
+03:33 < n2liquid> at the*
+03:34 < n2liquid> Ahg, sorry for pinging for all messages, I'm not used to IRC anymore
+03:34 < Guest_1448> ya, old v2 guide was better
+03:34 < Guest_1448> there are like 5 separate pages now that you have to open and ctrl+f
+03:35 < Guest_1448> to find something
+03:36 < n2liquid> I'll remember that :)
+03:41 < othiym23> does anybody have a good method for determining why a Node process is still running?
+03:41 < othiym23> it's not hung, it's not doing anything useful
+03:42 < HacDan> no, but the quickest way to dispose of it would be with fire =) 
+03:42 < othiym23> I'm wondering if something is just continuously adding itself to the nextTick queue for some reason
+03:42 < othiym23> yeah, I've got a test case that's refusing to give up the ghost
+03:43 < othiym23> and if I process.exit() it, I don't actually get the test results back, but if I just let it proceed, it does print out the results and then hangs around forever
+03:43 < othiym23> at some point the code creates an http.request
+03:44 < othiym23> but the callback attached to it doesn't fire until it's done, and when I dump its state, I can see that the response is finished by the time the end code runs
+03:45 < othiym23> process._getActiveHandles() and process._getActiveRequests don't show anything weird
+03:46 < cody--> hi
+03:49 < hemanth> meow
+03:49 < n2liquid> hemanth, nyan~
+03:49 < hemanth> n2liquid, puuur ^_^
+03:50 < n2liquid> hemanth, pfffffff..! >:
+03:51 < darklrd> hi, i have a quick question, if I am creating a http server in node.js, and if I am about to receive high number of concurrent requests from a different servers, will node.js by default rate limit it?
+03:51 < darklrd> *different server (only one server)
+03:52 < othiym23> darklrd: nope, node will handle the requests as quickly as they come in
+03:52 < darklrd> even if the source which is making request is same?
+03:52 < othiym23> if the number of requests gets too high, you might see some queueing on the network interface, but node itself won't block
+03:53 < darklrd> ok, and when we ourselves act as a client then we have this rate limit of issuing 5 requests per socket?
+03:56 < sente> I want to pass an object to the view, as javascript
+03:56 < sente> <script>var variable={{__myobject}}</script>
+03:56 < sente> that's in my .mustache template, and it's almost right
+03:57 < LouisT> oh wow.. i just realized why mustache was called mustache... -.-
+03:59 < darklrd> othiym23: thanks
+04:00 < samholmes> Anyone here built a iOS/Android node.js app?
+04:03 < othiym23> holy CRAP that sucked
+04:03 < othiym23> lesson learned, be very careful about how use use setInterval in autonomous code
+04:03 < hemanth> :)
+04:04 < samholmes> othiym23: autonomous?
+04:07 < st_luke> SlexAxton: you around?
+04:08 < SlexAxton> ya
+04:08 < SlexAxton> sup
+04:09 < othiym23> samholmes: I had a class that's meant to be running passively inside other people's code (instrumentation) and I was starting up a couple samplers but only shutting down one of them, which would keep the node process from exiting
+04:09 < sente> how can i pass raw javascript to the view?
+04:09 < othiym23> because there was still a setInterval handler registered on the active handle list
+04:09 < sente> so the browser has it, as an object
+04:11 < othiym23> samholmes: it was also causing node-tap tests to not exit and drove me completely bonkers trying to figure out what was going on
+04:11 < Guest_1448> sente: are you trying to pass it to the view from your app or pass it to the browser from your view?
+04:12 < othiym23> so I fixed a long-hidden bug in my code *and* switched test frameworks
+04:12 < othiym23> good job, me
+04:12 < sente> Guest_1448: the same?
+04:12 < sente> i'm using mustache to render things
+04:12 < Guest_1448> JSON.stringify it inside a script tag
+04:13 < sente> yeah that's not working for some reason
+04:13 < Guest_1448> are you prefixing it with a variable name?
+04:13 < Guest_1448> foobar = ${ JSON.stringify(obj) };
+04:14 < Guest_1448> make sure you keep the varname outside the special render/output tags
+04:15 < sente> that goes in the view?
+04:15 < sente> yeah i had
+04:15 < Guest_1448> can you pastebin?
+04:16 < sente>    <script>var variable=JSON.stringify([object Object])</script>
+04:16 < sente> <script>foobar = ${ JSON.stringify(__session) };</script>
+04:16 < sente> heh, that's what I see in the browser, after the page loads
+04:16 < Guest_1448> don't use ${}
+04:16 < Guest_1448> that was just an example. mustache uses {{}} or something
+04:16 < sente> ive done like every combination
+04:17 < sente> (it seems)
+04:17 < sente> well, just {{ and {{{
+04:17 < sente> ugh
+04:18 < Guest_1448> pass the stringified object to mustache
+04:18 < Guest_1448> i don't think mustache can do inline js
+04:18 < Guest_1448> then just do variable = {{ stringifiedObject }};
+04:19 < sente> having issues with quotes
+04:19 < sente> tried that
+04:19 < Guest_1448> what does it output?
+04:20 < SomeoneWeird> variable = "{{ s }}";
+04:20 < Guest_1448> if you wrap it in string, it won't be an object in js world
+04:22 < chovy> is anyone using dustjs-linked package for express?
+04:23 < chovy> linkedin*
+04:29 < sente>     <script>var variable="{&quot;title&quot;:&quot;I Dont Need A 
+04:29 < sente> looks like that
+04:29 < sente> but 2000x longer
+04:29 < sente> I can't convert it an obj
+04:30 < Guest_1448> use the unescaped varian
+04:30 < Guest_1448> t
+04:31 < Guest_1448> sente: use triple {
+04:31 < Guest_1448> {{{variable}}}
+04:31 < Guest_1448> so that it doesn't escape quotes and other special html chars
+04:34 < chovy> damn beltre
+04:34 < sente> Guest_1448: thank you
+04:34 < sente> so my prob before was it was 'object'
+04:35 < sente> not just json
+04:35 < sente> specifically the session data
+04:37 < larryapplegate> anyone doing iOS and node?
+04:43 < SomeoneWeird> larryapplegate, https://github.com/TooTallNate/node-iOS
+04:43 < SomeoneWeird> very old but worth a look :)
+04:45 < larryapplegate> Thanks for the link!
+04:53 < larryapplegate> interesting to run node on a jailbroken iOS device, i suppose, but:
+04:53 < larryapplegate> i want to write a node server for my existing iOS app, that uses a less efficient server method
+04:56 < SomeoneWeird> larryapplegate, node server on the device?
+04:56 < larryapplegate> no
+04:57 < larryapplegate> the devices are in the apple mainstream
+04:57 < larryapplegate> not jailbroken
+04:58 < larryapplegate> they are currently talking to iCloud, Game Center, and parse.com
+04:59 < larryapplegate> the database is currently in parse
+04:59 < larryapplegate> iCloud is to synchronize a users data across all of his devices
+04:59 < larryapplegate> game center is for audio chat, not written yet
+05:07 < SomeoneWeird> larryapplegate, right, so just a node server for them to communicate with?
+05:07 < larryapplegate> yes
+05:07 < SomeoneWeird> yeah, should be easy
+05:07 < larryapplegate> except i'm really bad at command line stuff
+05:07 < larryapplegate> i'm to pampered with using the apple ide
+05:08 < SomeoneWeird> lol
+05:08 < SomeoneWeird> its not hard
+05:08 < SomeoneWeird> ask if you have any questions :)
+05:10 < larryapplegate> i am running Ryan Dahl's example chat, but after starting the server from Terminal, hitting command '.' stops the server. Yet in his video, he is then running Telnet to send something to the server
+05:10 < SomeoneWeird> pastebin your code
+05:10 < larryapplegate> what is that?
+05:10 < larryapplegate> i put the source in a folder in my user
+05:18 < bubbles10101> can anyone explain something about engine.io. Guillermo Rauch positions it as "better" than socket.io because it uses XHR first then websockets... except many say that socket.io uses engine.io
+05:19 < bubbles10101> totally confused
+05:21 < SomeoneWeird> never heard of it
+05:29 < mdedetrich> http://theamazingios6maps.tumblr.com/
+05:29 < mdedetrich> lol
+05:29 < issackel_> in node are people using processors that do LESS compilation on the fly when it's requested (for the first time, or doing it when the file is saved in development or what? In django I'd use django-compressor and just do it when it's first requested (and warm the cache)
+05:29 < mdedetrich> that is hilarious
+05:30 < mdedetrich> issackel_: most people use stylus/jade in the node.js world
+05:30 < mdedetrich> less has issues with import and preprocessor
+05:30 < issackel_> I want to stick with LESS 
+05:31 < issackel_> I'm ambivalent about templating right now
+05:32 < mdedetrich> well the thing is, most node.js frameworks use modules for CSS templating
+05:33 < mdedetrich> LESS's import imports CSS multiple times
+05:33 < mdedetrich> also
+05:33 < mdedetrich> it has some other issues
+05:33 < mdedetrich> the one I just mentioned has been around for years and still isn't fixed
+05:36 < issackel_> great. Precompiler it is
+05:36 < issackel_> thanks! :)
+05:38 < bubbles10101> so no-one knows anything about engine.io?
+05:39 < context> bubbles10101: the internet does
+05:39 < bubbles10101> haha yeah.. ive been reading the internets for a while now.. and am way more confused  haha
+05:40 < timeturner> noooo, github changed :(
+05:40 < context> the moved the star/fork stuff?
+05:40 < chovy> i used npm install -g 
+05:40 < timeturner> no I mean the whole interface changed
+05:40 < chovy> where did it put the files?
+05:41 < issackel_> feed interface changed
+05:41 < timeturner> and I don't like how activites is in a different tab
+05:41 < timeturner> really don't like that
+05:41 < dragon> I hope so.
+05:41 < dragon> No, news feed still looks terrible.
+05:41 < timeturner> it looks more terrible
+05:41 < context> chovy: npm config list | grep prefix
+05:41 < timeturner> because now there's half as much information
+05:42 < timeturner> as there was before
+05:42 < timeturner> on a single page...this sucks
+05:42 < dragon> It's flooded with 20 commits in one push to one repo that I care the least about.
+05:42 < context> chovy: or: npm -g prefix
+05:44 < chovy> thanks
+05:47 < wingy> anyone here has succeeded with using jQuery ajax on node.js?
+05:56 < sente> how can I setup express with two loggers?
+05:57 < sente> if i have multiple `app.use(express.logger(...));` lines only the first is applied
+06:11 < Guest_1448> wingy: why not use some other request module?
+06:12 < wingy> Guest_1448: my style to not learn 2 things doing the same thing
+06:13 < Guest_1448> wingy: have you looked at superagent? it's pretty close and it even has comparison/samples comparing the code to $.ajax on the homepage
+06:13 < wingy> Guest_1448: yeah i like it 
+06:13 < wingy> although i would still wanna use jQuery ajax .. but i think it have to settle for superagent
+06:23 < elliottcable> >> ~function(arg){ console.log(delete arguments[0]); console.log(arguments[0]) }(2)
+06:23 < purr> elliottcable: (number) -1; Console: true, undefined
+06:24 < elliottcable> er. Aren't Arguments members supposed to be DontDelete? or am I mis-remembering?
+06:24 < elliottcable> mm. wrong room.
+06:35 < owen1> i created a node server that provide get and post that save some data into mongo. how would i test it? make a post and assert that the data exist in mongo?
+06:41 < ashr_> ww
+06:42 < SomeoneWeird> something like that, yeah owen1 
+06:43 < owen1> SomeoneWeird: ok. so no mock, hit my db and verify the data exist. (and delete the data at the end)
+07:29 < pawn> how can I tell whether to server the mobile version of my site or the desktop version from express?
+07:34 < [AD]Turbo> hi there
+07:35 < bubbles10101> i know its a bit thorny.. but does anyone know why node.js community do not seem that supportive of Meteor?
+07:35 < bubbles10101> i mean considering Meteor was built on top of node... you would think...
+07:36 < substack> bubbles10101: with meteor it's really hard to use modules from npm
+07:36 < substack> meteor isn't even on npm
+07:37 < bubbles10101> yeah.. no i get that.. but why not? it's a bit worrying and makes me not want to use meteor, even if they have some nice features
+07:42 < kuebk> hello
+07:43 < iamme> hello all, does anyone know how to add headers for to allow cors to https://github.com/nodejitsu/node-http-proxy#proxy-requests-within-another-http-server this example
+07:43 < st_luke> bubbles10101: meteor is basically its own thing. it's 'node' in the sense that node is a dependency, but not in the sense that it lets you use node and node's tools as practically ever other node-related library/project/framework
+07:45 < maneulyori> Hello, Is there any methode to remove loaded module and immediately reload it (with newer code)?
+07:46 < bubbles10101> st_luke: pity - i would be cool maybe to take some of the stuff (like the latency compensation bits) and create npm modules out of it
+07:46 < kuebk> maneulyori: yes it is
+07:46 < kuebk> you would have to clear the cache
+07:47 < kuebk> look at require
+07:47 < st_luke> bubbles10101: don't know what license it uses but other than that there's probably nothing stopping you from doing something like that other than inconvenience
+07:49 < bubbles10101> its on MIT, yeah .... not sure i have the skill for it
+07:53 < phrearch> hi
+07:54 < phrearch> with supervisor, is it possible to trigger a reload when changing non-js files as well?
+07:55 < iamme> is there anyone that has some knowledge from using node-http-proxy here?
+07:56 < maneulyori> kuebk, Thanks. Now it reloads renewed code well.
+07:58 < aMoniker_> Is there anything like nodemon or supervisor that works with changes of all file types?
+07:59 < SomeoneWeird> mm maybe forever?
+08:00 < stagas> aMoniker_: https://github.com/stagas/nolife does the job for me
+08:02 < aMoniker_> does it watch all files in the current directory and subdirectories by default?
+08:02 < stagas> yes
+08:03 < stagas> er, the ones you tell it by extension, defaults to .js and .json
+08:04 < aMoniker_> perfect, just gave it ejs,js,json works a treat
+08:04 < harbhub> hey fellas
+08:04 < SomeoneWeird> yeah aMoniker_ 
+08:04 < stagas> aMoniker_: cool
+08:04 < harbhub> can someone help me get started with mongo
+08:04 < harbhub> i'm using express with ejs
+08:04 < aMoniker_> strange that nodemon/supervisor had so much trouble with simply watching different extensions and recursing subdirectories..
+08:04 < harbhub> i want to make a mongo db for persitant storage
+08:05 < harbhub> i'd like to use mongoose, but am open to any
+08:05 < SomeoneWeird> mysql
+08:05 < SomeoneWeird> >.>
+08:05 < SomeoneWeird> <.<
+08:05 < harbhub> i want to make a basic html page with input text, input password, and input submit
+08:05 < harbhub> on submit call an action and the method is post
+08:06 < harbhub> i want to retrieve that call on the server side and store it in the db
+08:06 < harbhub> how do i make a mongo collection?
+08:08 < estonia> hello from estonia!
+08:08 < SomeoneWeird> ello
+08:09 < aMoniker_> greetings, estonia
+08:09 < aMoniker_> I feel like I'm addressing the entire country
+08:12 < kpsullivan> Hello :) I'm looking at the feasibility of having my node application stream HTTP POST file uploads directly through to an Amazon S3 Bucket. I'm looking at using Formidable and Knox for this. The part I'm unsure about is that S3 requires that you know the total number of bytes in the file before transmission. Would I be right in thinking that the only way to accomplish this then would be to use the HTML5 File API (And possibly a
+08:12 < kpsullivan> n ActiveX control on Internet Explorer) to check the file size on the client and send this as part of the HTTP POST request ? Has anyone done something like this before ?
+08:17 < aMoniker_> kpsullivan: knox has putStream/putBuffer methods that don't require knowing the total number of bytes
+08:19 < kpsullivan> aMoniker_: Thanks, I'll have a look for those
+08:20 < aMoniker_> actually… looking at it now I could be wrong
+08:20 < aMoniker_> the example shows putStream passing a content-length header
+08:20 < aMoniker_> and buffer could be determining the content-length itself
+08:21 < aMoniker_> worth a shot though
+08:21 < kpsullivan> Yeah, from what I have read of the S3 documentation, put requests require a Content-Length header
+08:30 < kpsullivan> I might have to temporarily store the entire file on my node server and then send it up to S3 as I'll know the number of bytes then. Alternatively I could look at using S3's new CORS functionality to directly upload from the client to S3...
+08:44 < samg_> I have a weird problem, and I don't think it's node, but I want to make sure.
+08:44 < samg_> Can someone try my chat application: http://long-chat.herokuapp.com
+08:46 < samg_> ah, person helping me... the chat died I think?
+08:46 < kpsullivan> looks like it yes
+08:47 < kpsullivan> I was about to send a message in the second tab but it died :D
+08:47 < samg_> that might be a separate issue
+08:47 < samg_> so I can see myself chat between tabs in safari, and between tabs in firefox, and between firefox and safari
+08:47 < samg_> but I can't see myself chat between chrome tabs!
+08:48 < samg_> it's a very naive implementation, but I can't figure out what's wrong
+08:48 < samg_> https://github.com/samwgoldman/long-chat
+08:49 < kpsullivan> yeah it's weird - I have no idea what could cause it :/
+08:51 < nsm> samg_: is text from the chrome tab input being sent to the server?
+08:52 < samg_> nsm: yeah, if I have 2 chrome tabs open, I still see everything I send, but only in 1 of the 2 tabs. And that 1 tab switches back and forth. If I have > 2 tabs, it cycles.
+08:52 < samg_> Would be helpful to know that someone can reproduce that...
+08:54 < jbpros> Hey guys, I'm a freelance developer based in Belgium and I'm looking for some node.js project. The official job board being quite empty, do you have any recommendations?
+08:55 < nsm> any errors on the chrome console?
+08:56 < samg_> no errors
+08:57 < ashWork> really slow
+08:58 < ashWork> i got like 3 messages thru then it just stopped responding
+08:58 < ashWork> but i got messgaes in both tabs
+08:58 < samg_> what version of chrome?
+08:58 < ashWork> different messages
+08:58 < samg_> you should see all messages in all tabs
+08:59 < ashWork> SR Ware Iron 15.0.900.2 (Developer Build 107001 Windows)
+08:59 < ashWork> Anonymous2message in both tabs now
+08:59 < ashWork> fast
+08:59 < nsm> in chrome i see messages i send from tab 2 in tab 1 but not in tab 2 itself
+09:01 < samg_> in all the examples of chat applications I've seen, clients request for the data which is in a buffer on the server
+09:01 < samg_> in this chat application, GET requests are held in an array, and when a POST comes in, the request is piped into the listeners' responses
+09:02 < nsm> its not restricted to chrome, same bug in ff too, problem is mostly on the server
+09:02 < nsm> any reason to keep popping listeners off?
+09:03 < phrearch> is angularjs usable on node by the way?
+09:04 < samg_> nsm: I'm popping off the listeners so I don't keep sending to closed connections. The client reopens the connection whenever it receives a response.
+09:04 < pawn> How can I set up browserify without express?
+09:04 < samg_> might be misunderstanding long polling though
+09:10 < nsm> samg_: i'm not sure piping is the way to go here
+09:12 < samg_> nsm: yeah, piping definitely has problems.
+09:12 < samg_> this is my first node app, so I'm just learning what the libraries are/can do
+09:13 < samg_> I really want to know what is causing this bug though
+09:15 < nsm> i have a feeling its related to the streams not getting flushed
+09:15 < nsm> can you try that? cal flush on the speaker
+09:16 < samg_> sorry, which stream?
+09:28 < substack> pawn: just use the command-line tool
+09:29 < pawn> substack: it's a pain when developing
+09:29 < pawn> I figured it out with the API
+09:30 < substack> pawn: watch mode
+09:31 < Cogito_Ergo_Sum> does anybody know if it is possible with node in the "net" module to disable nagle's algorithm?
+09:31 < Cogito_Ergo_Sum> TCP_NODELAY
+09:31 < pawn> substack: Yeah, I figured out how to use watch mode with the API
+09:33 < Cogito_Ergo_Sum> ah yes
+09:33 < Cogito_Ergo_Sum> setsocketnodelay
+09:33 < Cogito_Ergo_Sum> the api docs are  great
+09:34 < xico> Hello everyone.
+09:34 < xico> What do you call an object that carries utilities and values and passes around a whole application?
+09:34 < pawn> What's a super simple storage system. I'm going to be storing discography data for music artists. What would best suit this kind of data?
+09:34 < xico> It's like a utility cart
+09:35 < xico> pawn: MongoDB *.*
+09:36 < xico> pawn: By discography you don't mean the actual binary data that composes the musics, right? Just the information.
+09:36 < pawn> yeah, just the info
+09:36 < xico> MongoDB is really easy to use with Node.JS
+09:37 < xico> Check out the module "MongoSkin" for example
+09:37 < xico> on github
+09:37 < xico> Easy queries by artist name for example
+09:37 < xico> etc
+09:38 < pawn> Is there a free host for mongo databases?
+09:38 < xico> I think there are several.
+09:38 < xico> Try Heroky
+09:38 < xico> *Heroky
+09:39 < xico> what the hell? HEROKU
+09:39 < LouisT> pawn: take a look at mongolab
+09:39 < dragon> mongohq
+09:40 < xico> LouisT: Nice one
+09:40 < LouisT> pawn: http://www.mongodb.org/display/DOCS/Hosting+Center
+09:43 < pawn> which is better?
+09:46 < Cogito_Ergo_Sum> is it necessary to use socket.pipe() after socket.write() ?
+09:59 < ashnur> is it possible to deploy node without nginx and/or monit and still get a stable environment?
+10:05 < Lemminkainen_> Cogito_Ergo_Sum: this may help you http://docs.nodejitsu.com/articles/advanced/streams/how-to-use-stream-pipe
+10:09 < Lemminkainen_> Cogito_Ergo_Sum: if you're using the net.Sockets native to Node, then you've only got socket.write() available; whereas if you're using the socket.io library, you would generally use socket.emit()
+10:10 < Lemminkainen_> socket.pipe() isn't a method to any socket object so far as I know, unless you've named a readable stream "pipe"
+10:10 < Lemminkainen_> *"socket"
+10:11 < Lemminkainen_> now, as to my question:
+10:11 < iksik> hm
+10:11 < Lemminkainen_> I want 1 server to listen on 1 port and emit data on another port
+10:11 < Cogito_Ergo_Sum> hm
+10:11 < SomeoneWeird> https://github.com/substack/stream-handbook
+10:11 < SomeoneWeird> read that ^^
+10:11 < Cogito_Ergo_Sum> var server = net.createServer(function (socket) {
+10:11 < Cogito_Ergo_Sum>   socket.write('Echo server\r\n');
+10:11 < Cogito_Ergo_Sum>   socket.pipe(socket);
+10:11 < Cogito_Ergo_Sum> });
+10:11 < Cogito_Ergo_Sum> this is the default example at the node.js site
+10:12 < Cogito_Ergo_Sum> but it seems to me that socket.pipe() is not needed, as the data gets transferred even without it
+10:12 < jcoglan> using child_process, can you make a process that shares stdin/stdout with the node process?
+10:12 < jcoglan> e.g. I want to invoke the w3m browser and have it appear in the same terminal where my CLI app is running
+10:14 < spionL> Cogito_Ergo_Sum, that example is an echo server. it pipes what comes from the client back to the client (i.e. 'echoes' everything)
+10:14 < Cogito_Ergo_Sum> yes and what i'm saying is: why is socket.pipe() needed when the data gets echoed even with just socket.write() ?
+10:15 < Gottox> Cogito_Ergo_Sum: echo != write
+10:16 < Gottox> echo means "I type something to the server, it receives and sends the same message back."
+10:16 < hemanth> anyone working on node-irc? client.addEventListner('JOIN',function(prefix){console.log(prefix);}); whatz wrong with that?! it's not capturing JOIN event....
+10:17 < Cogito_Ergo_Sum> goraxe how is that relevant to whether we should pipe() after write() ?
+10:17 < Cogito_Ergo_Sum> whether it's an echo server or not is simply an application layer issue
+10:17 < spionL> Cogito_Ergo_Sum pipe means take this stream and everything that comes to it and write it to another stream.
+10:18 < Cogito_Ergo_Sum> ah
+10:18 < Cogito_Ergo_Sum> hm
+10:18 < spionL> client.pipe(client) - take everything that comes to the client and write it back to the client
+10:18 < spionL> comes from the client*
+10:18 < Cogito_Ergo_Sum> so instead of just socket.pipe(socket) i could just do socket.write(data)
+10:18 < Cogito_Ergo_Sum> yes
+10:19 < spionL> you could socket.on('data', function(data) { socket.write(data); }); but you'll also need to handle errors, backpressure and... uhh
+10:19 < spionL> pipe does everything right, magically.
+10:19 < Gottox> also it's kinda slow.
+10:21 < Cogito_Ergo_Sum> yes got it now
+10:21 < Cogito_Ergo_Sum> thank you
+10:21 < Gottox> A good usage for pipe is a static http server. You can handle the header in the code, connect a filestream with pipe and forget about this connection.
+10:23 < Lemminkainen_> btw, to answer my own question, looks like creating an http.request client will take care of my needs
+10:24 < Cogito_Ergo_Sum> yes got it thanks goraxe
+10:24 < Cogito_Ergo_Sum> Gottox
+10:24 < Gottox> :)
+10:24 < Cogito_Ergo_Sum> does anybody know if the libuv api for creating a server, sending and receiving data is at the same level as the node.js api or at a lower one ?
+10:26 < jcoglan> e.g. I would expect this to show the w3m browser in my terminal:
+10:26 < jcoglan> require('child_process').execFile('w3m', ['http://www.google.com'], {stdio: 'inherit'})
+10:31 < hemanth> anyone working on node-irc? client.addEventListner('JOIN',function(prefix){console.log(prefix);}); whatz wrong with that?! it's not capturing JOIN event....
+10:42 < SomeoneWeird> hemanth, use client.on('join', 
+10:43 < ashnur> why do i feel like i'm ignored? :D
+10:43 < hemanth> SomeoneWeird, http://node-irc.readthedocs.org/en/latest/API.html does not list client.on
+10:43 < SomeoneWeird> <ashnur> is it possible to deploy node without nginx and/or monit and still get a stable environment? < ofc
+10:44 < SomeoneWeird> http://node-irc.readthedocs.org/en/latest/API.html#events
+10:44 < SomeoneWeird> hemanth, ^
+10:44 < SomeoneWeird> you use client.on('event', cb) to listen to an event
+10:45 < ashnur> SomeoneWeird, is there maybe some online resource on how to this, I need some kind of VirtualHost alternative
+10:45 < SomeoneWeird> ashnur, http://www.senchalabs.org/connect/vhost.html
+10:45 < ashnur> thx
+10:46 < hemanth> SomeoneWeird, https://github.com/martynsmith/node-irc/issues/108
+10:46 < SomeoneWeird> did you try .on('join'?
+10:47 < hemanth> yup
+10:50 < hemanth> SomeoneWeird, updated the ticket https://github.com/martynsmith/node-irc/issues/108
+10:52 < nsm> Cogito_Ergo_Sum: slightly lower level
+10:52 < SomeoneWeird> does the event get fired or not?'
+10:55 < hemanth> SomeoneWeird, yes
+10:55 < hemanth> SomeoneWeird, after the bot joins, i leave and re-join 
+10:56 < SomeoneWeird> so whats the problem/
+10:56 < hemanth> SomeoneWeird, the event is not handled 
+10:56 < SomeoneWeird> it is
+10:56 < SomeoneWeird> function (channel, nick, message) { }
+10:56 < SomeoneWeird> it's not passing back "data"
+10:56 < SomeoneWeird> its passing back those 3 args
+10:57 < hemanth> SomeoneWeird, tired that as well
+10:57 < SomeoneWeird> client.on('JOIN', function (c, n, m) { client.say(n, m); });
+11:12 < hemanth> SomeoneWeird, Same
+11:12 < hemanth> bye for now
+11:23 < Pitel_IPEX> can someone help me with socket.io? <script src="socket.io/socket.io,js"></script> is not giving me the script, but "Welcome to socket.io" instead. http://pastebin.com/viNG9GLe here is the node.js code.
+11:23 < Pitel_IPEX> oh, now I see it!
+11:24 < Pitel_IPEX> io,js... derp :)
+11:54 < Cogito_Ergo_Sum> is anyone having problems interrupting a node instance running with ctrl-c through putty ( ssh ) ?
+11:56 < Cogito_Ergo_Sum> ( in a linux box that is - ec2 micro )
+11:56 < SomeoneWeird> putty from windows?
+11:58 < Cogito_Ergo_Sum> yes
+12:06 < Cogito_Ergo_Sum> and the process can't even be killed with kill -9
+12:14 < SomeoneWeird> then something is defs wrong :p
+12:28 < mbalho> attention node.js channel: you are being projected onto a wall in estonia
+12:28 < zomg> BOOBIES
+12:28 < Gottox> boobies.js
+12:28  * mbalho facepalm
+12:33 < Hupo> estonia, eh
+12:54 < jmar777> well then, i guess we better talk about threads or streamline
+12:57 < aMoniker> I want to talk about gummi bears
+13:27 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+13:29 < boutell> I've run into an interesting jade issue. (I assume this is a good channel to talk about jade templates.)
+13:30 < boutell> If you 'include' two files, and they both extend the same file, overriding its named blocks in different ways, you don't get a reasonable result. You get the same result twice.
+13:30 < boutell> I think this is because jade has a single namespace of named blocks and they are inserted at the very end of the process
+13:31 < boutell> this is problematic because express has no facility for a partial to render another partial in a really independent way, without trying to share the same namespace of blocks
+13:32 < boutell> (or rather, express has no facility for partials at all, it punts that to jade, which has no facility for inserting another partial with an independent namespace)
+13:33 < boutell> for els I injected my own render function for calling other partials, sharing stuff only explicitly, otherwise keeping variables independent. That's starting to look like a good idea again.
+13:33 < boutell> (for ejs, rather)
+13:41 < jmar777> sorry about the shameless self promo, but i was crazy excited about this tweet: https://twitter.com/MongoDB/status/249037051339632640
+13:42 < jmar777> there seems to be a lot of node.js haters on reddit, so it was cool to see a little validation
+14:01 < nohu> mbalho: sorry, have to ask, is there a node conference in Estonia?
+14:43 < q_> Anyone know how I can make me ec2 instance completely cut off from the outside world ?
+14:43 < q_> I dont want it accessible from the interwebs
+14:43 < SomeoneWeird> firewallll
+14:43 < yawnt> you wouldnt be able to use it the 
+14:43 < yawnt> *then :D
+14:44 < SomeoneWeird> sudo apt-get install ufw && sudo ufw default deny && sudo ufw enable
+14:44 < SomeoneWeird> ^ dont do that if you dont want to lose access
+14:44 < SomeoneWeird> :p
+14:44 < q_> I want a mongo server that only I can get to from my other aws instance
+14:45 < SomeoneWeird> yeah, just firewall it off
+14:45 < yawnt> i'd say use a whitelist
+14:45 < SomeoneWeird> from everything but yourself and the other instance
+14:45 < bradgignac> or make yourself ssh through the other instance
+14:45 < bradgignac> or better yet, set up a bastion server
+14:46 < q_> bastion ?
+14:46 < SomeoneWeird> could also do port knocking
+14:48 < q_> yawnt, is that in the ec2 config ?
+14:54 < janmower> q_: just use ec2 security groups, assign one 'mongo' or whatever that only accepts inbound traffic from your other boxen
+14:55 < janmower> q_: if you're super concerned about inbound/outbound fire up the box in vpc, and then use one proxy to your regular ec2 tier
+14:56 < q_> janmower, ok, yeah was trying to avoid vpc, let me look at the security groups, thanks
+15:03 < Hoppertje> when you disconnect someone from the server, how can the client attempt a new connection request (socket.io) ?
+15:08 < nkuttler> Hoppertje: there's some reconnect parameter
+15:09 < Hoppertje> nkuttler: on the client side?
+15:09 < nkuttler> Hoppertje: yeah
+15:09 < CIA-118> libuv: Charlie McConnell v0.8 * rb877db9 / src/unix/error.c : unix: map EDQUOT to UV_ENOSPC - http://git.io/aZ8wvQ
+15:13 < shlevy> How does the event loop work in the REPL? If I create a ReadStream and then wait a bit before piping it into a WriteStream, for example, could I miss some chunks?
+15:14 <@konobi> ryah, isaacs : http://video.theaustralian.com.au/2281983039/Swan-criticises-cranks-and-crazies
+15:49 < strk> is "a" < "a " according to Array.sort() ? -- does it depend on any setting ?
+15:51 < fb55> strk: str.slice(0, -n) is always > str
+15:51 < fb55> strk: *for any positive int value of n
+15:59 < therealkoopa> Can you change NODE_PATH within a node script?
+16:04 < aandy> therealkoopa: If you mean changing environment variables, then check out http://nodejs.org/api/all.html#all_process_env
+16:05 < therealkoopa> aandy: I'm trying to change: process.env.NODE_PATH = __dirname + '/../lib' before a require, but it only works if set NODE_PATH before I run the script. 
+16:06 <@konobi> therealkoopa: nopw
+16:06 <@konobi> *nope
+16:07 <@konobi> well, you can... but it won't change anything for the local env, just child processes
+16:07 < therealkoopa> konobi: Okay, thanks
+16:07 < plato> therealkoopa: hmm either require('../lib/foobar') or at cmd line export NODE_PATH=../lib;node app.js
+16:07 < aandy> therealkoopa: You *could* do a wrapper
+16:07 < aandy> like plato said :)
+16:08 < plato> therealkoopa: do you want to have the NODE_PATH set to different things at different times during the program's execution?
+16:08 < therealkoopa> plato: No, I just wanted to do it all in one script. I'm already doing the NODEPATH=lib node app.js and that works fine. I'll roll w/ it.
+16:10 < plato> therealkoopa: is it an option to put the stuff that is currently in lib/ into node_modules/
+16:10 < plato> because require checks there
+16:11 < aandy> or set up a symlink while you're developing the lib
+16:12 < therealkoopa> plato: I've thrown that idea around. I set up express sub apps. Each module in lib is a private module/app for the main app. I could put it in node_modules, but I thought it might be confusing with mixing it with what's in package.json
+16:12 < plato> perhaps prefix those with some characters to denote that it is part of your project?
+16:13 < plato> i.e. instead of apps named foo, bar do koopa_foo, koopa_bar
+16:13 < therealkoopa> I could do that.
+16:18 < qbit> http://lispyscript.com/ <----
+16:21  * BennyLava barfs
+16:24  * solidoodlesuppor barfs more
+16:24 < mstenta> Hey all, I'm trying to post some data to a Node.js server (which is running the Express framework), but the Node.js server is choking on it and giving the following: "Error: Request Entity Too Large"
+16:27 < raj> do I have to create a new sockjs connection on document ready or can I do it before that?
+16:27 < plato> mstenta: are you trying to post a shit ton of data?
+16:27 < CIA-118> node: Bert Belder openssl-asm * r4634126 / (4 files in 3 dirs): openssl: use optimized asm code on x86 and x64 (+7 more commits...) - http://git.io/zL9CHw
+16:27 < plato> i've not had issues posting >1MB images
+16:27 < mstenta> plato: yea, sorta… about 1.5 mb
+16:28 < mstenta> plato: but it's JSON encoded text
+16:29 < mstenta> plato: that error doesn't seem to be coming from Express, I just grepped for it… so it must be node.js itself? or something more general...
+16:30 < mstenta> plato: do i need to do something in the Node.js server code to receive large requests in chunks?
+16:34 < plato> mstenta: https://github.com/therealplato/express-formidable-demo
+16:34 < plato> are you posting a file? are you using enctype='multipart/form-data'
+16:35 < plato> ah you are pasting 1.5MB of plaintext into a form field?
+16:36 < mstenta> plato: i set up a Node.js server that just acts as a listener for my Drupal website, and forwards requests to another REST API I have running (so that Drupal doesn't have to wait for the response itself). So Drupal packs up the data into JSON, sends it to Node.js via a POST request.
+16:36 < mstenta> plato: I'm using Express in Node.js to receive the requests.
+16:37 < mstenta> plato: there aren't actually any forms involved, it's all behind the scenes, so-to-speak
+16:39 < superjoe> I'm looking for a module that does async logging and log rotation
+16:39 < strk> shouldn't assert.equal(1,2) throw a non-undefined exception ?
+16:41 < plato> mstenta: why so big?
+16:41 < mstenta> plato: it's scientific data files that are being sent to a backend processor
+16:42 < mstenta> plato: it works fine if i post directly to the processor, which is a REST server itself. But I want to use Node.js as an intermediary, so that I don't have to wait for a response from the backend for the page to load in Drupal
+16:43 < gildean> mstenta: did you try piping the request through node to the backend?
+16:44 < mstenta> gildean: that's what i'm trying to do, yes. the problem is I'm getting an error from Node.js: "Error: Request Entity Too Large"
+16:44 < plato> mstenta: what do you need express for?
+16:45 < gildean> mstenta: are you actually using .pipe() or just grabbing the request as a whole and then send it?
+16:45 < mstenta> plato: this is my first node.js project, and I found Express during my intial research. I figured it would be a good library to use on top of Node.js. I know it's not necessary, but do you think it's a bad choice to use
+16:45 < mstenta> ?
+16:45 < tjholowaychuk> mstenta you can use { limit: size }
+16:45 < mstenta> gildean: Oh… no… i'm not aware of .pipe()
+16:45 < plato> perhaps express is causing issues. i would check out .pipe() it might be better
+16:45 < mstenta> gildean: the Node.js app I wrote does make some changes to the request, so I don't want to send it directly…
+16:45 < gildean> plato: tj already answered
+16:45 < plato> mstenta: http://docs.nodejitsu.com/articles/advanced/streams/how-to-use-stream-pipe
+16:45 < mstenta> gildean: but maybe I could...
+16:46 < gildean> mstenta: so do what tj said
+16:46 < mstenta> tjholowaychuk: where would I use that?
+16:46 < plato> gildean: that would just cause express to disallow requests above `size` i think
+16:46 < tjholowaychuk> plato yeah there's a default though
+16:46 < tjholowaychuk> if you're using bodyParser() etc
+16:46 < plato> Ahh
+16:47 < tjholowaychuk> you probably wont want people posting 3GB at you
+16:47 < tjholowaychuk> but yeah if you have massive files you'll want to pipe them to disk
+16:48 < mstenta> tjholowaychuk: ah! I am using bodyParser()
+16:49 < mstenta> tjholowaychuk: ok… so i should set the 'limit' option for the bodyParser? that would make sense… looking into that now...
+16:49 < tjholowaychuk> yeah you can do bodyParser({ limit: '100mb' })
+16:49 < tjholowaychuk> etc
+16:50 < tjholowaychuk> how big are your posts?
+16:50 < mstenta> tjholowaychuk: 1.5mb
+16:50 < tjholowaychuk> you might want to use one of the streaming json parsers
+16:50 < mstenta> tjholowaychuk: YOU'RE AWESOME! that worked!
+16:51 < mstenta> tjholowaychuk: oh? i'm not familiar with that approach...
+16:51 < mstenta> still getting my feet wet with node
+16:56 < hemanth> > 1 in [1,2,3]
+16:56 < hemanth> >> 1 in [1,2,3]
+16:56 < purr> hemanth: (boolean) true
+16:56 < creationix> >> 1 in [3,4,5]
+16:56 < purr> creationix: (boolean) true
+16:57 < hemanth> >> k = ["joe","ram","pc] ; "pc" in k 
+16:57 < purr> hemanth: SyntaxError: Unexpected identifier
+16:57 < hemanth> >> k = ["joe","ram","pc"] ; "pc" in k
+16:57 < purr> hemanth: (boolean) false
+16:57 < creationix> "in" only matches keys, not values
+16:57 < hemanth> hmm
+16:57 < creationix> the keys are "0", "1", and "2"
+16:57 < hemanth> yup, recalled 
+16:57 < creationix> but it coerces 1 to "1"
+16:57 < hemanth> will have to emulate that now 
+16:58 < creationix> >> ([4,5,6]).indexOf(5)
+16:58 < purr> creationix: (number) 1
+16:59 < recidive> hello, guys, anyone using dox for documenting code could help here? https://github.com/visionmedia/dox/issues/68
+16:59 < hemanth> >> ["joe","ram","pc"].indexOf("pc")
+16:59 < purr> hemanth: (number) 2
+16:59 < hemanth> >> ["joe","ram","pc"].indexOf("p")
+16:59 < purr> hemanth: (number) -1
+16:59 < hemanth> indexOf works fine!
+16:59 < creationix> hemanth, so if you juat want to check if it's in there, then array.indexOf(value) >= 0
+17:00 < hemanth> was trying to do : if (new RegExp('^(' + names.join('|') + ')$').test('sue')) {...}
+17:00 < creationix> yeah, don't do that :P
+17:00 < creationix> indexOf is much cleaner
+17:01 < hemanth> creationix:  i had done if(friends.indexOf(who))…so thought it failed, but need that >=0 
+17:01 < aldus> if anybody is interested helping me in testing my Chat+Visual Quiz game, totally written in nodejs & Drupal (it's fun to play!) please try www.quizrooms.com - fake email can be used for quick registering. 
+17:02 < creationix> hemanth, just be aware that it has cost O(n) where n is the length of the array
+17:02 < creationix> but given a JS array, it's the fastest way
+17:02 < creationix> unless you know the array is sorted or something
+17:03 < hemanth> >> "hemanth, laxmi".split(",").indexOf('laxmi')
+17:03 < purr> hemanth: (number) -1
+17:03 < hemanth> why −1?
+17:03 < creationix> the space
+17:03 < hemanth> oh damn
+17:03 < creationix> split  using /, */
+17:03 < hemanth> :)
+17:04  * creationix thinks split accepts regular expressions
+17:04 < icebox> Todd, as usual, is the Man :)
+17:04 < hemanth> yes it does 
+17:05 < hemanth> creationix: kool, was working on something interesting, will update once done 
+17:15 < Ancien> hi
+17:15 < Ancien> i have a probleme
+17:18 < Ancien> one of my var when i concatenate it return [object object]  and i don't know why
+17:18 < BennyLava> ..
+17:18 < plato> console.log(JSON.stringify(someobject,null,2)) to see waht the object is
+17:18 < BennyLava> >> ({}).toString()
+17:18 < purr> BennyLava: (string) '[object Object]'
+17:18 < BennyLava> that's why
+17:20 < q_> how do I share node.js utility classes with my client side, browserify ?
+17:20 < q_> needs to work in IE7
+17:20 < hemanth> creationix: was working on https://github.com/hemanth/irc-notify 
+17:20 < hemanth> :)
+17:21 < jacobrask> q_: browserify is great for that
+17:21 < BennyLava> browserify++
+17:25 < CIA-118> node: isaacs v0.8 * r0400571 / (3 files in 2 dirs): domain: Properly exit() on domain disposal - http://git.io/6y0pUg
+17:26 < dehimer> есть кто русскоговорящий?
+17:26 < dehimer> нужна минуточка внимания
+17:28 < dehimer> how made simple autorization with mongodb (no connect)
+17:28 < dehimer> how made simple autorization with mongodb (no connect)?
+17:30 < dehimer> hey
+17:31 < plato> ask a few more times
+17:31 < dehimer> ok, it's password
+17:31 < plato> i bet that will make people help you
+17:32 < dehimer> *passport
+17:33 < dehimer> plato ok..
+17:33 < q_> *sarcasm*
+17:35 < plato> dehimer: http://passportjs.org/guide/username-password.html replace the code that looks for user with your mongo code
+17:36 < plato> make sure to store a hashed password and a salt for each user instead of storing plaintext password
+17:36 < plato> this is for express 2.x but the idea is the same: https://github.com/therealplato/passport-multiauth-demo/blob/master/app.js#L76
+17:36 < q_> passport looks cool , I wonder if they have ldap support
+17:37 < dehimer> plato thank for help
+17:38 < plato> dehimer: my last link is the passport function to CHECK if a u/p matches the stored hash/salt
+17:38 < plato> this is the function that generates hash and salt. it saves it in local memory in USERS object. you will need to modify it and include your async mongo code. https://github.com/therealplato/passport-multiauth-demo/blob/master/app.js#L490
+17:38 < dehimer> plato ok, i reading it right now
+17:41 < jfsiii> I'm getting an error during `make install` of node 0.8.9
+17:42 < jfsiii> CentOS 5.8 32 bit
+17:42 < jfsiii> [jfsiii@web235 node-v0.8.9]$ make install
+17:42 < jfsiii> make -C out BUILDTYPE=Release V=1
+17:42 < jfsiii> make[1]: Entering directory `/home/jfsiii/src/node-v0.8.9/out'
+17:42 < jfsiii> make[1]: Nothing to be done for `all'.
+17:42 < jfsiii> make[1]: Leaving directory `/home/jfsiii/src/node-v0.8.9/out'
+17:42 < jfsiii> ln -fs out/Release/node node
+17:42 < jfsiii> /usr/bin/python2 tools/install.py install 
+17:42 < jfsiii>   File "tools/install.py", line 219
+17:42 < jfsiii>     cmd = args[1] if len(args) > 1 else 'install'
+17:42 < jfsiii>                    ^
+17:42 < jfsiii> SyntaxError: invalid syntax
+17:42 < jfsiii> make: *** [install] Error 1
+17:42 < gkatsev> paste in a pastebin, not channel
+17:42 < dehimer> plato cool) all clear
+17:44 < jfsiii> gkatsev: https://gist.github.com/3762875
+17:45 < gkatsev> um... did you run ./configure and make before hand?
+17:46 < jfsiii> gkatsev: um...make is in the paste. yes, I ran `./configure —prefix=$HOME`
+17:46 < gkatsev> but I dont really know much about the install process
+17:46 < jfsiii> gkatsev: ok, nm, thanks
+17:46 < gkatsev> gl, hopefully someone else here knows
+17:47 < dehimer> there example of using passport without of express?
+17:49 < draginx> Is there a node npm of useful string helpers?
+17:49 < jaredrhine> the above python error seems likely to be a python version issue, as that form of ternary operator wasn't introduced until the last couple versions of python.
+17:49 < draginx> like a capitalize() function, etc.
+17:49 < draginx> camelcase, snakecase, pluralize, singularize, etc.
+17:50 < jaredrhine> python -V (capital) gives version, not sure what centos 5.8 default is.
+17:50 < EyePulp> anybody have a favorite module or service they use for mapping an IP to a destination/location?
+17:51  * plato perks up
+17:51 < plato> i could use that too
+17:51 < jaredrhine> like geoip?
+17:51 < jfsiii> jaredrhine: ah, that's plausible. my env is 2.4.3. I had to edit the config to use the 2.7 binary. Let me go fiddle with that for a sec.
+17:54 < EyePulp> jaredrhine: exactly
+17:57 < jfsiii> jaredrhine: That was it. Updated $PYTHON to use 2.7 and we're cool https://gist.github.com/3762875#gistcomment-576165 Thanks.
+17:57 < jaredrhine> happy to help.
+18:00 < jaredrhine> geoip lite is free and works off simple csv files. no existing js wrapper i'm aware of, but easy to access as a remote service, or an ideal github project for someone who's been looking for an excuse for a new open source project.  
+18:01 < eventualbuddha> anyone use node with jasmine much?
+18:01 < jaredrhine> i'm sure there are other services, but i don't know of them. using geoip lite has been enough to answer questions in the past.
+18:04 < shlevy> Is there an efficient way to do the equivalent of memcmp with buffers?
+18:05 < thlorenz> shlevy deepEqual  should work
+18:07 < thlorenz> shlevy: https://github.com/joyent/node/blob/master/lib/assert.js#L157
+18:07 < shlevy> thlorenz: Thanks!
+18:08 < thlorenz> shlevy: nop
+18:08 < shlevy> thlorenz: So buf1.deepEqual(buf2)?
+18:09 < shlevy> Oh, https://github.com/substack/node-deep-equal
+18:10 < thlorenz> shlevy: tha doesn't compare buffers
+18:10 < shlevy> Nope
+18:10 < shlevy> Darn
+18:10 < shlevy> So I need to do assert.deepEqual and try-catch?
+18:10 < thlorenz> just do something along the lines of the code I sent you
+18:10 < shlevy> Yeah, probably the best
+18:10 < thlorenz> i.e. compare each item in the buffer one by one
+18:18 < q_> anyone have any cool node libraries that they want to share /
+18:19 < bradleymeck_> understudy, for when you actually want more than just http middleware
+18:24 < rauchg> ಠ_ಠ
+18:24 < mbalho> those eyes, they do not mean what you think they mean
+18:25 < TooTallNate> rauchg: nice
+18:25 < mbalho> rauchg: i gave you a shout out in estonia today :)
+18:25 < mbalho> rauchg: cause i was giving a talk about how collaboration in open source communities works
+18:25 < rauchg> oh wow thanks
+18:26 < bradleymeck_> rauchg: ?
+18:27 < q_> I wonder if there is a passport login widget anywhere
+18:27 < rauchg> q_ like <script src="login.js"> 
+18:27 < rauchg> auto-renders form
+18:27 < rauchg> with validation
+18:28 < q_> doh, I should have looked that up first
+18:28 < rauchg> no, i don't think ti exists
+18:28 < rauchg> but that'd be cool
+18:28 < rauchg> :p
+18:28 < plato> would indeed be cool
+18:28 < rauchg> we can call it
+18:28 < rauchg> ಠ_ಠ.js
+18:28 < q_> yes!
+18:31 < bradleymeck_> disapproving-look.js might make some file systems happier lol
+18:35 < jmar777> isaacs: was that you requesting online talks from @nodejs?
+18:37 < jmar777> isaacs: i guess even if not, i still have a suggestion. maybe do "this week in nodejs" roundups, like on the 10gen blog? never hurts to have a curated roundup
+18:37 < mbalho> as the node turns
+18:42 <@isaacs> jmar777: that was me, yes
+18:43 <@isaacs> jmar777: also, blog post on domains coming soon
+18:44 < jmar777> isaacs: that would be a good topic. think there's still a lot of when/how/why questions around them
+18:54 < StewartJarod> Hey noders
+18:54 < nerph> are there any active CMS projects using node.js?
+18:55 < StewartJarod> just googled it and found Calipso never used it
+18:56 < StewartJarod> and nodize if you like coffee
+18:57 < nerph> looking at git it doesn't appear to be very active
+18:59 < StewartJarod> I'm only really familiar with express and restify
+19:04 < Asm_Freak> If you type `String.prototype` in the Node.js REPL, why isn't an object with the function names and functions returned like in the Chrome JavaScript console?
+19:04 < version2beta>  /join #nginx
+19:06 < BennyLava> Asm_Freak: Object.getOwnPropertyNames(String.prototype)
+19:06 < jmar777> Asm_Freak: because in the REPL you basically get the result of calling `toString()` on the result, whereas the chrome console has some fancy interactive display of objects
+19:07 < Asm_Freak> BennyLava, jmar777 thanks !
+19:07 < BennyLava> Asm_Freak: they're just not enumerable
+19:09 < Asm_Freak> BennyLava: Weird, why would they not be enumerable?
+19:11 < bradleymeck> Asm_Freak because most people don't use strings like objects since they are a primitive type
+19:12 < Asm_Freak> bradleymeck: That makes sense. Thanks.
+19:12 < AAA_awright> nerph: What are you looking for, exactly?
+19:12 < AAA_awright> Maybe you don't want Node.js
+19:13 < nerph> We use Liferay ATM, just interested in knowing what's being done in that
+19:15 < AAA_awright> hmm
+19:16 < AAA_awright> nerph: I'm building some content management platform, but I know exactly why I'm using Node.js as opposed to, say, PHP
+19:16 < AAA_awright> (It's event-oriented, and it's ECMAScript)
+19:17 < BennyLava> PHP sucks donky balls, that's reason enough to not use it for *anything*, *ever*.
+19:18 < AAA_awright> Eh, without a perfect alternative, you have to choose the lesser of evils sometimes
+19:18 < AAA_awright> And anyways, PHP is a fantastic _template_ language
+19:18 < BennyLava> PHP is never the lesser of any two evils.
+19:18 < AAA_awright> I've considered using it for my own templates, use the ECMAScript VM that's out for it
+19:18 < AAA_awright> You can be worse
+19:18 < AAA_awright> You could be using Java or Python
+19:19 < BennyLava> ..
+19:19 < BennyLava> not taking you seriously, ever again
+19:19 < nerph> Everything that I've written is Java, as my company looks at our mobile strategy node.js looks very appealing.
+19:19 < AAA_awright> Brainfuck... Malbolge...
+19:19 < BennyLava> obvious troll is obvious
+19:20 < AAA_awright> For all the crap people give PHP, they don't ever attack python on the same things. python isn't exempt from attacks, guys
+19:20 < AAA_awright> and Java is just a productivity killer
+19:20 < BennyLava> No, but it's still infinitely better
+19:21 < nerph> I'm using Appcelerator for the mobile part which is using Javascript, everywhere I turn it's more javascript :)
+19:21 < CoverSlide> The problem with PHP is that it's usability is far disproprotionate to its popularity
+19:21 < BennyLava> its*
+19:22 < CoverSlide> the only reason for its popularity is because it cam bundled with Apache for several years and it became a better alternative to perl CGI
+19:22 < AAA_awright> How would usability ever be proportional to popularity?
+19:23 < AAA_awright> You sure it's not like O(x^2) or something?
+19:23 < AAA_awright> Or any correlation at all?
+19:23 < CoverSlide> well these are qualitative and not quantitative
+19:23 < cpsubrian> Kinda proud of https://github.com/cpsubrian/node-eventflow … would love to get some feedback on it :)
+19:23 < CoverSlide> so it's not a quantifiable ratio
+19:23 < AAA_awright> So then it's better than Perl
+19:24 < CoverSlide> for web development, yes
+19:24 < CoverSlide> and also has a shorter learning curve
+19:26 < SoulRaven> hello
+19:26 < SoulRaven> i am try to read some bin data from a protocol, and i am try to use buffer and read16BE
+19:27 < SoulRaven> but is not working
+19:27 < SoulRaven> the code is something like this: http://jsfiddle.net/dbURC/
+19:27 < SoulRaven> but i get: DEBUG: TypeError: Object 2 has no method 'readInt16BE'
+19:29 < SoulRaven> anyone has work with buffers?
+19:29 < CoverSlide> SoulRaven: Bueffer#write returns a number
+19:29 < CoverSlide> *Buffer
+19:30 < creationix> SoulRaven, browsers don't have node Buffers (not sure if you're testing in jsfiddle)
+19:30 < CoverSlide> and numbers don't have readInt16BE
+19:30 < SoulRaven> so, how i put the data inside the buffer, and after that, read from the buffer a specific portion
+19:30 < SoulRaven> i am not testing in jsfiddle
+19:30 < SoulRaven> is for bin
+19:31 < creationix> SoulRaven, Buffer.prototype.slice will give you a window view into a buffer
+19:31 < CoverSlide> what are you expecting the return value for bufferData to be?
+19:31 < SoulRaven> a portion from a bin dump, i am try to make a parser for some AVL equipments
+19:32 < SoulRaven> and this type returns bin data
+19:32 < SoulRaven> an i have to get some data from the protocol
+19:33 < shlevy> Best xml parsers?
+19:35 < SoulRaven> i am trying to do something like: http://jsfiddle.net/dbURC/1/
+19:35 < SoulRaven> the orginal source came from java
+19:35 < SoulRaven> look on decodeLong method
+19:35 < CoverSlide> shlevy: use sax-js
+19:37 < SoulRaven> but returns 2 for a hex code like this: 000f333532383438303238323834373830 , where i have to read only the first 0f from the hex
+19:37 < SoulRaven> but returns 2
+19:37 < CoverSlide> SoulRaven: read the Buffer api docs. The return code of Buffer#write is a LENGTH, it's the LENGTH of bytes written
+19:38 < CoverSlide> it doesn't return a buffer
+19:38 < SoulRaven> i undestand that, but how i slice without damage the original buffer
+19:39 < SoulRaven> i nead to read from the code, more pices
+19:40 < SoulRaven> i guess is something wrong with this method, http://jsfiddle.net/dbURC/2/
+19:40 < CoverSlide> Buffer#copy if you want a new buffer. there's params for offset and length
+19:41 < CoverSlide> er wait
+19:41 < CoverSlide> no, you'd have to do new Buffer(length), then Buffer.copy
+19:53 < sirvon> is there anything current like nodejuice?
+19:54 < CoverSlide> nodejuice? wtf?
+19:54 < nathan7> sirvon: I was considering modding vogue
+19:56 < sirvon> it only watches css files...
+19:56 < sirvon> is there anything that watches directories... that you can point me to
+20:03 < sirvon> vogue is wack
+20:03 < sirvon> i can do that without nodejs
+20:04 < nathan7> sirvon: sure you can
+20:05 < nathan7> sirvon: I can write shit in Brainfuck too
+20:05 < sirvon> dont take it personal
+20:06 < sirvon> with dropbox hooked into a webserver u can accomplish the same feat
+20:06 < nathan7> You could write Vogue in assembly
+20:06 < nathan7> ..Dropbox?
+20:06 < nathan7> Why do I need to involve anything other than my own computer?
+20:06 < sirvon> yes
+20:06 < nathan7> Why can I not host shit on my own machine?
+20:07 < sirvon> i mean thats probably the MAIN attraction/advantage to vogue if u care about that
+20:07 < sirvon> i dont care about havin shit on my own servers
+20:08 < nathan7> sirvon: I develop on the go
+20:09 < nathan7> sirvon: With 3G, but nevertheless, on the go, without a reliable internet connection
+20:09 < benDos> Can I use the irc package with a socks4 proxy?
+20:10 < sirvon> ic so u wanna keep thing local.
+20:15 < msu_> hi, can someone tell me if i can use socket.io for reading a stream from an URL and then broadcasting it? all examples i see use listen()
+20:15 < Jona> Does anyone know of any project based node JS tutorials? Any frameworks? 
+20:18 < msu_> Jona, geddyjs maybe? http://geddyjs.org/tutorial.html
+20:19 < Jona> msu_ I will look into it. Any books on Amazon that you're aware of? Or used
+20:20 < msu_> books are too old for new tech i would say.. google is your friend :)
+20:23 < nerph> i'm coming from the java world and new to node.js, what development ide/debug options?  just using Textmate for now.
+20:23 < mephju> I second that. What's the best ide
+20:24 < EyePulp> sublimetext2
+20:24 < EyePulp> or TM2
+20:24 < msu_> first google result -> Nide?
+20:24 < mephju> coming from Java I think aptana studio and sublime text2 are not bad.
+20:24 < q_> hmm, getting require() not defined in my bundle.js file from browserify
+20:24 < mephju> but it's not good enough
+20:24 < q_> webstorm, hands down
+20:25 < mephju> webstorm costs money. but the Internet indeed agrees with u
+20:26 < ksmth> hey guys
+20:26 < q_> yeah its well worth it, with webstorm 5, they have LiveEdit built in, so you dont even have to refresh your browser to see the changes
+20:26 < ksmth> how do you guys pass data around when developing event based programs?
+20:27 < q_> json
+20:27 < ksmth> nah, I mean more like ... do you pass it around when triggering the event or storing it in an object and the observer is then reading that object
+20:28 < ksmth> the first would how I would have initially done it, but the second seems more like the right way, the more I think of it
+20:28 < q_> I pass it around, reading from some place will eventually lead to some data corruption problems
+20:29 < q_> why would you read from some place, performance ?
+20:29 < ksmth> hmm, I'm really not 100% certain, why it looks off to me. it really reminds me of just calling a function
+20:30 < plato> ksmth: you risk scary race conditions if you have several asynchronous functions working with the same object
+20:32 < ksmth> plato: so you too would recommend passing the associated data along with the event
+20:32 < plato> unless there's a good reason to do otherwise?
+20:32 < plato> i'm sure that both approaches have their situations
+20:33 < ksmth> haha, yeah. I guess that's why I'm so torn.
+20:34 < plato> maybe give us more details?
+20:36 < ksmth> well, I started thinking about it because I'm currently building an event based frontend. I wanted to decouple the header from the main content, which is a gallery. the header can apply filters on the gallery.
+20:37 < ksmth> so, the header is triggering a filter:change event and I though about whether it made more sense to change an object representing the current state of the ui of the gallery and make the gallery rerender itself on the event or just pass the data along with the event and rerender.
+20:37 < plato> i am shit at handling events on frontend
+20:38 < plato> my code is usually very messy
+20:38 < ksmth> me too, that's why I'm giving it proper thought this time :D
+20:38 < ksmth> and I'm curious how other people are doing it
+20:38 < plato> although; i would think that a state object is one of the cases when you might want a singleton state object
+20:38 < owensmartin> hey how many of you guys code in straight-up js rather than coffee?
+20:38 < plato> o/
+20:39 < ksmth> owensmartin: depends ;)
+20:39 < owensmartin> well… okay so if something gets very detailed you can write _that_ part in js…
+20:40 < owensmartin> but coffee seems just so much nicer for virtually the whole time
+20:40 < ksmth> sometimes I just don't like to set everything up and just start writing js but I prefer cs when it gets bigger
+20:41 < plato> ksmth: if you can do everything synchronously i would see nothing wrong with using a single state object
+20:41 < plato> if you have to handle time consuming image loads and uploads, i still wouldn't dismiss it, but i would be careful
+20:41 < owensmartin> yeah so I was also wondering what kind of set up was required
+20:42 < owensmartin> if you have "node" installed… coffee is just a module… plug and play
+20:42 < ksmth> hm, sometimes firing up the watcher for compilation is too much for me :)
+20:43 < ksmth> as is starting CodeKit / LiveReload
+20:43 < ksmth> plato: hm, the main reason I was passing the data along is, that I don't need a reference to any object and can just put it on the event bus.
+20:44 < ksmth> plato: someone will have to update an object after all, because most probably there are other events that will trigger a rerender and then the filtering still has to be in place.
+20:46 < ksmth> plato: I guess it's the cleanest way to make the listener update it's state according to the data passed along and then trigger an internal event to rerender itself.
+20:46 < BennyLava> its*
+20:50 < ksmth> ah, silence - much better :)
+20:50 < plato> i gtg good luck ksmth 
+20:50 < ksmth> plato: thanks! :)
+20:58 < SoulRaven> please help me with some advice, if is ok like this:
+20:58 < SoulRaven> http://pastebin.com/5v2vXpsh
+20:58 < SoulRaven> is this the best practice to extract some information from a hex data?
+20:59 < SoulRaven> or is another solution much better that i have right now? anyone ho work with binary data and protocols
+21:13 < superjoe> forever.js sucks so I wrote something better. check it out: https://github.com/superjoe30/naught
+21:13 < SoulRaven> is a better solution for this: http://pastebin.com/5v2vXpsh
+21:13 < skimmas> hello. can anyone help me... I'm making a simple xmpp bot. It reads a directory for commands and loads them into an array how can I listen from the events emited by all these commands
+21:13 < skimmas> ?
+21:14 < CoverSlide> um
+21:14 < CoverSlide> addEventListener?
+21:14 < SoulRaven> i also have a code for bitwise, but is not working:(
+21:15 < skimmas> to each of them? I tried to make a loop to add event listeners to each item in the array but that didn't work
+21:16 < skimmas> code is here if you like to take a look https://github.com/homem-arvore/Tobias-the-bot/blob/master/tobias.js (line 39)
+21:18 < CoverSlide> can't you just listen for a 'command' event?
+21:19 < skimmas> hm
+21:19 < skimmas> I might... maybe I didn't wrapped my head around events yet...
+21:19 < CoverSlide> and emit when necessary
+21:20 < CoverSlide> skimmas: http://nodejs.org/docs/latest/api/events.html 
+21:20 < skimmas> I'm going to have to experiment with that 
+21:21 < CoverSlide> and util.inherits(MyClass, EventEmitter)
+21:21 < skimmas> the thing is from the node site: server.on( blah blah... but I don't know where it came from
+21:22 < skimmas> since the commands have been loaded by node
+21:22 < skimmas> commands[className] = require(__dirname + '/commands/' + files[i]);
+21:22 < CoverSlide> http://nodejs.org/docs/latest/api/all.html#all_util_inherits_constructor_superconstructor << how to create your own eventemitter from anything
+21:24 < skimmas> Hmm ok I'm going to look into it
+21:24 < skimmas> thnaks CoverSlide
+21:30 < tnorris> anyone have an idea why turning a Buffer to string in a child process would slow transfer rate by about 4x's? (numbers here: https://gist.github.com/3752293)
+21:31 < CoverSlide> strings suck
+21:32 < CoverSlide> curious, are you encoding random data that could be outside the ascii range?
+21:32 < tnorris> CoverSlide: nope. just create a 100MB buffer of '0'.
+21:33 < CoverSlide> hm me no likey
+21:33 < tnorris> give me a sec and I'll update the gist with the scripts.
+21:35 < CoverSlide> 100MB of '0' or '\0'?
+21:36 < tnorris> CoverSlide: e.g. (new Buffer(10).fill('0');
+21:36 < tnorris> missing a )
+21:36 < CoverSlide> i see
+21:36 < tnorris> CoverSlide: added the scripts: https://gist.github.com/3752293
+21:37 < tnorris> you can run `single-parent.js` or `multi-parent.js` and it will output throughput.
+21:37 < tnorris> and for raw throughput, remove the `process.stdin.setEncoding('utf8')` from the child.js
+21:37 < tnorris> and you should see a much higher throughput.
+21:40 < tnorris> whoops. left some old code in, I've cleaned it up.
+21:41 < asdsamdsmia> hi
+21:41 < TheJesus> hi
+21:42 < asdsamdsmia> does anyone know if there is a log.io channel?
+21:42 < asdsamdsmia> i'm having a problem but i don't really know if it's nodejs or log.io
+21:42 < asdsamdsmia> this is the main error i get
+21:42 < tnorris> asdsamdsmia: ask away.
+21:43 < tmpvar> what is an alternative to IOWatcher for watching fds created in an addon?
+21:43 < asdsamdsmia> this is my error 
+21:43 < asdsamdsmia>   monitor.send(JSON.stringify(options)); 
+21:43 < asdsamdsmia> TypeError: Object #<ChildProcess> has no method 'send' 
+21:44 < tnorris> asdsamdsmia: what version of node are you using?
+21:44 < asdsamdsmia> i'm not sure, i tried using the specific version of nodejs that they were using in this "tutorial" https://github.com/NarrativeScience/Log.io/wiki/v0.2.7-Build-Recipe-(Ubuntu-12.04)
+21:44 < CoverSlide> you've forked? not just spawned?
+21:44 < tnorris> asdsamdsmia: from the command line run `node -v`
+21:44 < asdsamdsmia> tnorris:  i tried with 0.6.19 and 0.9.2
+21:45 < asdsamdsmia> i'm currently running 0.9.2
+21:45 < tnorris> mother... use v0.8.9
+21:45 < tnorris> 0.9.x is currently unstable.
+21:45 < asdsamdsmia> ugh
+21:46 < asdsamdsmia> i guess that either the distro is shipping that unstable version or some asshole set it to use the unstable repository
+21:46 < asdsamdsmia> it's debian 6.0.5
+21:46 < tnorris> hm, strange.
+21:47 < tnorris> well, log.io worked out of the box for me. if you have code you've written, create a pastebin or something.
+21:47 < asdsamdsmia> uhm this doesn't seem to be set to use any unstable sources
+21:47 < asdsamdsmia> nope, it's just log.io
+21:47 < CoverSlide> yeah don't use the repo version for node, compile from source
+21:47 < asdsamdsmia> so i'll download that specific version you told me
+21:47 < CoverSlide> debian stable is probably 4.x or something
+21:47 < Fike> hm, with the sub process module is it possible that when the parent process is killed the sub process continues?
+21:47 < nlf> i use nvm, saves time
+21:48 < Fike> i've only has a sift through the API doc about it
+21:48 < CoverSlide> I prefer give
+21:48 < asdsamdsmia> compiling 0.8.9, wish me look
+21:48 < tnorris> Fike: yes, you can create a `detached` long running process.
+21:48 < tnorris> asdsamdsmia: good look!
+21:49 < Fike> tnorris: how would I achieve that? :P
+21:49 < CoverSlide> sometimes you can get zombie processes
+21:50 < asdsamdsmia> has anyone fooled around with browserquest's server component?
+21:50 < tnorris> Fike: is a command option you pass when spawning. read the heading child_process.spawn(...) in the api.
+21:50 < tnorris> CoverSlide: good point. any way to check if the child process has zombified?
+21:50 < Fike> tnorris: ah okay, will do. any way to reattach to it if you have the PID? I might need to send messages to it
+21:50 < Fike> child.send(); etc.
+21:52 < tnorris> Fike: not sure.
+21:52 < Fike> mm
+21:53 < Fike> it appears the spawn method is for spawning any command rather than a module so I probably won't have as much options there
+21:53 < Fike> "When using child_process.fork() you can write to the child using child.send(message, [sendHandle]) and messages are received by a 'message' event on the child."
+21:55 < tnorris> Fike: here's a bug about "re-attaching" to a pid: https://github.com/joyent/node/issues/3146
+21:56 < tnorris> Fike: so you'd want to create each child process as detached and have it listen on the loopback. that way it can connect/disconnect whenever.
+21:57 < asdsamdsmia> haha TheJesus i wasn't watching #log.io
+21:57 < tnorris> CoverSlide: any idea about the `setEncoding()` slow down? I've looked at the source, but my cpp skills are crap.
+21:59 < CoverSlide> yeah I have no idea either
+21:59 < CoverSlide> does this seem to happen for all versions?
+22:01 < draginx> is there a library that can detect parts in ur code thats not asynch? O_o
+22:02 < CoverSlide> yeah it's called grep
+22:03 < CoverSlide> grep -r 'Sync' .
+22:05 < Fike> tnorris: thing is, I need to have loads of socket connections open to a server at the same time
+22:05 < Fike> :P
+22:05 < Fike> think one process would be fine?
+22:08 < asdsamdsmia> great tnorris, it didn't fail, thank you very much =)
+22:16 < draginx> CoverSlide: no that will not work
+22:16 < draginx> eejit :P
+22:19 < CoverSlide> why do you need to detect what isn't async?
+22:20 < CoverSlide> anything using net.* is asynchronous. fs.* is asynchronous unless the method ends in Sync. 
+22:27 < herokudevacct> there doesn't appear to be mature middleware for postgres.
+22:28 < herokudevacct> there are two packages with zero issues and barely any activity since creation
+22:29 < herokudevacct> ahem
+22:29 < tuhoojabotti> man, streams are hard
+22:29 < herokudevacct> mature middleware for *sessions* with postgres
+22:29 < tuhoojabotti> net.pipe(parser).pipe(this) should take data from the inter webs and emit data events
+22:29 < herokudevacct> does that conclusion make sense? does anybody have experience setting up persistent sessions with postgress
+22:30 < tuhoojabotti> but it instead tries to write it back to the socket
+22:31 < efbeka> I need little help please
+22:32 < efbeka> someone?
+22:32 < tuhoojabotti> that's because socket is a duplex
+22:32 < tuhoojabotti> of course
+22:32 < tuhoojabotti> hmm
+22:32 < tuhoojabotti> my garden hose has some leaks
+22:33 < efbeka> tuhoojabotti: can u help me please?
+22:33 < tuhoojabotti> maybe, but unlikely, because I don't know what your problem is.
+22:34 < efbeka> http://pastie.org/4776435
+22:34 < herokudevacct> the best option for persistent sessions backed by postgres seems to be to write my own store from scratch. but that seems like a lot more work than necessary for what should be a solved problem.
+22:34 < herokudevacct> does anybody have experience to the contrary? what's the scale of writing a store from scratch?
+22:34 < tuhoojabotti> efbeka: the problem?
+22:35 < efbeka> tuhoojabotti: When i run this, with end option at true, and s.end('ii') commented the output is "2568 bytes written"
+22:36 < tuhoojabotti> yeah?
+22:36 < efbeka> tuhoojabotti: but when i set end at false without the last line commented the output is "2 bytes written"
+22:36 < efbeka> tuhoojabotti and i expected "2570..."
+22:36 < herokudevacct> is there another irc channel for express/connect?
+22:36 < herokudevacct> yes: #express
+22:36 < tuhoojabotti> efbeka: that was surprising
+22:37 < tuhoojabotti> or not
+22:37 < tuhoojabotti> efbeka: what happens if you call s.end(new Buffer('ii'));
+22:37 < efbeka> Ok, explain me why, if u understand
+22:37 < tuhoojabotti> because it's expecting a buffer, not a string
+22:38 < efbeka> tuhoojabotti: new Stream() or new Buffer?
+22:38 < tuhoojabotti> buffer.
+22:41 < efbeka> tuhoojabotti: no changes
+22:41 < tuhoojabotti> it's weird
+22:42 < tuhoojabotti> or not
+22:42 < tuhoojabotti> yeaah
+22:42 < tuhoojabotti> I get it
+22:43 < efbeka> :p
+22:43 < tuhoojabotti> efbeka: I think the file is so small, that it only calls stream.end(data)
+22:43 < tuhoojabotti> except that you tell it not to
+22:43 < tuhoojabotti> that could be it
+22:44 < efbeka> ?
+22:44 < efbeka> The file is so small?
+22:45 < efbeka> tuhoojabotti: note that if i put s.end('ii') before the pipe i have the correct result (2568+2)
+22:45 < tuhoojabotti> oh right
+22:48 < tuhoojabotti> so weird
+22:49 < tuhoojabotti> :D
+22:49 < efbeka> tuhoojabotti: pleaasssseee
+22:49 < tuhoojabotti> how can the byte counter reset after writing I just don't get it
+22:50 < tuhoojabotti> oh
+22:50 < tuhoojabotti> I might know what's the problem
+22:51 < tuhoojabotti> of course
+22:51 < tuhoojabotti> aha
+22:52 < tuhoojabotti> efbeka: it takes time to read the file from the disk, you are calling s.end('ii') before any data events come from the readstream
+22:52 < tuhoojabotti> lulz
+22:52 < tuhoojabotti> I feel so stupid now
+22:53 < tuhoojabotti> but I can always blame the fact that it's 2am
+22:53 < efbeka> ^^
+22:53 < tuhoojabotti> efbeka: now, you help me
+22:53 < tuhoojabotti> my class does this: self.net.pipe(self.parser).pipe(self);
+22:53 < tuhoojabotti> self = this;
+22:54 < tuhoojabotti> the problem is that when data comes from the net, it goes to the parser and then sent back through the class
+22:54 < tuhoojabotti> but of course it is written back to the socket
+22:54 < tuhoojabotti> and that's not what I want
+22:55 < efbeka> tuhoojabotti: omg
+22:55 < tuhoojabotti> what?
+22:56 < efbeka> u did a duplex socket let me read  welllllll ^^
+22:56 < tuhoojabotti> well two duplex streams
+22:56 < tuhoojabotti> efbeka: https://github.com/jslush/node-irc-stream this is the project, but I haven't committed anything yet
+22:56 < tuhoojabotti> star it if you're interested. :P
+22:57 < efbeka> tuhoojabotti: okay
+22:57 < efbeka> But im learning u know
+22:58 < tuhoojabotti> Me too
+23:01 < tuhoojabotti> efbeka: good night
+23:01 < efbeka> tuhoojabotti: thks pizza for me, good night too
+23:09 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+23:19 < EhevuTov> anyone have a quick example of a package.json file using the Folders as Modules? http://nodejs.org/api/modules.html#modules_folders_as_modules
+23:20 < substack> shlevy: http://github.com/substack/node-buffer-equal
+23:21 < SomeoneWeird> EhevuTov, iirc if you name your main file 'index.js' it'll load it automatically, else run npm init
+23:22 < EhevuTov> SomeoneWeird, this is for a module, but that example isn't correct JSON syntax, unless it's the root.
+23:22 < EhevuTov> maybe I'm misunderstanding you
+23:23 < SomeoneWeird> go into the folder and run 'npm init'
+23:23 < SomeoneWeird> and why isn't that correct json?
+23:24 < EhevuTov> SomeoneWeird, if you're including that, I think you need an extra ' somename: '
+23:24 < EhevuTov> prefixed
+23:24 < EhevuTov> i'm trying to include a custom module directory
+23:26 < EhevuTov> for instance ' somename: { name: 'my_module',  main: './my_modules/index.js' } ' I think would be correct
+23:26 < EhevuTov> SomeoneWeird, are you saying I need to put in a package.json in the 'my_module' directory as well as my main app?
+23:27 < CoverSlide> first of all, valid JSON has double quoted strings
+23:27 < CoverSlide> second of all, there is no second of all
+23:28 < EhevuTov> SomeoneWeird, ?and does then npm recursively go thorugh the 'directories' and check for package.json in there?
+23:28 < EhevuTov> :-P
+23:28 < EhevuTov> CoverSlide, thank you for the correction :-)
+23:34 < EhevuTov> SomeoneWeird, thanks for the heads up on `npm init`. DIdn't know that existed
+23:52 < addisonj> hrm... there docs anywhere for the npm registry api?
+23:56 < EhevuTov> addisonj, if there isn't any, I know the npmjs.org website is on github. Maybe you could find useful information, like couchdb views, in there
+23:57 < addisonj> yeah... I was starting that, but that takes work...
+23:57 < EhevuTov> addisonj, hehe I'm the same way :-)
+23:57 < deoxxa> addisonj: https://github.com/isaacs/npmjs.org there's information there
+23:57 < deoxxa> i.e. https://github.com/isaacs/npmjs.org#api
+23:57 < addisonj> oh, missed that
+23:57 < addisonj> awesome
+23:58 < addisonj> oh but not very much...
+23:58 < deoxxa> there's not much to it
+23:58 < addisonj> I could get away with just a list of all packages, but can't find an index call anywhere
+23:58 < deoxxa> it's couchdv
+23:59 < deoxxa> *db
+23:59 < deoxxa> just talk to http://isaacs.iriscouch.com/registry
+23:59 < deoxxa> or even better, replicate the registry to your own couchdb instance and work with it
+23:59 < deoxxa> couchdb makes that really, really easy
+--- Log closed Sat Sep 22 00:00:59 2012
