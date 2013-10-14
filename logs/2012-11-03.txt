@@ -1,0 +1,1062 @@
+--- Log opened Sat Nov 03 00:00:00 2012
+00:01 < EhevuTov_> CoverSlide, you have to cover all your bases
+00:02 < Cheery> >8-s my face when I notice node-png is ONLY for encoding pngs
+00:03 < TooTallNate> Cheery: you can use node-canvas for that
+00:03 < TooTallNate> decoding I mean
+00:03 < nlf> tnorris: still interested in helping look for leaks?
+00:04 < tnorris> nlf: sure
+00:04 < nlf> https://github.com/nathan-lafreniere/node-butils/blob/master/index.js
+00:04 < nlf> i suspect there's something in there
+00:04 < Cheery> TooTallNate: I'm writing node-video. so there's no catch in there.
+00:05 < TooTallNate> catch?
+00:05 < Cheery> I don't want to include node-canvas just to draw a picture in node-video
+00:05 < Cheery> fortunately there's png.js
+00:06 < CoverSlide> 7 months old
+00:07 < CoverSlide> hmm png uses defalte doesn't it? i wonder if it can be used with node's zlib
+00:07 < CoverSlide> although i guess the point is to work in browsers too
+00:07 < tnorris> nlf: cool. going to eat dinner, but i'll check it out later
+00:08 < nlf> nice, i appreciate it
+00:15 < tjmehta> EhevuTov_ , found something better in the docs check out the "Controlling shutdown of your script" section in the docs, I can cleanup the db there
+00:18 < Cheery> oh GREAT
+00:18 < Cheery> png.js seems like broken. -_-
+00:20 < CoverSlide> it's 7 months old
+00:20 < CoverSlide> in node, that's ancient 
+00:20 < CoverSlide> might as well be writing cobol, man
+00:22 < othiym23> if you're gonna mention COBOL, you gotta spell it right
+00:22 < Cheery>  there's AMAZING amount of things that do something for images
+00:22 < othiym23> most of them are pretty terrible, too
+00:23 < Cheery> so lovely that png decoding has been skipped in all of them apparently.
+00:23 < othiym23> I eventually ended up using gm, which should do that for you, but it forks a child process for each thing you wanna do
+00:24 < othiym23> oh hey look, Aaron Heckmann wrote that, which accounts for its non-terribleness
+00:24 < CoverSlide> eww
+00:24 < Cheery> http://www.boutell.com/gd/
+00:25 < CoverSlide> well at least it isn't a compiled module
+00:25 < Cheery> I'll try that
+00:26 < Cheery> lets hope it runs in raspi and lets curse if it doesn't
+00:26 < othiym23> the only problem with graphicsmagick is the lovely ImageMagick command-line API, but it does a LOT of stuff quickly and its design is fairly DWIM
+00:26 < CoverSlide> gd would still need to be compiled
+00:26 < CoverSlide> i don't see how that would be better than node-canvas
+00:27 < Cheery> well there's apparently libgd in wheezy repository that's been compiled without xpm
+00:28 < Cheery> lets ese if it goes.
+00:28 < othiym23> but what about all those pixmaps you need to manipulate
+00:28 < CoverSlide> i mean you have to compile bindings to node
+00:28 < Cheery> lovely node_events.h missing
+00:28 < tuhoojabotti> http://tuhoojabotti.com/r/prsc/node_drawing.png (1858x995)
+00:29 < Cheery> I'm seriously bashed by this thing >:x
+00:30 < Cheery> annoying
+00:30 < TooTallNate> Cheery: node_events.h was removed a long time ago
+00:30 < CoverSlide> what's wrong with canvas anyway?
+00:31 < CoverSlide> can't you get like cairo-devel or something like that?
+00:31 < Cheery> CoverSlide: I don't think that fits, especially if it's provided by cairo
+00:32 < Cheery> bit frustrated by it all. but I'm not giving up >x(
+00:33 < Cheery> but this means no kittehs for you!
+00:33 < Cheery> at least not yet
+00:33 < CoverSlide> well the last update to canvas was 7 days ago, gd was 3 months ago, and very little activy before that
+00:33 < devatwork> Anyone here work with socketio/nodejs on android/java ?
+00:33 < devatwork> i have it working. Only issue i cant seem to solve is, it doesnt hit the function handler(req, res)
+00:34 < devatwork> which is where dependant on the url i categorize the sockets into rooms.
+00:36 < TooTallNate> Cheery: "fits" like in memory? or conceptually?
+00:36 < Cheery> TooTallNate: conceptually
+00:37 < Cheery> http://learningwebgl.com/lessons/lesson05/index.html
+00:37 < TooTallNate> Cheery: meh, i disagree. <canvas> is how you'd interact with <video> elements in the browser, so isn't kinda a 1-1 match
+00:37 < Cheery> it's not about <video>
+00:38 < Cheery> it's about getting those demos running in raspberry pi, without a browser
+00:38 < Cheery> so that people can reapply it all to designing new desktop environments
+00:39 < Cheery> also. I'll need to find a better name for it. it seems it goes somewhere that people don't even think of.
+00:40 < MI6> joyent/libuv: Charlie McConnell master * 1d85815 : unix: do not set environ unless one is provided  Currently, `uv_spawn` wi - http://git.io/XxEzSA
+00:44 < MI6> joyent/libuv: Charlie McConnell v0.8 * fb64948 : unix: do not set environ unless one is provided  Currently, `uv_spawn` wi - http://git.io/_wml3w
+00:52 < nlf> man, i am not finding a single thing legitimately leaking.. maybe it's async doing it
+00:53 < othiym23> nlf: what are you using to track leaks?
+00:53 < nlf> memwatch's heapdiff module
+00:54 < nlf> take a heap, run the code 100,000 times, take another heap and print the diff
+00:54 < Cheery> there we go..
+00:54 < nlf> two modules are showing no statistically significant leaks
+00:54 < Cheery> a first texturized demo
+00:55 < nlf> all that's left is async's queue, and some core stuff
+00:58 < othiym23> whew... seaport 1.0 was out for almost a whole hour before substack pushed out seaport 1.1
+00:59 < othiym23> nlf: it's possible that async could be leaking due to closure references, but it seems kinda unlikely
+01:00 < draginx> If an npm package requires a speicifc version of another npm package.. will that library only use that package even if that same package is installed somewhere else?
+01:01 < othiym23> it will use the version from its own node_modules folder
+01:01 < othiym23> you can try npm dedupe
+01:01 < draginx> ty
+01:08 < MI6> joyent/libuv: Ben Noordhuis master * 914185d : unix: make some internal methods static - http://git.io/AIvtvA
+01:09 < Cheery> https://github.com/cheery/node-video/blob/master/tutorial/tutorial-2.js
+01:12 < Cheery> my tutorials won't cover 3D graphics until things have been well covered in other tutorials first.
+01:13 < Cheery> anyway. I need a better name for this library.
+01:14 < Cheery> and maybe an another designer as well.
+01:14 < othiym23> Cheery: you can have "hambulator" free of charge
+01:14 < othiym23> pret. sure it's not taken on npm yet
+01:15 < Cheery> what's hambulator?
+01:15 < othiym23> I dunno! It's evocative!
+01:15 < othiym23> of ham!
+01:15 < othiym23> it's possible it's been a very long week
+01:16 < Cheery> true it has been a very long week
+01:17 < Cheery> node-video is sort of okay. but people confuse it with <video> and it's slightly undescriptive
+01:18 < othiym23> compositr?
+01:19 < othiym23> gotta admit that at this point I'm deriving post-post-ironic entertainment out of sticking flickr-style names on things
+01:19 < Cheery> um. it's something but not much better than mine
+01:20 < othiym23> ok ok how about 'k0mposit0r'
+01:20  * othiym23 is helping!
+01:20 < Cheery> it's still the same name
+01:20 < othiym23> but it's leet now
+01:21 < Cheery> my project is leet enough without lame name
+01:21 < othiym23> aw
+01:22 < TooTallNate> Cheery: what exactly is the module then? also, you're aware "video" is already taken on npm right?
+01:22 < TooTallNate> by github.com/pkrumins/node-video
+01:23 < Cheery> it is a library for constructing a video context
+01:23 < Cheery> early version only supported on raspberry pi
+01:25 < Cheery> the point in that is to get the context library designed such that it doesn't depend on any particular desktop multiplexer
+01:26 < Cheery> and to get it support compositing straight out of the box if that feature's available.
+01:26 < Cheery> you obviously don't do anything with bare video context, so it implements webgl too
+01:27 < Cheery> TooTallNate: I'd also like to make some cool stuff about few libraries. to give it pleasant properties
+01:27 < Cheery> sort of like library-against-library bindings. .)
+01:28 < Cheery> I'm not sure how to implement it in practise.. maybe give some sort of interface for C++ wrappings?
+01:29 < TooTallNate> Cheery: have you seen https://github.com/luismreis/node-openvg?
+01:29 -!- mode/#node.js [+o piscisaureus_] by ChanServ
+01:30 < Cheery> TooTallNate: I wonder about that yeah.
+01:30 < Cheery> it's (again) something relatively interesting.
+01:31 < Cheery> TooTallNate: we need a tool to get these all talk together
+01:33 < Cheery> duck typing. eh. is sorto f okay. :)
+01:37 < Cheery> part of the problem is built up by the fact that special type of surfaces need unique implementation of few gl functions
+01:37 < Cheery> a good friend probably knows what to do
+01:50 < devatwork> when not connecting via http and websockets, how do i differentiate a connection enough to make them join separate rooms ?
+01:50 < devatwork> err, i meant not http, but websockets
+01:53 < chovy> is it acceptable to add collections to collections outside of mongo? for example i get a collection with mongoose lists and I am assigning list.items = items to it (another collection)
+01:58 < chapel> chovy: you mean schema in a schema?
+02:12 < jonno11> Hi - Proving a point here, nothing dodgy. How do I go about loading a page (such as google.com) and pushing the loaded data to the client?
+02:12 < jonno11> ie. if they access localhost:3000 on my machine
+02:12 < jonno11> it shows google home page
+02:13 < isnoop> Hello, all.
+02:14 < isnoop> What is the preferred means of maintaining context for a given connection pushing large amounts of data into a node.js server?
+02:15 < sokaeoals> Black people
+02:16 < isnoop> In other words, if I fire up a listener on port 900 and three clients connect and begin streaming large amounts of data, how can I separate the data events coming from each connection?
+02:16 < sokaeoals> Niggers
+02:32 < chovy> chapel: i'm expanding on your userMap from yesterday. I'm just starting to rely more and more on this, so I want to be sure i"m not breaking any fundamental concepts by doing so.
+02:32 < chovy> i collect all user ids, then get lists for them and associate to listMap[user._id] = list;
+02:33 < chovy> same way.
+02:33 < chapel> ok
+02:33 < chapel> any specific questions?
+02:33 < chovy> i guess not
+02:34 < chovy> it is working fine. i'm just assigning things to a mongoose object
+02:34 < chovy> mongoose data object
+02:57 < TheAceOfHearts> what's the fastest way to just increment a number in mongoose?
+02:58 < TheAceOfHearts> say I have a table: evaluationID, evaluatableName, evaluatableEmail. Whenever I add a new tuple, I wanna increment evaluationID
+02:58 < TheAceOfHearts> is there any quick way?
+02:58 < Determinist> hey guys. anyone here using domains in production or has any significant amount of code based on this feature? I realize it's experimental, but I'm wondering just how unstable it should be considered.
+02:59 < AAA_awright> TheAceOfHearts: MongoDB doesn't do incrementing numbers, if that's what you mean by mongoose
+03:00 < TheAceOfHearts> k, ty; I meant using mongoose, the package
+03:00 < TheAceOfHearts> I guess I'll just hack it together, thanks!
+03:00 < AAA_awright> TheAceOfHearts: You probably ought to figure it out using an ObjectID or a UUID
+03:03 < chapel> TheAceOfHearts: the objectid is naturally ordered
+03:03 < chapel> has a timestamp + sequential number added
+03:04 < TheAceOfHearts> ah, sweet
+03:07 < sokaeoals> IAMTAISCL
+03:08 < rvagg> TooTallNate: you around?
+03:08 < TooTallNate> rvagg: sup?
+03:08 < rvagg> node-gyp build on Windows 7 64
+03:08 < rvagg> getting that error about invalid "Platform='x64'"
+03:08 < rvagg> not sure what i should be doing! any ideas?
+03:09 < TooTallNate> rvagg: do you have the Windows 7 64-bit sdk installed?
+03:09 < TooTallNate> brb
+03:09 < rvagg> I have VS Express 10... I thought that was enough
+03:09 < TooTallNate> nope, for 64-bit you *also* need the 64-bit sdk
+03:10 < TooTallNate> https://github.com/TooTallNate/node-gyp#installation
+03:10 < TooTallNate> http://www.microsoft.com/en-us/download/details.aspx?displayLang=en&id=8279
+03:11 < rvagg> right, thanks, installing
+03:11 < rvagg> friggin' windows, what a lame platform
+03:12 < TooTallNate> haha, it has its annoyances
+03:12 < TooTallNate> it'd be nice if they had they equivalent for the "command line tools for OSX", but alas no
+03:13 < rvagg> it'd be nicer still if you could just 'apt-get install helpfulstuff'
+03:30 < rvagg> TooTallNate: here's another question, I have some a lib that needs linking to and header files that need including, it's easy on Linux etc. cause you can put them in global locations, it's not so clear to me on Windows what you do with them other than just install them somewhere convenient..
+03:30 < rvagg> TooTallNate: is there a way to -I & -l while running node-gyp ?
+03:30 < rvagg> rather than embedding them into the binding.gyp
+03:31 < rvagg> node-gyp rebuild -lc:\path\to\lib -Ic:\path\to\includes, or something like that?
+03:31 < sokaeoals> ASSS
+03:31 < sokaeoals> ASSSS
+03:31 < sokaeoals> ASS
+03:31 < sokaeoals> AS
+03:31 < sokaeoals> AS
+03:31 < sokaeoals> AS
+03:31 < sokaeoals> AS
+03:31 < sokaeoals> aSSSS
+03:31 < TooTallNate> rvagg: well i mean ideally you write a gyp file for the dependency and bundle it statically
+03:31 < TooTallNate> rvagg: as in: http://n8.io/converting-a-c-library-to-gyp/
+03:32 < rvagg> TooTallNate: I did that with leveldb & snappy but that's easy cause those are mine, I'm just trying to contribute a simple binding.gyp to couchnode which depends on libcouchbase so it's not as simple
+03:32 < rvagg> ("those are mine"... leveldb and snappy are not mind obviously but I could bundle them in my package)
+03:33 < TooTallNate> rvagg: well even still i'd encourage you to give it a shot (i have no idea how complex libcouchbase is)
+03:33 < TooTallNate> rvagg: but alternatively, you can try something like this https://github.com/ncb000gt/node.bcrypt.js/blob/master/binding.gyp#L13-32
+03:34 < TooTallNate> i.e. depend on the user installing the prebuilt windows libraries to a specific place
+03:34 < TooTallNate> and then include those headers and .lib files
+03:34 < rvagg> TooTallNate: eeek, that's kind of messy but I suppose it works if you just dictate that's where things should be
+03:34 -!- sokaeoals was kicked from #Node.js by Nexxy [sokaeoals]
+03:34 < TooTallNate> that's why bundling is a better user experience
+03:35 < sokaeoals> WHAT
+03:35 < sokaeoals> SO FAKE
+03:46 < sokaeoals> =============++++++++??7??????II????IIIIIII7I777$$$$$$Z$ZZZZ
+03:46 < sokaeoals> ?+=~=========++++++++??7????????I??II??IIIIII777$7$$$$ZZZZZZ
+03:46 < sokaeoals> ?+7============++++++??$+??+??????II???III7I7I777$$$$7Z$ZZZZ
+03:46 < sokaeoals> ?~===========+=+++++?ODDZ...:+?????II?III7IIII777$$$$$$$ZZZZ
+03:46 < sokaeoals> ~===~=========++++78DDDDDD8...,???III??II7II7777$$$$$$$$ZZZZ
+03:50 < rvagg> Nexxy
+04:00 < sokaeoals> AM  I COOL
+04:02 < TehShrike> :-P
+04:14 < caracos> Hi guys, I'm having trouble with For Loop in node.js. Is this the correct place to ask question?
+04:14 < wookiehangover> ##javascript
+04:15 < wookiehangover> would probably be more supportive
+04:15 < wookiehangover> but don't ask to ask... just ask
+04:17 < caracos> Ok, I'm using For Loop to insert value in array but when display the array, it seems only the last element showed up. All the previou element before that is missing.
+04:18 < gkatsev> caracos: If something is only being applied to the 'last' one of many, you have a scoping  problem. e.g.: in for (i=0; i<5; ++i) {doX(function(){ doY(i) })}; `doY' might only  receive 4 as a value. You can solve this using closures, so see !closures. For more  info see http://www.mennovanslooten.nl/blog/post/62/
+04:19 < caracos> I did use closure but the array content is showing the return function instead of the actual value.
+04:20 < rvagg> caracos: paste your code somewhere to show up, http://gist.gitbub.com perhaps
+04:20 < caracos> Here's the code: http://pastie.org/5175129
+04:21 < gkatsev> rvagg: gitbub? Are you wolverine by any chance?
+04:22  * rvagg qwops
+04:22 < gkatsev> :P
+04:22 < rvagg> initially it was gitist.gitbub.com but I "fixed" that
+04:22 < rvagg> I need to stop trying to make the Microsoft C compiler work, it's doing my head in
+04:24 < tmpvar> anyone know if its possible to get the number of bytes processed by the zlib module?
+04:24 < tmpvar> isaacs, if you're around ^
+04:27 < bakadesu> would be nicer if the http://logs.nodejs.org/node.js/latest logs omitted the joins and quits
+04:40 < mscdex> anyone know who's adding all these node.js modules to softpedia?
+04:43 < airtanah> does anyone have a recommended AMI for production nodejs?
+04:45 -!- mode/#node.js [+b *!*sokaeoals@*.bb.sky.com] by konobi
+04:45 -!- sokaeoals was kicked from #Node.js by konobi [sokaeoals]
+04:47 < mscdex> AMI?
+04:47 < airtanah> sorry, amazon machine instance
+04:48 < rvagg> airtanah: I'm happy just using a standard canonical ubuntu 12.10, add Chris Lea's PPA to it and install from there
+04:48 < mscdex> ah, AMI to me means Asterisk Manager Interface
+04:48 < mscdex> :-)
+04:48 < rvagg> depends more on what you're comfortable administering
+04:49 < airtanah> mscdex: you've given me something new to google
+04:49 < airtanah> rvagg: that's what i was eyeing, i think i'll go with it for now
+04:49 < rvagg> airtanah: fwiw I always get my AMI details from here: http://alestic.com/
+04:49 < rvagg> right side, select region and he'll give you the latest
+04:50 < chovy> node seems to be running pretty slow for me today
+04:50 < rvagg> 12.04 might be a better bet cause it's LTS but that's up to you
+04:50 < airtanah> rvagg: i'm googling this "Chris Lea's PPA" but what is it exactly?
+04:50 < rvagg> see Ubuntu section @ https://github.com/joyent/node/wiki/Installing-Node.js-via-package-manager
+04:51 < airtanah> rvagg: aha, thanks
+04:51 < rvagg> he keeps his Node dists within a day or two of formal releases
+04:51 < airtanah> awesome!
+04:51 < rvagg> announces here too: twitter.com/chrislea
+04:52 < airtanah> rvagg: i prefer to roll with the latest stable releases
+04:52 < airtanah> sort of CI for sysadmins
+04:52 < airtanah> so that's cool
+04:55 < rvagg> airtanah: fair enough, I compile on my own dev machines but am happy to use a PPA for production machines
+04:56 < airtanah> rvagg: i like nvm locally
+04:57  * rvagg prefers `git fetch joyent; git checkout v0.x.x-release; ./configure; make -j8; sudo make install`
+04:58 < rvagg> cause I'm hardcore!
+04:58 < airtanah> pssh... you don't parse the git repo manually?
+05:00 < rvagg> only while I'm asleep
+05:47 < samholmes> Why did they call it Sandy?
+05:49 < samholmes> What's up #node.js?
+06:13 <@konobi> samholmes: http://geology.com/hurricanes/hurricane-names.shtml
+06:41 < chovy> chapel: you there?
+06:44 < sinclair_> samholmes: enjoying the awesomeness of TypeScript
+06:45 < TheAceOfHearts> so.. I have an express app. I'm trying to separate some parts into extra folders. I have the viiews, routes, public folders. I want another one for things like db.js (everything database related, etc.) and such, is there any good name, or should I just go with utils?
+06:46 < Determinist> sinclair_: how's that working for you?
+06:46 < sinclair_> Determinist: awesome
+06:46 < Determinist> sinclair_: any thorns? is it easy to debug?
+06:47 < sinclair_> TS supports source mapping
+06:47 < sinclair_> no thorns
+06:47 < sinclair_> accessible compiler
+06:47 < sinclair_> just tops
+06:48 < Determinist> sinclair_: so you get errors that point to your TS code, not the generated JS code? I mean, I understand exactly what source mapping means, but I'm not sure how this works wrt TS
+06:48 < chovy> how much load can one server handle with node.js? 
+06:48 < Determinist> chovy: 2562046972406972046
+06:48 < Determinist> that enough for ya?
+06:48 < chovy> i'm guessing the bare minumum will be good until i get concurrent users.
+06:48 < sinclair_> Determinist: yes, JS errors can be mapped directly to TS code
+06:49 < Determinist> sinclair_: k, thanks
+06:49 < chapel> chovy: whats up?
+06:50 < sinclair_> nodejs does need some extra fluff to make it all work together, but tbh, its trivial to work out whats going on without source mapping
+06:50 < sinclair_> Determinist: TS also supports commonjs and AMD modules
+06:50 < sinclair_> which is awesome :)
+06:50 < Determinist> sinclair_: yeah, but you just know that eventually you'd end up with a piece of code that's going to drive you crazy. and yes, I'm aware of CJS and AMD modules in TS
+06:51 < sinclair_> Determinist: it drives me less crazy than coding in JS
+06:51 < Determinist> sinclair_: using it in production or just dev so far?
+06:51 < sinclair_> that's just me tho
+06:52 < sinclair_> Determinist: just dev at this stage, tho there are some releasing nodejs modules in TS already
+06:52 < Determinist> sinclair_: it does look very nice, I have to admit.
+06:52 < sinclair_> Determinist: hang around in #TypeScript
+06:53 < sinclair_> grab the compiler and have a play
+06:53 < Determinist> sinclair_: already have, but I'm always hesitant when it comes to using stuff that's not even 1.0, unless it's totally worth it.
+06:54 < Determinist> node... is totally worth it, cept when it sucks, and it does, from time to time.
+06:54 < chovy> chapel: i was just curious what kind of server setup you have over at GL
+06:54 < deoxxa[cookies]> why are people trying so hard to push typescript recently
+06:54 < sinclair_> deoxxa[cookies]: because its awesome?
+06:54 < deoxxa[cookies]> i'd say it's "interesting" more than "awesome"
+06:54 < Determinist> deoxxa[cookies]: and because it's a buzzword and some developers are hipsters :)
+06:55  * sinclair_ is not a hipster
+06:55 < sinclair_> hes old, bitter and twisted
+06:55 < Determinist> not necessarily saying that's a bad thing tho. no hipsters = no progress because nothing would gain any significant mindshare to become really good
+06:55 < deoxxa[cookies]> i'm 23 :/
+06:55 < sinclair_> 32 here
+06:55 < Determinist> i'm 30, it's not about age. it's a state of mind.
+06:56 < Determinist> wanna see hipsters? check out techcrunch.
+06:56 < Determinist> can't read that stuff for more than 5 mins straight. just makes me wanna kill something pretty.
+06:56 < chapel> chovy: pretty standard setup
+06:57 < chovy> chapel: just one server, or do you have a bunch of them
+06:57 < chapel> chovy: we are on heroku atm, multiple servers
+06:57 < sinclair_> deoxxa[cookies]: you probably fit the age demographics for most people who use node
+06:57 < chapel> we are moving away from heroku, but haven't yet
+06:57 < chovy> chapel: i see.
+06:57 < chapel> will still be multiple servers
+06:57 < deoxxa[cookies]> sinclair_: likely yes
+06:57 < chovy> any idea what the monthly cost is on heroku?
+06:58 < chapel> chovy: too much
+06:58 < chapel> not to say other options aren't expensive
+06:58 < Determinist> chovy: if you have the knowledge, don't use heroku style stuff.
+06:58 < chapel> not a huge fan of heroku for anything big
+06:58 < chovy> i just have 1 vps
+06:58 < deoxxa[cookies]> heroku gets mad expensive once you need more than a tiny database
+06:58 < chapel> its good to get started, but a pain beyond that
+06:58 < deoxxa[cookies]> unless you run your own db servers
+06:58 < chovy> but i'm curious what kind of traffic my site will handle
+06:58 < deoxxa[cookies]> (which is an option)
+06:59 < deoxxa[cookies]> chovy: how long is a piece of string
+06:59 < chovy> ?
+06:59  * Determinist blinks
+06:59 < chapel> chovy: don't worry about performance until it is an issue
+06:59 < chapel> then again, make sure you follow good practices
+06:59 < deoxxa[cookies]> clean code is usually fast code
+07:00 < chapel> what deoxxa[cookies] said
+07:00 < deoxxa[cookies]> more importantly, if it's not fast yet, it's much easier to make clean code fast than it is to make ugly code fast
+07:00 < chovy> what do you mean 'how long is a piece of string' ?
+07:00 < deoxxa[cookies]> chovy: it's a question without an answer, because there's not enough details
+07:00 < deoxxa[cookies]> chovy: just like "i wonder how much traffic my site will handle"
+07:00 < astropirate> its a trick question
+07:01 < chovy> how can i assess where the slow areas of my code are?
+07:01 < deoxxa[cookies]> chovy: profiling
+07:01 < astropirate> music to cheer you nice folks up: https://www.youtube.com/watch?v=2y09pD1r-Qs
+07:01 < deoxxa[cookies]> chovy: there are two meanings of "slow" there - "uses a lot of cpu time" and "waits a long time for an external service"
+07:02 < deoxxa[cookies]> chovy: you'll want to use v8's profiling stuff for the first meaning
+07:02 < chapel> but don't spend time doing that now
+07:02 < deoxxa[cookies]> chovy: for the second meaning it's tricky, you have to determine what points of your application you want to profile
+07:02 < deoxxa[cookies]> but yeah
+07:02 < deoxxa[cookies]> don't even think about it now
+07:02 < chapel> thats really something you should do only when you have exhausted everything else
+07:03 < chapel> its usually obvious where things are slow
+07:03 < sinclair_> astropirate: that's not dubstep?
+07:03 < chapel> look at response times
+07:03 < chovy> k
+07:03 < chapel> what you are doing
+07:03 < chapel> minimize external i/o
+07:03 < astropirate> sinclair_, take it back!!
+07:03 < deoxxa[cookies]> chapel: i don't know about that, i think it's a good idea to profile your application semi-regularly so you can catch intermittent slowdowns/faults
+07:03 < chapel> minimize cpu usage
+07:03 < chapel> deoxxa[cookies]: well, it can and usually is a waste of time
+07:03 < sinclair_> astropirate: needs more "wub wub wub" and drops
+07:03 < chapel> if the slowest bits are external
+07:04 < astropirate> lol
+07:04 < chapel> or due to simple things, like bad loops for instance
+07:04 < deoxxa[cookies]> sinclair_: http://www.youtube.com/watch?v=lv_RUcyMc7Q :3
+07:04 < chapel> but if you are asking how much your site can handle, you don't need to profile
+07:05 < sinclair_> deoxxa[cookies]: ah, UKF 
+07:05 < sinclair_> deoxxa[cookies]: im don't like all this new stuff
+07:05 < chovy> i've only used firebug profiler
+07:05 < deoxxa[cookies]> UKF seem to have uploaded nearly everything ever released in the UK that mentions dubstep or drum and bass
+07:05 < sinclair_> deoxxa[cookies]: http://www.youtube.com/watch?v=t57gdaqQAh0
+07:06 < deoxxa[cookies]> nice
+07:06 < deoxxa[cookies]> reminds me of logistics a bit
+07:06 < deoxxa[cookies]> and spor back in the day
+07:06 < deoxxa[cookies]> ewun maybe
+07:08 < deoxxa[cookies]> sinclair_: http://www.youtube.com/watch?v=9Tul74_wvWk
+07:09 < deoxxa[cookies]> http://www.youtube.com/watch?v=4TYt4OYlWP0 also great
+07:11 < sinclair_> deoxxa[cookies]: better than most stuff i hear nowadays
+07:11 < deoxxa[cookies]> http://www.youtube.com/watch?v=h0vS73yL6ys <3
+07:12 < chovy> i will look into profiling
+07:12 < chovy> i'd rather find out where my code sucks now than later
+07:12 < deoxxa[cookies]> chovy: wronggggg
+07:13 < deoxxa[cookies]> chovy: your code will suck in a different way later
+07:13 < deoxxa[cookies]> chovy: right now you've probably got 20% of the actual behaviour in your application
+07:13 < deoxxa[cookies]> chovy: profiling that is like profiling only one page of a website for performance
+07:14 < chapel> chovy: thats my point
+07:14 < chapel> don't waste your time
+07:14 < chapel> because right now it is a waste of time
+07:14 < chapel> you can always improve performance
+07:14 < chapel> well, to a certain point
+07:15 < chapel> there are many ways to invest in improving performance
+07:15 < chapel> but spending it now before even really launching is a waste
+07:19 < deoxxa[cookies]> chapel: another part of that is that synthetic load will be much different than actual people using the service
+07:19 < deoxxa[cookies]> chapel: so you often end up picking up the wrong slow parts
+07:19 < deoxxa[cookies]> "what? how was i supposed to know people would hit enter on an empty search box so often?!"
+07:20 < deoxxa[cookies]> (^^ an actual thing that happened to me)
+07:25 < chapel> deoxxa[cookies]: yep
+07:26 < chapel> deoxxa[cookies]: you can't know what is a real bottleneck until you have users causing it
+07:30 < chovy> alright, that makes sense
+07:30 < chovy> don't fix it if it ain't broke
+07:30 < deoxxa[cookies]> ...close enough
+07:33  * sinclair_ hugs TS
+07:33 < sinclair_> just tops
+08:14 <@Nexxy> sinclair_, such a troll lol
+08:15 < deoxxa[cookies]> ur
+08:15 <@Nexxy> ABSOLUTELY NOT
+08:16 < Jakey> deoxxa[cookies] is
+08:16 <@Nexxy> deoxxa[cookies], have the cookies cheered you up?
+08:16 < deoxxa[cookies]> no, they made me more angry than ever
+08:16 < deoxxa[cookies]> i'm positively livid
+08:17 <@Nexxy> what were they made from?
+08:17 < sinclair_> awww, i wasn't trolling :(
+08:17 <@Nexxy> oh
+08:17 < Jakey> yeah deoxxa[cookies] was
+08:18 < deoxxa[cookies]> wat
+08:23 < chovy> if i require a module, does it get loaded into memory?
+08:23 < chovy> debating whether to load module at the top of the file or the top of the function it is needed for.
+08:24 < deoxxa[cookies]> well, yes, it does. for various definitions of "it".
+08:26 <@Nexxy> chovy, you should always require the modules you're going to use as the process begins
+08:31 < chovy> what if i have two methods needing same modules, should i just load them at the top of the file, or at the top of the two functons
+08:31 < deoxxa[cookies]> top of the file, nearly always
+08:32 < deoxxa[cookies]> the only exception i can think of is if you want to load a different module based on platform capabilities
+08:32 < deoxxa[cookies]> i.e. require("something-unix") vs require("something-windows")
+08:32 < deoxxa[cookies]> even then, you'd do it as soon as possible
+08:39 < chovy> i'm asking because i have a routes file that has several routes in it, two of which require user model. All the other routes will uncessaryily load the user model if i do it at the top of the file.
+08:39 < deoxxa[cookies]> chovy: that doesn't actually make any sense
+08:40 < chovy> which part
+08:40 < deoxxa[cookies]> chovy: if you think that through a bit, you'll realise it doesn't actually do what you think it's doing
+08:40 < deoxxa[cookies]> are you saying there's going to be some circumstance where your application will -never- hit any of those routes?
+08:41 < chovy> let me paste a gist
+08:41 < deoxxa[cookies]> and are you also saying that loading your user model is such an overhead that it's going to be anything more than immeasurable?
+08:41 < deoxxa[cookies]> because both of those things are probably very false
+08:44 < chovy> https://gist.github.com/e5e49f87a18bc28821c1
+08:44 < chovy> should i move all my models to the top of the file, or keep them in the route methods.
+08:45 <@Nexxy> chovy, requires are cached
+08:45 <@Nexxy> so requiring something again isn't really going to impact your app
+08:46 < chovy> i'm more concerned about a route that is used which loads other models it doesn't need.
+08:46 <@Nexxy> but are you loading those models anywhere else within the app?
+08:46 < deoxxa[cookies]> chovy: do you even...
+08:46 <@Nexxy> if so, it doesn't matter anyway
+08:46  * deoxxa[cookies] shakes head
+08:47 < chovy> Nexxy: User gets loaded on every request, but the others no.
+08:47 < deoxxa[cookies]> IT DOESN'T GET LOADED ON EVERY REQUEST
+08:47  * deoxxa[cookies] shakes chovy
+08:47 <@Nexxy> LOUD NOISES
+08:47 <@Nexxy> hey, shaken baby syndrome
+08:47 <@Nexxy> be gentle
+08:47 < deoxxa[cookies]> chovy: you do realise the whole script doesn't get evaluated from start to finish for every "request", right?
+08:47 < deoxxa[cookies]> it's not php
+08:48 < chovy> no, i didn't know that
+08:48 < deoxxa[cookies]> ah
+08:48 < deoxxa[cookies]> well
+08:48 < deoxxa[cookies]> that's how it is
+08:48 <@Nexxy> \o/
+08:48 < chovy> all the code for the entire app gets loaded into memory? 
+08:48 <@Nexxy> yus
+08:48 <@Nexxy> kind of
+08:48 < deoxxa[cookies]> bingo
+08:48 < chovy> oh, then t his is pointeless
+08:48 <@Nexxy> yay!
+08:48 < chovy> i should just include everything at the top
+08:48 < deoxxa[cookies]> \o/
+08:48 < deoxxa[cookies]> correct!
+08:49 <@Nexxy> now you get it :)
+08:49 < deoxxa[cookies]> chovy: try writing a simple http application using nothing but the core http methods - that'll give you a much better idea of how things happen underneath in things like express
+08:49 < deoxxa[cookies]> chovy: i mean really simple, like no templates or whatever. just hacky hacky hacky so you can see how it all fits together
+08:53 < deoxxa[cookies]> chovy: basically that "route" file is nothing special - it's just code. what you're doing there is defining a bunch of functions and assigning them as properties to the exports object. it gets evaluated just once, and those functions are probably shoved into express.
+08:53 < deoxxa[cookies]> chovy: like, you're literally taking those functions and putting them into express as request handlers, not just telling express "hey this is the file where some stuff is"
+08:53 < chovy> k
+08:54 < deoxxa[cookies]> i wonder if my jeans are dry yet
+08:55 < deoxxa[cookies]> nope!
+08:55 < rvagg> I GOT A BRAND NEW (COMPLEX) GYP TO COMPILE ON WINDOWS!
+08:56  * rvagg basks in the brief moment
+09:02 < chovy> what is node-gyp
+09:02 < chovy> i see it getting compiled a lot when i run npm update
+09:03 < astropirate> its a secret backdoor
+09:03 < astropirate> you have been warned
+09:03 < chovy> it debits money from my atm card?
+09:05 < astropirate> chovy, do you have a github?
+09:06 < chovy> yea
+09:06 < astropirate> hmm thought i used a library by you
+09:07 < chovy> maybe
+09:07 < chovy> i only have one for npm
+09:07 < chovy> or maybe it was the node-startup script for debian
+09:07 < astropirate> hmm i dont know
+09:07 < astropirate> i use upstart with ubuntu
+09:08 < astropirate> or maybe i'm confused
+09:08 < astropirate> ignore me
+09:10 < chovy> dammit, changing F to f broken all my tests
+09:12 < chovy> astropirate: express-force-domain maybe?
+09:13 < astropirate> chovy, did you make a bot that randomly follows people github?
+09:14 < astropirate> on github*
+09:14 < chovy> no
+09:14 < astropirate> :S
+09:14 < astropirate> nvm then
+09:16 < chovy> where did you find that?
+09:23 < asmita> hi
+09:32 < chovy> asmita: howdy
+10:27 < syskk> evening' all
+10:30 < Industrial> substack: Does fleet check out submodules on deploys?
+10:36 < Industrial> Right now I'm just copying my submodules over when I tag them, then committing the new tags in the drones/apps that use them.
+10:41 < stannley> hey guys, can anybody explain me which tests run when I execute "make test". It seems there are some integration tests which fails. Is it possible only to run the unit tests.
+10:42 < RLa> stannley, look inside the Makefile
+10:43 < stannley> ah, thanks.
+11:20 < chakrit> clear
+11:21 < chakrit> oops sry
+11:31 < yorick> substack: https://gist.github.com/4007104 is what I've been using, it works with normal servers, finishes ongoing requests and everything, but I can't get it to work with sockjs
+11:34 < Uterian> Hi
+11:35 < Uterian> what's up guys
+11:35 < Uterian> isn't there anyone?
+11:35 < yorick> Uterian: no one!
+11:36 < Uterian> no one except you then
+11:36 < Uterian> and me, and this new airtanah guy huh?
+11:36 < yorick> and all the other 750+ users on this channel
+11:36 < Uterian> need some help for nodejs, are you pro?
+11:36 < Uterian> but they are not answering buddy, so It's useless to count them
+11:37 < yorick> you have a weird way of talking
+11:37 < yorick> but what do you need help with
+11:44 < uterian> ah yes, english is not my primary  language, is it that much obvious ? :D
+11:46 < onr> no
+11:47 < yorick> uterian: well, I have no idea about restify, you're better off asking here
+11:47 < yorick> so one of the 750 people might see it, instead of just me
+11:48 < onr> actually 782
+11:49 < yorick> uterian: so ask this question here
+11:49 < yorick> http://pastie.org/5176260
+11:49 < yorick> onr: my irc client misses a few sometimes :P
+11:50 < onr> heh
+11:51 < uterian> guys full question is here with code http://pastie.org/5176260 can someone help?
+11:52 < rynym> newbie question -- if i install a package via npm with -g, why does my code still say cannot find module?
+11:52 < yorick> rynym: because you're not supposed to install packages you want to require('') somewhere with -g
+11:54 < azbyin> hi all.. i've been reading the tutorial on nodebeginner.org  is it considered a good tutorial?
+11:55 < uterian> azbyin I've read that tutorial too and that was the best beginner tutorial I've read about nodejs
+11:56 < azbyin> well, i'm a little bit confused as to why the server needs to handle the form or post data
+11:56 < azbyin> what if there is no form in your end application?
+11:57 < yorick> azbyin: then you don't need to handle that I gues
+11:57 < yorick> s
+11:57 < azbyin> i think the request object needs to be passed arounfd until the actual servlet/application itself
+11:58 < azbyin> because then i can keep adding new servlets/applications/requesthandlers without any updates to the server,router,index(main) except for adding the url->handler mapping
+11:59 < rynym> yorick: which modules should be installed with a -g vs those that shouldn't?
+11:59 < yorick> rynym: jshint and generally things you call from your command line
+12:00 < rynym> yorick: ooh ic. thanks for that
+12:02 < gurjeet> I am using nvm to install and run nodejs v0.8.11 and have installed `npm install pg` and can even run tests cleanly `npm test pg` but for some reason the first line 'require' my code barfs:  Cannot find module 'pg' !!
+12:02 < gurjeet> I am sure I am doing something wrong.
+12:02 < gurjeet> But what?
+12:02 < yorick> gurjeet: what does npm ls say
+12:02 < gurjeet> I have even tried npm -g install pg
+12:03 < yorick> is your code in the right directory
+12:03 < yorick> npm -g install pg is definately wrong
+12:03 < gurjeet> $ npm ls
+12:03 < gurjeet> /home/gurjeet
+12:03 < gurjeet> ├── formidable@1.0.9
+12:03 < gurjeet> └─┬ pg@0.8.6
+12:03 < gurjeet>   └── generic-pool@1.0.12
+12:03 < yorick> your...home..directory?!
+12:03 < gurjeet> My script is in /tmp/
+12:03 < yorick> yeah that won't work
+12:03 < gurjeet> !!??
+12:03 < yorick> you're supposed to install modules in the directory your scripts are in
+12:03 < yorick> rm -r ~/node_modules
+12:04 < yorick> then cd /tmp/ and npm i pg
+12:04 < gurjeet> I have heard of installing modules globally too. And that didn't work either.
+12:04 < yorick> that will only work if you want their binaries in your path
+12:04 < yorick> mostly
+12:05 < gurjeet> Hmm.. so libraries, like pg, won't be used even though they are installed globally.
+12:05 < gurjeet> Is that right?
+12:06 < yorick> yes
+12:07 < uterian> Hey guys, I'm new at using nodejs and restify and I 've tried to write server using them
+12:07 < yorick> npm has a model where libraries are installed locally, to help with dependency hell
+12:07 < yorick> modules are small anyways
+12:09 < uterian> I'm a flash game developer and I have to make my game client connect my server, my server will connect to crossdomain server for ask some user information, then my server will return the values back to the game client, but there are some problems that my client cannot read values from my server, because it tries to read directly but my server needs a little time to read data from the crossdomain server, code is here 
+12:09 < uterian> http://pastie.org/5176294
+12:10 < uterian> I'm trying to find a way to fix my code for whole 2 days , I'm gonna be crazy at this rate :/
+12:11 < onr> zeromq kullan
+12:13 < azbyin> uterian, your line 18 should be within the closure which ends on line 17!
+12:14 < azbyin> thats why youre returning a response before anything is obtained from your client.get()
+12:14 < Industrial> What's the best way to make a tree of directories of modules requireable? or by directory e.g. var models = require('./lib/models'); instead of requiring each model by itself.
+12:14 < onr> azbyin: ninja response :)
+12:15 < gurjeet> yorick: Thanks. As you might have guessed, I am noob. Such support channels help a lot.
+12:16 < azbyin> onr, it was kinds obvious, but given the formatting it took a while :)
+12:16 < deoxxa[cookies]> Industrial: add an index.js perhaps
+12:16 < apb> Industrial: i use this to do a similar thing for my routes http://pastie.org/5176343
+12:16 < deoxxa[cookies]> not sure if that's still a thing
+12:17 < draginx> Is there a way to add onto objects in jade? LIke make all a.href preprend with "/api/" ?
+12:18 < uterian> my connection has problem, did someone answered?
+12:18 < onr> uterian: azbyin> uterian, your line 18 should be within the closure which ends on line 17!
+12:18 < draginx> apb: you used to? What did u change? :)
+12:18 < draginx> Thats how I currently do it
+12:19 < uterian> but what's clousure
+12:20 < azbyin> umm.. just move line 18 before the  });  on line 17
+12:21 < azbyin> uterian, http://pastie.org/5176359
+12:22 < apb> eh? not changed anything, I include the'/' route in the same file, but thats it
+12:22 < azbyin> ofcourse the line numbers changed now as i ran the thing through jsbeautifier
+12:22 < uterian> azbyin: but it then gives an error 
+12:23 < uterian> azbyin: because client is restify.createJsonClient, not a restify.createServer
+12:23 < uterian> azbyin: and JsonClient's response doesn't have res.sen
+12:23 < uterian> res.send*
+12:24 < azbyin> well, in that case change the variable name!
+12:24 < Industrial> deoxxa[cookies]: but then I have to keep track of every file in every directory. It's already in git :P
+12:24 < azbyin> uterian, http://pastie.org/5176371
+12:25 < Industrial> apb: I guess that works :)
+12:25 < uterian> what is that _obj ? I meant what is that ' _ '
+12:26 < azbyin> i just changed the name
+12:26 < uterian> let me read the whole code
+12:26 < franck34> hi
+12:26 < azbyin> you can call it something else  function(error, request, response, object) { ...
+12:27 < uterian> but what and why it does effect in a different way?
+12:27 < azbyin> it has 2 changes from your original paste: (1) move line 18 within the closure, (2) rename the variable so that you refer to the correct 'res' object
+12:27  * franck34 brainstorming about encrypted url. is it possible to use express and received AES encrypted URL -> decrypt URL -> send decrypted URL to express to handle it
+12:27 < uterian> ahh got it
+12:28 < uterian> I'm gonna try it
+12:31 < franck34> is there a way to hook "express" so i can received AES encrypted URLs (and query string) ?
+12:36 < deoxxa[cookies]> franck34: middleware, my man
+12:37 < franck34> deoxxa[cookies]: let me google, i already saw this word somewhere :)
+12:39 < franck34> deoxxa[cookies]: thanks, exactly the starting point i was looking for
+12:39 < deoxxa[cookies]> \o/
+12:40  * franck34 now coding :)
+12:41 < uterian> azbyin: no buddy, it still doesn't work, but at least it doesnot give the previous error, thanks for that, but now it does not write the result on the screen named 127.0.0.1:8888/fromServ and it returns value to the game client as null, but it copies it in the log accurately. so what it the problem :(
+12:42 < uterian> http://pastie.org/5176371 I guess still have to fix something in this link http://pastie.org/5176371
+13:05 < Industrial> How do I structure my Module to make it browserify-able?
+13:15 < nathan7> Industrial: as a normal CommonJS module
+13:16 < al80> I am trying to use asser.throws with callback methods. For example    assert.throws(function() {model.validate(callback)});
+13:17 < al80> the problem here is that callback throws an exception that is not catched by assert.throw...how am I supposed to test that exception?
+13:25 < abrkn> anyone have a backbone.sync for mongodb?
+14:30 < vandenoever> how can i convert a stat.mtime in a valid Last-Modified like Sat, 03 Nov 2012 14:27:13 GMT ?
+14:40 < apb> vandenoever: stat.mtime.toUTCString() ?
+14:40 < vandenoever> apb: that's not the correct format apparently
+14:41 < vandenoever> the date should follow rfc 2822
+14:48 < larzconwell> vandenoever,  stat.mtime.toGTMString()
+14:49 < larzconwell> .toGMTString()*
+14:50 < larzconwell> stat.mtime is just a Date object..
+15:17 < mnaser> Has anyone ever worked with a json-backed dict (sort of dict that you can load state from, any writes to the dict is automatically stored in the file
+15:22 < vandenoever> larzconwell: that does look better indeed
+15:22 < larzconwell> Awesome.
+15:32 < Topcat> I want a page to list devices like itself, So an app to grab its own ip/subnet to scan and check the mac's it finds against it's own. Is this something I should even think about doing in node or is there a program I should use as an input for this page.
+15:46 < nlf> what the crap
+15:46 < nlf> my socket is never firing a data event
+15:59 < nlf> ah, there we go, turns out i'm an idiot
+16:03 < robdodson> Could someone help me debug a bogus `npm link`. My structure looks like this: https://github.com/robdodson/tessellate when I run `npm link` from the root I'm getting the error: Error: ENOENT, chmod '/usr/local/lib/node_modules/tessellate/bin/tesselate'     …. not sure what's going on there...
+16:05 < bradleymeck> robdodson: ls -l /usr/local/lib/node_modules # gives you? and do it for node_modules/tessellate too?
+16:06 < robdodson> looks like: /usr/local/lib/node_modules/tessellate -> /Users/Rob/Developer/tessellate
+16:07 < robdodson> so it's pointing back at my development dir
+16:07 < nlf> also turns out that async.queue leaks memory
+16:08 < robdodson> but I still don't understand the error of ENOENT, chmod '/usr/local/lib/node_modules/tessellate/bin/tesselate' ...
+16:09 < bradleymeck> nlf dangling ref somewhere in your code, when checking for leaks be sure you set any dangling refs to null (including closure refs)
+16:09 < robdodson> the bin folder and file in it are both set to 777
+16:09 < bradleymeck> robdodson: unsure
+16:09 < nlf> bradleymeck: wasn't my code, was in the async library
+16:09 < nlf> took that out, leak went away
+16:11 < bradleymeck> nlf: interesting, if you can produce a test case i would love to see it
+16:11 < nlf> yeah i'll try to isolate it
+16:11 < bradleymeck> dangling refs from passing inline callbacks are nightmares for leaking
+16:11  * bradleymeck wish there was an easy way to detect them
+16:12 < nlf> i'm down to some really minor leaks
+16:12 < nlf> ~300kb in 100,000 iterations
+16:12 < nlf> it was over 4mb
+16:12 < bradleymeck> nlf ouch
+16:12 < nlf> yeah, it was pretty bad
+16:13 < al80> what's wrong with this vows test? http://pastebin.com/F8TSQ1vL
+16:15 < al80> It should test that validation on that mongoose object fails. Instead I get "An unexpected error was caught: ValidationError: Validator "required" failed for path name"
+16:22 < robdodson> ugh. it was because I misspelled my library in the package.json `bin` section
+16:22 < robdodson> i should have picked a name that's less error prone than 'tessellate'
+16:22 < robdodson> :D
+16:24 < nlf> psh, where's your sense of adventure
+16:27 < nlf> hooray, i leak the same amount of memory whether i run my code 1 time or 100,000 times
+16:28 < nlf> and it's a small amount
+16:28 < nlf> i can live with that
+16:51 < uterian> hey guys
+16:51 < uterian> does anyone know flash programming? asking this because I need to create communication between flash client and restify server
+16:55 <@mbalho> use socket.io d00d
+17:00 < AAA_awright> mbalho: This is a Flash applet I'm guessing
+17:00 < AAA_awright> uiureo: I think that's a question for a Flash audience, not Node.js
+17:01 < AAA_awright> Or rather, Actionscript
+17:02 < TehShrike> https://github.com/simb/FlashSocket.IO ?
+17:02 < aandy> anyone have ideas for a small minimal box which can be stacked with ram (4gb+) - cpu and storage is non-essential, although storage is a plus :) i used to have a revo for this, but it's very limited with ram. wondered if anyone has some alternatives?
+17:03 < TehShrike> Newegg?
+17:03 < TehShrike> Maybe you need to specify what you're trying to minimize when you say "minimal" :-x
+17:04 < omggraphs> any neo4j guru's here? neo4j channel is dead :(
+17:04 < aandy> ah, right, sorry. i mean, i'm trying to assemble (or buy) a small pc. something like ion or something alike. the main criteria being i can stack lots of ram on it.
+17:05 < AAA_awright> aandy: Yeah, are we talking like ARM or MicroATX?
+17:05 < aandy> but as i ask, i realize there's only one thing to do: get a mb and build custom
+17:05 < TehShrike> Pretty much
+17:05 < TehShrike> Good heatsinks are key
+17:05 < aandy> AAA_awright: not familiar with atx, but regular hardware for linux. arm would do, but i was thinking of regular architecture x86/x64
+17:05 < AAA_awright> aandy: It's a form factor, not a CPI :p
+17:05 < AAA_awright> *CPU
+17:06 < aandy> omggraphs: i've used it some, and other graph dbs
+17:06 < aandy> i thought ARM was a "cpu" (architecture anyway) :)
+17:06 < dogmatic69> aandy: http://pcpartpicker.com/uk/part/asus-motherboard-f1a75mpro
+17:06 < dogmatic69> 64gb ram, micro atx
+17:06 < aandy> oh, that looks good
+17:07 < dogmatic69> http://pcpartpicker.com/uk/parts/motherboard/#f=7&sort=d4
+17:07 < aandy> thanks :)
+17:07 < dogmatic69> np
+17:07 < dogmatic69> btw, I linked the top one. Not for any other reason.
+17:09 < nlf> aandy: a mac mini can have up to 16gb of ram
+17:09 < nlf> and 2tb of storage
+17:11 < TehShrike> They're pretty small.
+17:11 < omggraphs> aandy: Let's say i want to iterate over all nodes to see if they have matches (i.e. two nodes need to like each other), do you know how to do this. It seems that any query hogs up my machine. and in think it might be better to have a list of all nodes, and use every node as a start point individually instead of doing START n = node(*)
+17:11 < aandy> could be, yeah
+17:11 < aandy> could double as media center :>
+17:12 < nlf> they're tough to beat in the performance per square inch category
+17:12 < aandy> omggraphs: do you have indices? and which interface do you use, gremlin or cypher?
+17:12 < aandy> nlf: hehe
+17:12 < nlf> a 2.6ghz quad core i7 with 16gb of ram and 2tb of storage in a less than 8 inch square
+17:13 < nlf> 7.7x7.7x1.4
+17:13 < nlf> that's a tiny computer
+17:13 < TehShrike> Yup.
+17:13 < omggraphs> aandy: I'm using cypher, i have indices, but its about 5m nodes and like double relationships. But i'm not sure about the internals i think start n = node(*), just loads everything in memory except iterating it trough it in batches but i could be wrong.
+17:14 < aandy> ah yeah, you should definately not do that
+17:14 < aandy> you should start at a known / indexed node
+17:14 < omggraphs> aandy: i thought so, so if i just want to have all matches, i should just make a script that iterates over all the indexed nodes and make individual graph queries
+17:15 < aandy> what do you mean by "see if they ahve matches", as in, find nodes that have > 0 relationships?
+17:15 < aandy> well, that *will* take time, so you shouldn't be surprised at it being (reasonably) slow
+17:16 < aandy> you're basically iterating over everything at least once 
+17:16 < omggraphs> aandy: i think the easiest metalhor is, if two people like each other they could be a potential match. i want to get all the nodes that like eachother.
+17:17 < aandy> well, one way you could do that is to have all people edged to a root object
+17:18 < omggraphs> ooh and then make a cypher query from the node object?
+17:18 < aandy> so you'd START n=node(0) n-[:USER]->a<-[:LIKE]->b
+17:18 < aandy> yeah, i think that'd be easiest
+17:18 < omggraphs> makes sense
+17:18 < aandy> for most graph db's i've tried, i've used a root, and i learned it the hard way
+17:19 < omggraphs> well I'm learning it the hard way
+17:19 < aandy> not all support iterating over all nodes, and not all support the same kind of operations on all types of "selections". pain in the ass, but what're you gonna do
+17:19 < omggraphs> thanks aandy
+17:19 < omggraphs> i start to realise you can't just dump nodes in a db 
+17:20 < omggraphs> you need to think about how you organise it
+17:20 < omggraphs> so you can query it 
+17:20 < aandy> definately. which is my rule # 1 with graph dbs: never delete your original data until you're *absolutely* sure your setup works with your queries
+17:21 < omggraphs> sandy do you have any other tutorials, or hints where i can read this kinda stuff?
+17:21 < omggraphs> *andy
+17:21 < aandy> hmm, no, not really. neo4j has some tutorials/guides on different setups and usages
+17:22 < omggraphs> thanks anyway I'm going to read a bit more i guess
+17:23 < aandy> know, if only someone would make a flockdb client for node (using node-thrift?) that'd be great :D
+17:24 < aandy> omggraphs: i'm still fishing around a lot with graph dbs. haven't really found one i like yet. neo4j is ok, but rest api and single instance. flockdb is distributed, but no traversing, just relationships. titan is actually ok, and works well with a cassandra cluster - but also rest api only
+17:24 < omggraphs> sandy what kinda api do u want
+17:24 < omggraphs> omg
+17:24 < omggraphs> why does it keep correcting me
+17:24 < aandy> makes my queries ridiculously slow (like 500-1000 ms for a simple graph with ~2k nodes)
+17:25 < aandy> hey, i'm not that hurricane
+17:25 < omggraphs> i know got brainwashed
+17:25 < aandy> i just want something i can access directly, not through http overhead
+17:26 < aandy> seems like all the blueprint's implementations are great - if you write java code, but horrible to access if you're using anything else
+17:26 < aandy> blueprint = neo4j, titan, orientdb etc
+17:26 < omggraphs> yeah exactly, i an thinking of writing it partially in java no
+17:26 < omggraphs> now
+17:26 < omggraphs> just so i can get the speed 
+17:26  * aandy lost will to live
+17:26 < nlf> java makes my stomach hurt
+17:27 < aandy> i'm looking at flockdb, hope i can make it work, but the lack of traversing really bugs me
+17:27 < nlf> it is a natural laxative, after all
+17:27 < aandy> true
+17:27 < aandy> and also, it's a coffee, which is also a natural laxative
+17:28 -!- mode/#node.js [+o piscisaureus_] by ChanServ
+17:28 < omggraphs> i know, makes u a man. writing java
+17:28 < omggraphs> the pain
+17:28 < omggraphs> i don't like it, but if it speeds up the indexer..
+17:29 < aandy> we really need a c/c++ alternative to lucene :>
+17:29 < aandy> all the fast stuff is built around that java monster. elastic search aswel
+17:29 < aandy> java, stop being all up in my business
+17:29 < omggraphs> yep, solr
+17:29 < nlf> java be trippin, yo
+17:29 < omggraphs> thank god redis is not java
+17:29 < omggraphs> might just port it for the fun of it
+17:29 < aandy> to java?
+17:29 < nlf> i hate you all of a sudden
+17:30 < omggraphs> no the rest ofcourse
+17:30 < nlf> i really thought you were implying you were going to port redis to java
+17:30 < omggraphs> hahaha
+17:31 < nlf> and it really made me sad in my heart
+17:31 < omggraphs> i heard it break
+17:31 < omggraphs> im sorry
+17:31 < omggraphs> <3
+17:31 < aandy> i hear riak can do simple graph dbs aswel
+17:31 < nlf> now that i know that's not what you meant i feel a little better
+17:32 < omggraphs> i have to google that
+17:32 < aandy> on the other hand, i'm pretty sure the only interface to riak is http :D
+17:32 < nlf> false
+17:32 < aandy> but at least it's not java, if that counts as anything
+17:32 < nlf> there's a protobuf interface too
+17:32 < aandy> oh
+17:32 < nlf> i've been working with it a lot
+17:33 < nlf> i, in fact, wrote a protobuf implementation in pure javascript specifically for it
+17:33 < omggraphs> what kinda companies do u guys work on if u need such a big thing
+17:33 < nlf> and have a very raw riak client working against it
+17:33 < aandy> nice. i think i saw your riak module on github a while back
+17:33 < nlf> i have two now
+17:33 < nlf> simpleriak uses the http transport, riakpbc is protobuf but very low level
+17:34 < aandy> omggraphs: big thing? it's not for jobs, just two small startup ideas. and not really that big capacity, but around 6mio nodes with up to 20mio relationships. not saying it can't run on a single machine, though :)
+17:35 < devatwork> anyone work with android and nodejs ?
+17:35 < aandy> nlf: you should do a simple one using protobuf aswel :)
+17:35 < nlf> aandy: that's the plan, i've been working on getting all the kinks out of the low level stuff first
+17:37 < aandy> protobuf.js is yours?
+17:37 < nlf> yes
+17:38 < aandy> nice :)
+17:39 < omggraphs> hows the performance of protobuf with js?
+17:39 < nlf> i think i have most of my performance issues and memory leaks tidied up now, so it's time to write up some solid unit tests and start making it a bit higher level
+17:39 < nlf> omggraphs: compared to what?
+17:39 < nlf> compared to using riak with the http transport, it's a *ton* faster
+17:39 < omggraphs> compared to simple json messages over the wire
+17:40 < nlf> oh, i'm not sure on that one, haven't really tested
+17:40 < nlf> i imagine it wouldn't be much different
+17:40 < nlf> for json objects protobuf essentially just stringifies it and sends it anyway
+17:41 < omggraphs> ah right
+17:41 < aandy> so what you spare is the http headers back and forth
+17:41 < nlf> you could define protobuf messages to break each json field into a protobuf native field and possible see some performance gain, but i doubt it's significant
+17:41 < nlf> aandy: right, and the overhead of creating and destroying the connection for every call
+17:41 < nlf> protobuf stays open
+17:41 < aandy> that too
+17:42 < nlf> i did a quick benchmark of simpleriak versus riakpbc, 10,000 GETs of a small json object
+17:42 < omggraphs> so I'm a bit new to node, so what would one use, if two node.js servers need to talk with eachother
+17:42 < nlf> took 27.4 seconds in simpleriak, 7.6s in riakpbc
+17:42 < aandy> yikes
+17:42 < aandy> that's a lot of throughput
+17:42 < nlf> yeah, that's what made me decide it was worth pursuing further
+17:43 < nlf> that's all over one connection too, theoretically i could open several sockets and pool them and make it stupid fast
+17:44 < aandy> omggraphs: well, there are a few ways to go. some use websockets, or you could do a direct connection, but it also depends if you're planning on running 2 servers - then tomorrow 3, then 5, 10, etc., or if you'll rather use a "hub"
+17:44 < nlf> omggraphs: also depends on if your servers are located on the same physical box or not
+17:47 < aandy> +1 for your nick btw. very typical reaction when people start using graph dbs :)
+17:48 < omggraphs> i am iterating over the options, so web sockets/axon if separate from each other, and pipe if not on the physical box. 
+17:48 < omggraphs> aandy: haha yeah. i was like omg i can map the world
+17:48 < omggraphs> put all our politicians in a graph db and figure out heir lobbies and hidden schemes
+17:48 < aandy> oh, i thought you were like omg f'ing graphs.., but yeah it works on many levels ;)
+17:48 < aandy> but yeah, you can do some nice network analytics
+17:49 < omggraphs> i am reaching that point now
+17:49 < omggraphs> now i have to batch reinsert all my data after your tip
+17:50 < aandy> hehe. start out small
+17:51 < omggraphs> yeah will do :P thanks
+17:52 < aandy> there are some good slides from neo4j on slidesshare.net btw
+17:53 < aandy> and http://www.slideshare.net/knowfrominfo/titan-big-graph-data-with-cassandra/60 twitter benchmark
+17:56 < omggraphs> aandy: thats a lot of data
+18:00 < aandy> it's twitter, yo. a few years ago anyway :)
+18:01 < omggraphs> too big for my tiny setup
+18:03 -!- mode/#node.js [+o xyxne] by ChanServ
+19:13 < kanyl> I want to communicate between a node client and server securely, can someone point me in the right direction?
+19:17 < aandy> kanyl: off the bat, ssl, but securely how?
+19:18 < niggler> kanyl: try telepathy
+19:19 < kanyl> aandy: Secure in the sense that someone sniffing my data would not be able to decrypt it
+19:19 < kanyl> niggler: thanks
+19:19 < nlf> yeah, just use an ssl socket
+19:22 < sashman> i dont know if i should you couch or mongodb
+19:22 < sashman> use
+19:24 < nlf> use what makes you happy
+19:25 < nlf> i'd suggest trying both before making a decision
+19:25 < nlf> also check out more than one client library
+19:25 < nlf> if you like model-type behavior, you may be more inclined to use mongodb since mongoose is very popular and well maintained
+19:26 < nlf> at least i don't know of an equivalent for couch
+19:26 < nlf> it may exist
+19:44 < zezikaro> hi does anyone know if i can create programs with javascript/nodejs ?
+19:44 < zezikaro> Like i can with java's swing or c#'s winforms
+19:44 < Sly> zezikaro, there have been a few GTK+ platforms started for Node.js using C/Javascript.
+19:45 < Sly> However, most of them that I have seen are majorly outdated because they never caught on.
+19:45 < zezikaro> :(
+19:45 < zezikaro> that's a pity
+19:45 < Sly> They were pretty much ahead of their time, before Node got super popular.
+19:45 < Sly> Owners apparently abandoned them for better things.
+19:45 < aandy> i wonder if you could write a bridge between node and win32 api dll's to use createWindowA and such
+19:46 < zezikaro> Sly any names or such that i could google?
+19:46 < Sly> aandy, you can. You can compile C/C++ modules with node-gyp for Node.
+19:46 < Sly> Then you can use them just like a normal module.
+19:46 < aandy> interesting
+19:46 < Sly> require('windows-shit')
+19:46 < Sly> aandy, http://nodejs.org/api/addons.html
+19:46 < TooTallNate> aandy: there's also node-ffi
+19:46 < Sly> zezikaro, not off the top of my head. Look on Github, or even Google, and just search for "node gtk framework"
+19:47 < TooTallNate> https://npmjs.org/package/node-ffi
+19:47 < aandy> thanks Sly 
+19:47 < Sly> Hey, Nate.
+19:47 < aandy> TooTallNate: that also looks like something i could use, thanks
+19:47 < zezikaro> does that mean nodejs could talk with java
+19:47 < zezikaro> and thus could be part of osgi?
+19:47 < Sly> zezikaro, if you wanted to make it that way.. I suppose it could.
+19:47 < Sly> As long as you can somehow tie Java into C/C++.
+19:47 < TooTallNate> Sly: yo
+19:47 < Sly> Then turn that into a module.
+19:47 < zezikaro> nodejs tying into osgi would be /awesome/
+19:47 < zezikaro> JNI ?
+19:48 < zezikaro> or indirectly with a restful interface i guess :/
+19:48 < rburton-> jni--
+19:48 < rburton-> Is there really a need for OSGi in Node.JS?
+19:49 < zezikaro> one of my longterm goals is to write an integration platform, esb, using nodejs
+19:49 < zezikaro> and tie it up with existing ones like apache camel
+19:49 < zezikaro> which would just be amazing
+19:50 < zezikaro> and providing a nice dsl for it too
+19:50 < zezikaro> maybe i'm just a sick person though
+19:52 < Sly> TooTallNate, how have you been?
+19:52 < Sly> zezikaro, to each his own.
+19:53 < zezikaro> hah
+19:53 < Sly> I despise Java, or really anything to do with Windows.
+19:53 < zezikaro> it's just, it seems nodejs would be very powerful handling all of that sort of thing
+19:53 < Sly> I have Windows 8 on this computer, but not by choice. Linux isn't compatible to be installed natively yet.
+19:53  * Sly is talking to you from a VM.
+19:53 < Sly> :(
+19:53 < zezikaro> :o
+19:53 < zezikaro> what computer?
+19:53 < Sly> ASUS Q500A
+19:53 < zezikaro> that comes with windows 8 
+19:55 < zezikaro> i never knew they were shipping laptops with windows 8 now
+19:56 < Sly> lol. Yeah, they have been for a couple months now.
+19:56 < Sly> Probably longer, actually.
+19:56 < zezikaro> what do you think of windows 8 then
+19:56 < zezikaro> obviously not much if you're running a vm :D
+19:56 < Sly> It's alright on a computer that's built for it.
+19:56 < Sly> Like, on my old laptop.. it was a pain in the ass.
+19:56 < Sly> But this one has a multitouch touchpad and such..
+19:57 < Sly> So it makes it a bit easier, since Windows 8 has gestures.
+19:57 < zezikaro> oh nice
+19:57 < Sly> There's not a lot of gestures, but enough that it's pretty slick.
+19:57 < zezikaro> is it 'programmer friendly' though?
+19:58 < zezikaro> or rather, is it usuable for non-idiot users, if that makes sense
+19:58 < DTrejo> what service is this?
+19:58 < zezikaro> i hate software that hides everything useful etc
+20:01 < zezikaro> yeah all of these gtk bindings are 2+ years old
+20:01 < zezikaro> :(
+20:01 < zezikaro> and not finished
+20:02 < cactus> what about qt
+20:03 < cactus> huh, I don't remember changing my name to cactus
+20:05 < zezikaro> hmm there's node-qt which was last updated 2 months ago
+20:05 < zezikaro> :o
+20:06 < mnaser> Anyone knows if there's a way I can use eventfd in nodejs?
+20:06 < zezikaro> oh cool, and node-five apparently works with qt in a way that you can use the canvas api 
+20:07 < zezikaro> seems like i would have to do everything myself though? There's no default buttons or anything :S
+20:07 < cactus> I want to see a full-fledged GUI application written in node-qt
+20:08 < cactus> what kind of default buttons?
+20:09 < cactus> there's QMessageBox with default buttons
+20:10 < cactus> this actually looks much cleaner than PySide
+20:11 < zezikaro> cactus i'm looking at https://github.com/arturadib/node-qt
+20:11 < zezikaro> and it just seems to have drawing
+20:11 < zezikaro> like basic drawing functionality, not any 'gui' items
+20:11 < zezikaro> if that makes sense
+20:11 < zezikaro> there's no, window.addButton() sort of thing
+20:12 < mnaser> aw man, I really don't wanna resort to using python for this, no one knows of eventfd support for node? :(
+20:13 < goku22> hi
+20:14 < goku22> i am getting Error: EMFILE when trying to read a directory of files
+20:14 < goku22> and write the content into a single file
+20:14 < cactus> yeah it seems pretty limited zezikaro 
+20:14 < goku22> i have set a buffer size of 1024 * 1024 even so i get the error
+20:14 < goku22> any help
+20:14 < zezikaro> yeah that's a pity :(
+20:17 < BleKohl_> there's also node-gui
+20:17 < BleKohl_> lol my name changed again
+20:18 < zezikaro> https://github.com/appjs/appjs this looks interesting
+20:18 < zezikaro> BleKohl_
+20:18 < zezikaro> [20:13] * cactus (BleKohl@78.84.165.234) Quit (Disconnected by services)
+20:18 < zezikaro> [20:14] * BleKohl_ (BleKohl@78.84.165.234) has joined #Node.js
+20:18 < zezikaro> that's happening
+20:20 < zezikaro> node-gui looks good
+20:20 < zezikaro> although writing a desktop application with html would be amazing, as there's nothing new to learn
+20:20 < zezikaro> thanks for the help
+20:21 < BleKohl_> yeah, declarative markup > procedural
+20:21 < Styled> anyone here know libuv?
+20:22 < goku22> can anyone point me to a good article on file system flags like r r+ w 
+20:23 < BleKohl_> http://pubs.opengroup.org/onlinepubs/9699919799/functions/fopen.html
+20:25 < DTrejo> npmbro docs node-gui appjs node-qt
+20:31 < TheAceOfHearts> how can I tell my node.js app to kill itself once it's run?
+20:32 < nlf> process.exit()
+20:33 < TheAceOfHearts> thank you <3
+20:34 <@xyxne> TheAceOfHearts, it should exit automagically once it is finished
+20:36 < TheAceOfHearts> maybe I'm doing something wrong x.x ... but I got process.exit() to work :) so thanks
+20:36 < clever> TheAceOfHearts: if there are no open files/sockets and no remaining timers, it will die on its own
+20:36 <@Nexxy> the only reason I mention it is because you may be prematurely ending the process
+20:36 <@Nexxy> and destroying data/work
+20:36 < clever> because its smart enough to know there cant be any new data sources
+20:38 < zezikaro> You're so clever, clever
+20:38 < clever> Nexxy: i have found related bugs, in the serial-port module
+20:39 < clever> Nexxy: if the serial port is the ONLY data source holding the process open, it sucks 100% cpu, it cant poll properly
+20:39 < clever> but if i add any other event source, like a simple setInterval(100,function () {}); the problem goes away
+21:06 < Cheery> I need to implement this: http://bpaste.net/show/55670/
+21:06 < Cheery> I'm getting a file handle from libudev for monitoring
+21:07 < Cheery> I wonder how do I construct a watcher or whatever it's called in libuv.
+21:22 <@isaacs> ircretary: tell tmpvar It'll be available on all streams in master soon.  but currently, no, i dont' think so.
+21:22 < ircretary> isaacs: I'll be sure to tell tmpvar
+21:42 < Cheery> https://groups.google.com/forum/?fromgroups=#!topic/nodejs/ru2gKBEW6oU
+22:05 < airtanah_> does anyone use protobuf-js?
+22:05 < airtanah_> is there a better protobuf lib
+22:05 < airtanah_> i feel like google code is a project graveyard
+22:06 < niggler> airtanah_: what's google code?
+22:06 < airtanah_> niggler: exactly
+22:08 < ezkl> Has anyone tried the Cloud9 IDE
+22:10 < niggler> ezkl: its cute but there are many problems
+22:10 < airtanah_> ezkl: yes
+22:11 < ezkl> Any other IDE's or am I better to just stick with VIM? 
+22:11 < niggler> I've tried many but vim is by far the best
+22:12 < ezkl> niggler: sweet thanks. 
+22:19 < chovy> ezkl: vi
+22:20 < chovy> ezkl: sublime text maybe
+22:20 < niggler> vi > sublime text
+22:21 < niggler> if you want the gui go with macvim
+22:24 < ezkl> eh... I don't need anything fancy.  Just some text highlighting 
+22:24 < niggler> :syntax on
+22:25 < niggler> :set hlsearch is also nice
+22:30 < chovy> how do i use mocha to test my api routes?
+22:34 < zezikaro> chovy api routes?
+22:34 < chovy> i have routes for an api, like adding a comment
+22:34 < chovy> i want to write unit tests for it, but not sure how
+22:34 < chovy> POST /api/comment
+22:34 < zezikaro> chovy use zombie.js and verify the page is as you expect
+22:35 < zezikaro> and then write behaviour tests
+22:36 < chovy> is it not possible to use mocha?
+22:36 < chovy> zombie looks like i'm already doing with selenium
+22:37 < zezikaro> chovy it is similar to selenium es
+22:37 < zezikaro> yes*
+22:37 < tjholowaychuk> chovy anything that can make a request you can use, depends which level, for acceptance tests selenium or similar is definitely better
+22:37 < tjholowaychuk> for api stuff
+22:37 < tjholowaychuk> mikeal's request or something like github.com/visionmedia/supertest
+22:38 < tjholowaychuk> or node's regular http stuff but that gets a bit annoying
+22:38 < zezikaro> Does express allow the option for forms to go directly into json objects?
+22:39 < tjholowaychuk> zezikaro req.body is populated if you use bodyParser
+22:39 < zezikaro> uh as in a pojo, but a basic json object
+22:39 < zezikaro> Googling that now thanks
+22:39 < tjholowaychuk> http://expressjs.com/api.html#bodyParser
+22:40 < chovy> tjholowaychuk, zezikaro thanks. i'll look into zombie and supertest
+22:40 < zezikaro> chovy selenium is fine instead of zombie
+22:40 < zezikaro> we're both just making the suggestion to test at the acceptance level 
+22:40 < zezikaro> test your api at the acceptance level*
+22:42 < chovy> zezikaro: i see. yeah, selnium is really easy. i just record it in the ide
+22:42 < zezikaro> chovy which ide?
+22:43 < zezikaro> I prefer zombie because it's more 'manual' but allows me to be more clever about writing my tests
+22:46 < chovy> zezikaro: selenium ide
+22:46 < chovy> in firefox
+22:46 < chovy> they don't have an export as js though
+22:47 < zezikaro> ah yes i see 
+22:47 < zezikaro> There's so many tools i want to write... :/
+22:48 < zezikaro> a similar tool for zombie would be very nice
+22:48 < chovy> yeah
+22:48 < chovy> i've been doing acceptance testing with selenium already. I guess that's good enough for now.
+22:49 < zezikaro> chovy Am I right in saying that your selenium tests require control of the entire computer?
+22:49 < zezikaro> IE it's not headles
+22:49 < zezikaro> headless
+22:49 < chovy> simple tests like function getA() { return 'A'; } are easily testable, but I'm finding in the real world I don't have any functions like that.
+22:50 < chovy> zezikaro: yes. i run it on my laptop before i deploy. You can use selenium rc to do it on another machine, but it still requires a browser.
+22:50 < zezikaro> yeah
+22:50 < zezikaro> that's why i never went with selenium
+22:50 < chovy> it would be cool to record with selenium ide and export to zombie
+22:50 < zezikaro> you can just run zombie, or phantom, and just run it as a set of tests
+22:50 < zezikaro> no need to have an actual browser
+22:51 < chovy> but it takes a lot of time maintaining these tests.
+22:51 < zezikaro> which?
+22:51 < zezikaro> selenium?
+22:52 < chovy> recording them in selenium is faster.
+22:52 < chovy> no, if i had to write each test manually.
+22:52 < zezikaro> true, but only initially
+22:52 < chovy> using zombie or phantom
+22:52 < zezikaro> for instance
+22:52 < zezikaro> if you write one function to perform a small task with zombie
+22:52 < zezikaro> then you can piece them together to create very complex acceptance tests
+22:52 < zezikaro> and only need to make small changes once
+22:53 < zezikaro> You'll have a lot of time rewriting your selenium tests if something changes for instance
+22:53 < zezikaro> whilst zombie's initial cost is higher, it might be better in the long run
+22:58 < chovy> zezikaro: which is better, zombie or phantom?
+22:58 < chovy> we use phantom at work, but i've never done anything with it.
+22:59 < zezikaro> I believe phantomjs is a true headless browser, whilst zombie virtualises it
+22:59 < zezikaro> zombie has a nicer dsl
+23:00 < zezikaro> also I believe you can take pictures of the website with phantom when something goes wrong, but not with zombie
+23:00 < jgornick> Hey guys, is it possible to specify a directory that can be resolved when calling require? For example, I have a lib directory and I'd like to set it up so from anywhere when I call require('lib/path/to/file') it will load the file in the lib directory?
+23:00 < chovy> zezikaro: interesting
+23:01 < chovy> jgornick: why can't you just do that
+23:01 < zezikaro> chovy oh, and phantom js isn't made for nodejs
+23:01 < zezikaro> that's a huge difference
+23:01 < zezikaro> but there are wrappers for using it within nodejs
+23:02 < chovy> so how do i execute the zombie script?
+23:02 < jgornick> chovy: When I'm in the same directory that works fine, however, when I'm in another directory, I have to use relative paths which is sort of gross to me.
+23:02 < chovy> node ./test.js
+23:02 < zezikaro> it's just javascript
+23:02 < chovy> ?
+23:02 < chovy> jgornick: yeah. i use relative paths everywhere.
+23:02 < chovy> only a problem when you move files or copy them.
+23:02 < jgornick> chovy: Is there an option to not use relative paths?
+23:03 < chovy> jgornick: you might be able to set a cfg.lib path or something
+23:03 < chovy> but i've never done that
+23:03 < zezikaro> var zombie = require("zombie"); var browser = new zombie.Browser(); browser.visit("http://localhost:3000", function() { console.log(browser.statusCode); });
+23:03 < zezikaro> it's just javascript
+23:04 < zezikaro> chovy http://zombie.labnotes.org/
+23:59 < raj> how do you "run ./scripts/web-server.js" ? https://github.com/angular/angular-phonecat#development-with-angular-seed
+--- Log closed Sun Nov 04 00:00:05 2012
