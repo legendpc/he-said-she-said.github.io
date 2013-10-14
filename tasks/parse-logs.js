@@ -4,6 +4,10 @@ var HANDLE_CHANGE = /^(\d+:\d+)\s-\!-\s+([^\s]+)\s+(is )?now known as/;
 var MODE_CHANGE = /^(\d+:\d+)\s-\!-\s+mode\//;
 var DAY_CHANGE = /Day changed (.*)/;
 var ME = /^(\d+:\d+)\s+\*\s+([^\s]+) (.*)/;
+var TOPIC_CHANGE = /^(\d+:\d+)\s-\!-\s+\S+\s+changed the topic/;
+var TOPIC = /^(\d+:\d+)\s-\!-\s+Topic/;
+var USERS = /^(\d+:\d+)\s+\[/;
+var IRSSI = /^(\d+:\d+)\s-\!-\s+Irssi:/;
 
 function State(dateStr, options) {
   this.date(dateStr + ' 00:00:00');
@@ -75,8 +79,11 @@ module.exports = function() {
         if (!shell.test('-e', state.fname())) {
           fs.writeFileSync(state.fname(), parsed[3]);
         }
-      } else if (line && !HANDLE_CHANGE.test(line) && !MODE_CHANGE.test(line)) {
-        throw new Error('PARSE ERROR: "' + line + '"');
+      } else if (line && !HANDLE_CHANGE.test(line) && !MODE_CHANGE.test(line) &&
+          !TOPIC_CHANGE.test(line) && !TOPIC.test(line) && !USERS.test(line) &&
+          !IRSSI.test(line)) {
+        // throw new Error('PARSE ERROR: "' + line + '"');
+        console.error('PARSE ERROR: "' + line + '"');
       }
     });
   });
