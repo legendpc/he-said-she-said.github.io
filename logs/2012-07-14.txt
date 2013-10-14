@@ -1,0 +1,1039 @@
+--- Log opened Sat Jul 14 00:00:04 2012
+--- Day changed Sat Jul 14 2012
+00:00 < tjholowaychuk> state is state, so you have to be careful if it's something that you want to be request-specific etc
+00:01 < sigwhite> In this particular case, I want to keep a "global" array of let's-call-them-sessions and read from and write to it within requests. This seems icky, coming from a Java concurrency background, but I'm not sure how this applies to node.js.
+00:01 < TimeTurner> cross-file private state looks weird: http://www.adequatelygood.com/2010/3/JavaScript-Module-Pattern-In-Depth
+00:02 < deoxxa> sigwhite: one javascript interpreter = one thread
+00:02 < sigwhite> Ah, okay.
+00:02 < deoxxa> sigwhite: that assertion will be invalid if you start poking around with native extensions, but for the most part that's how it goes
+00:02 < tjholowaychuk> sigwhite typically you'd avoid that sort of thing even just because it couples you to a single heap
+00:02 < deoxxa> and yes, what tjholowaychuk said
+00:03 < deoxxa> darn you for typing faster
+00:03 < tjholowaychuk> so if all of sudden you need 5 nodes you have to refactor
+00:03 < sigwhite> tjholowaychuk: yeah, I'd usually prefer using redis for this like for the rest of my "global" state.
+00:03 < tjholowaychuk> yup
+00:03 < sigwhite> It's a collection of socket.io sockets, though. I don't think they can be serialized to anything I could store in and load from redis.
+00:06 < TimeTurner> socket.io already keeps a list of sockets in redis
+00:06 < sigwhite> FWIW, the socket.io connections would probably use the same node throughout their lifetime so the limitation isn't as terrible as it sounds. In fact, having the connections shared across all nodes would probably result in the same event being handled multiple times, no?
+00:06 < TimeTurner> not necessarily
+00:07 < sigwhite> Oh, indeed. It does. When did that happen?
+00:07 < TimeTurner> > 0.7  I think
+00:07 < TimeTurner> it also has support for multiple nodes since then
+00:07 < TimeTurner> socket.io is pretty solid now
+00:08 < sigwhite> Well, my use case is this: I have a third party web app my node is proxying; it uses redis to notify socket.io clients of changes. Currently my node listens on redis channels and notifies any relevant clients.
+00:08 < TimeTurner> It's going to get even better with respect to separation of concerns of transport handling when engine.io is fully separated and introduced as a dependency for socket.io
+00:09 < deoxxa> TimeTurner: here's hoping this rewrite or whatever it is entails removing that shitty logging
+00:10 < sigwhite> So does that mean socket.io can now handle redis as just another transport for server-server communication alongside the server-client transports?
+00:12 < sigwhite> I mean, I definitely don't want every message passed via redis to reach the clients directly.
+00:14 < sigwhite> nvm, I found #socket.io
+00:22 < sh1mmer> did anyone make any progress being able to full heap dumps from V8?
+00:22 < sh1mmer> It's been a while since I played with that
+00:22 < livinded> sh1mmer: do the core dumps not dump heap?
+00:23 < sh1mmer> well I think dap's tool work on SmartOS to extract a heap
+00:23 < sh1mmer> I was mucking about a while ago with a feature in v8 to dump the heap to disk
+00:24 < sh1mmer> well to a stream writer
+00:48 < TimeTurner> why is NODE_DEBUG not listed in the docs?
+00:48 < TimeTurner> as an enviroment variable
+00:49 < austinbv> TimeTurner: what is it used for?
+00:49 < prettyrobots> TimeTurner: I was looking for a debug environment variable recently and didn't find one.
+00:49 < TimeTurner> well apparently you can log certain parts of the application
+00:49 < TimeTurner> for instance I just started using NODE_DEBUG=http node app.js
+00:50 < TimeTurner> but I don't know if this is something that has been implemented by a lib author or node itself
+00:51 < frogstarr78> Is there a way to specify the resolvers, in code, that the DNS lib uses to query?
+00:51 < TimeTurner> ahh wait
+00:51 < TimeTurner> https://github.com/visionmedia/debug
+00:52 < TimeTurner> that's where it's coming from
+00:52 < TimeTurner> it's an express dependency
+01:04 < austinbv> can you get the name of an object?
+01:04 < austinbv> i feel like no
+01:15 < TimeTurner> reading well-written tests of any module has got to be the fastest way to learn the api
+01:15 < TimeTurner> and examples
+01:38 < dominictarr> creationix, I've been reading through c9/smith
+01:38 < dominictarr> some interesting stuff
+01:39 < dominictarr> pulled out the framing stuff and put it into https://github.com/dominictarr/msgpack-stream
+02:10 < prettyrobots> How do I get invited to the JavaScript channel?
+02:10 < riven> /join ##javascript
+02:10 < riven> Note, two #
+02:11 < joeandaverde> why would there be two #?
+02:11 < gkatsev> you need a registered nick
+02:11 < gkatsev> joeandaverde: freenode convention for unofficial channels
+02:11 < joeandaverde> gkatsev: thanks!
+02:11 < gkatsev> as the official js channel is on mozilla's js channel
+02:11 < prettyrobots> riven: I wasn't authenticated. Thank you.
+02:12 < prettyrobots> Thank you everone, I had mistyped my password and was not logged in.
+02:12 < gkatsev> prettyrobots: yeah, we added that this morning because there were way too many spammers lately
+02:13 < riven> I was just gonna say, I didn't remember it requiring auth
+02:13 < prettyrobots> gkatsev: Blech. Spam. Thanks for the help.
+02:13 < gkatsev> prettyrobots: np.
+02:16 < deoxxa> gotta learn backbone this weekend...
+03:41 < ill1cit> is it possible to execute php code from within node?
+03:41 < ill1cit> or not possible but more best practise
+03:42 < ill1cit> i dont want to slow node down by wanting this
+03:42 < gkatsev> worst case you can just make a system call.
+03:42 < ill1cit> ok will it be blocking?
+04:08 < prettyrobots> I see we've turned the listserv into eLance.
+04:48 < austinbv> are modules in lib wrapped in a closure?
+04:48 < prettyrobots> Yes.
+04:48 < austinbv> that's what I thought
+04:48 < prettyrobots> Node.js modules are wrapped in a closure.
+04:53 < austinbv> having a fun time fixing a bug with timers.js
+04:53 < austinbv> not really a bug but a weird thing
+05:22 <@maxogden> anyone know what this c statement does?
+05:22 <@maxogden> *(someBuffer++) =
+05:22 <@maxogden> err *(someBuffer++) = someValue
+05:22 <@maxogden> where someBuffer is a float*
+05:24 < mxweas> you're adjusting someBuffer to point at the next float in memory. Then storying a value where it points
+05:24 < mxweas> commonly seen when iterating through an array of floats
+05:24 <@maxogden> ooh
+05:25 <@maxogden> (tryin to do some mad science, thanks)
+05:25 < mxweas> np
+05:25 < mxweas> what're you working on?
+05:25 <@maxogden> https://github.com/maxogden/autotune.js
+05:26 < mxweas> doesnt a js FFT library already exist somewhere? hmm
+05:26 <@maxogden> this c lib is supposed to modify a buffer but when i cross compile it to JS using emscripten it doesnt actually modify it
+05:26 < deltab> mxweas: actually since it's postincrement it's the other way round
+05:27 < mxweas> you're right
+05:27 < deltab> store to where someBuffer points, *then* increment it
+05:27 < mxweas> yes
+05:28 < mxweas> maxogden: wouldn't be surprised if pointer arithmetic gets jumbled when cross compiling to js
+05:28 <@maxogden> hehe yea
+05:29 < mxweas> have you seen https://wiki.mozilla.org/Audio_Data_API_JS_Library ?
+05:29 < mxweas> seems they've got a fft js implementation
+05:31 <@maxogden> ooh nice
+05:48 < thealphanerd> mxweas: I'm doing work with audio data api
+05:48 < mxweas> ?
+05:48 < thealphanerd> you might want to take a look at this https://github.com/colinbdclark/Flocking
+05:48 < mxweas> maxogden: ^
+05:48 < mxweas> thealphanerd: this looks more like synthesis than analysis
+05:49 < mxweas> I think he's looking to use fft's to split out the base frequency from samples and autotune them
+05:49 < thealphanerd> oh neat
+05:49 < thealphanerd> well colin, who's library this is, is a really smart guy
+05:49 < thealphanerd> and that kind of stuff would fit well within flocking
+05:50 < thealphanerd> he's doen a lot of low level audio stuff in js… could probably help point you in the right direction
+05:50 < mxweas> cool beans, I don't think anyone's actually made an fft implementation yet. maxogden was just cross compiling a c library
+05:50 < austinbv> make test doesn't run all the test in /test :/
+05:52 < thealphanerd> that fft… what can't it do :P
+06:07 < llrcombs> so, my Node library to communicate with NewTek Tricasters is ready
+06:07 < llrcombs> :D
+06:13 < blueadept> marak: what was the @paulg tweet about?
+06:33 < t0lkman> Hi all
+06:43 < dragon> Hi t0lkman 
+06:43 < dragon> How do you do?
+06:44 < t0lkman> not bad
+06:44 < t0lkman> learning node.js art most us here
+06:44 < t0lkman> art=as
+06:44 < dragon> arts=ass
+06:44 < dragon> tsk tsk, something is off.
+06:56 < t0lkman> ;]
+08:10 < DTrejo> npm docs paulg
+08:10 < npmbro> DTrejo: No results
+08:10 < DTrejo> npm docs nodejs
+08:10 < npmbro> DTrejo: No results
+08:10 < DTrejo> wtff
+08:10 < DTrejo> npm docs node.js
+08:10 < npmbro> DTrejo: Please see http://search.npmjs.org/#/node
+08:11 < DTrejo> npm docs require
+08:11 < npmbro> DTrejo: Please see https://github.com/marcuswestin/require
+08:38 < prettyrobots> npm docs timezone
+08:38 < npmbro> prettyrobots: Please see http://bigeasy.github.com/timezone
+08:38 < prettyrobots> npm help
+08:38 < npmbro> prettyrobots: Please see npm's documentation at https://duckduckgo.com/?q=site%3Ahttp%3A%2F%2Fnpmjs.org%2Fdoc%2F%20
+08:39 < noordung> Hi guys. I'm trying to build a native extension I wrote for node, but when I require it I get an error like: undefined symbol: _ZN9Tokenizer4s_ctE
+08:39 < noordung> the class' name is Tokenizer, and the s_ct is the static v8::Persistent<v8::FunctionTemplate> in the public section of the class.
+08:40 < noordung> Can someone help?
+08:41 < noordung> Of course, I'm on 0.8.2 and building with node-gyp
+08:58 < noordung> Apparently I had an undefined function... :)
+09:12 <@Nexxy> noordung, hate it when that happens
+09:13 < livinded> \quit
+09:22 < noordung> Nexxy, yup. Lost a whole day searching for the problem... and it was so simple...
+09:27 < T_om> according to the docs, npm install <package> should install in the current working directory, however it installs them in /var/www/node_modules, which I assume is because the first time I ever installed one, I was in that directory on the command line? so now that must be my default, although I have no idea how to change it,  and appendly npm takes a <where> argument to install packages...
+09:27 < T_om> ...elsewhere, but i can't get that to work
+09:28 < T_om> s/appendly/apparently
+09:29 < deoxxa> T_om: it'll install to ./node_modules
+09:29 < deoxxa> if it doesn't, your shell is very broken
+09:31 < T_om> deoxxa: npm install <package> - just always puts them in /var/www/node_modules - which seemed random a location, but then I guessed I must have been in that directory in my shell the first time i ever used it, so it got set as the default or something
+09:31 < T_om> so now i've trying to figure out how to move it, to set another default location
+09:31 < T_om> or at least pass the location as an argument
+09:32 < deoxxa> one of my coworkers managed to break his npm install like that as well, not sure how
+09:32 < deoxxa> take a poke around in ~/.npm
+09:33 < T_om> oh, i see all my packages in there 
+09:33 < T_om> weird
+09:33 < Deathspike> Eh, very basic question, how do I trim a particular char of a js string (i.e. trim(':') to remove prefix and suffix character)?
+09:33 < noordung> Me again, I'm getting a v8 error that Handle<Object> (from args.This()) cannot be cast to Handle<Value>... :/
+09:44 < blakmatrix> T stop believin'
+09:59 < styol> Deathspike: are they an expectable length / string?
+10:32 < Deathspike> styol: No, I was expecting something like str.trim( ':' ) but that's a no-go. The default functionalities in JS are really poor :/
+10:33 <@Nexxy> Deathspike, look for String.split
+10:34 < Deathspike> Nexxy that's really horrible, I'd do like str.split(':')[0]
+10:34 < Deathspike> But then if there is a : somewhere, i'd have to join shit and remove the last.
+10:34 < Deathspike> Not very elegant :P
+10:34 <@Nexxy> Q_Q
+10:34 <@Nexxy> I think you just like to complain :)
+10:35 <@Nexxy> working with arrays, how barbaric.
+10:35 < Deathspike> Maybe; I'm spoiled with other languages.
+10:35 <@Nexxy> stay away from C
+10:35 <@Nexxy> you will be in agony
+10:35 < Deathspike> Isn't there a prototype-adding proj. to add all these types of 'standard' funcs?
+10:35 <@Nexxy> if you really want all the extra cruft of adding your little sugar functions to the prototype chain
+10:35 < Deathspike> C with Boost really isn't bad. :P
+10:36 <@Nexxy> I'm sure there are plenty of string manipulation libs out there
+10:36 < Deathspike> Yeah, I really want that. Know of a project I can use? :)
+10:36 < deoxxa> boost != c
+10:36 < deoxxa> boost is c++
+10:37 < deoxxa> Deathspike: what are you trying to do exactly?
+10:37 < MCHammel> anybody familiar with nowjs? i want the client to prevent trying to reconnect on a lost connection
+10:37 <@Nexxy> manipulate strings in Javascript without feeling like they're doing it in Javascript
+10:37 <@Nexxy> basically.
+10:37 < deoxxa> i see
+10:37 < deoxxa> sounds like the problem is javascript
+10:38 <@Nexxy> yep
+10:38 <@Nexxy> better get luvit
+10:38 < deoxxa> perhaps use a language that isn't javascript
+10:38 < Deathspike> Yeah, abstraction. I want stuff like str.trim(':');
+10:38 < deoxxa> WHAT DO YOU WANT THAT TO DO
+10:38 < Deathspike> Why does everyone always throw that first: Use something else! I just want to make my life easier in JS, is that so bad? :/
+10:38 <@Nexxy> LOUD NOISES
+10:38 < SubStack> WhERE
+10:38 < deoxxa> Deathspike: please explain, clearly, what you want to do.
+10:38 <@Nexxy> Deathspike, you could have written the wrapper yourself by now
+10:38 <@Nexxy> ;P
+10:39 < SubStack> Nexxy: you should be in #stackvm we have a loudbot and everything
+10:39 <@Nexxy> OH MAN
+10:39 < Deathspike> deoxxa: I would like a lot of utility functions to extend things like string, so you can say, do string.trim(':') which removes prefix and suffix : characters, but also like string.trim( [':',',']) to remove both those type of chars, and so forth. Just make it easier.
+10:40 < deoxxa> good news!
+10:40 < deoxxa> with a slight change in syntax, that's built in!
+10:40 < gildean> deoxxa: you can use regexp and .replace
+10:41 < gildean> soory, meant Deathspike 
+10:41 < deoxxa> str.replace(/^:*/, "").replace(/:*$/, "")
+10:41 < deoxxa> or if you want to get fancy
+10:41 < deoxxa> str.replace(/^:*(.+?):*$/, "$1")
+10:41 < deoxxa> "but regexes are too slow", i pretend to hear you say
+10:41 < deoxxa> "profile your app, prove that they're too slow, then come back", i pretend to respond
+10:41 < Deathspike> Regex are not slow, but aren't really easy to read nor elegant..
+10:42 < Deathspike> Just look at the amount of code for something simple :P
+10:42 < gildean> there are parts of javascript that lack elegance
+10:42 < gildean> unfortunate but true
+10:43 < deoxxa> that's a lot of code? :/
+10:43 < dominictarr> gildean, blasphamey!
+10:43 < Deathspike> Jup, way too annoying if you have to do it often.
+10:43 < leev> Deathspike: a little bit of googling produces http://stackoverflow.com/questions/2308134/trim-in-javascript-not-working-in-ie
+10:43 < deoxxa> then don't do it often..?
+10:43 < leev> gives you your string.trim function ..
+10:44 < Deathspike> i.e. I know of phpjs.org which basically ports php funcs to js and that has stuff like a simple trim() with char lists. Isn't there something true to js that extends existing obj with these kind of util funcs?
+10:44 < Deathspike> leev: That's for pure whitespace, I want to remove chars.
+10:45 < SubStack> regexes are fast as fuck
+10:45 < leev> Deathspike: really?  your knowledge of js wouldn't allow you to update that to allow it to do what you want?
+10:45 < deoxxa> ^^
+10:45 < SubStack> if you can rewrite anything to be a regex you probably should because that engine is optimized to a crazy degree
+10:45 < gildean> i agree that there should be a .trim() function in nodejs inbuilt
+10:45 < leev> dude, how about you tell me the project your coding, and i'll do it for you
+10:45 < leev> for free
+10:46 < deoxxa> there is a trim() built in
+10:46 < deoxxa> " a b c ".trim()
+10:46 < deoxxa> i'll wait while you paste it into a terminal
+10:47 < Deathspike> My ORIGINAL QUESTION was for a LIBRARY that ADDS UTILITY FUNCTIONS. Why is it always that I'm told that A) I shouldn't want it! B) Use something complex! or C) write it yourself (completely not on the question at hand)?
+10:47 < deoxxa> because those are the answers
+10:47 < mmalecki> Deathspike: https://github.com/mmalecki/node-rubish is kinda like that, only for numbers tho
+10:48 < gildean> deoxxa: there is a trim function inbuilt, now i feel stupid
+10:48 < leev> Deathspike: 09:33:36 < Deathspike> Eh, very basic question, how do I trim a particular char of a js string (i.e. trim(':') to remove prefix and suffix character)?
+10:48 < leev> that not your original question?
+10:48 < deoxxa> gildean: heh
+10:49 < Deathspike> leev: "I would like a lot of utility functions to extend things like string"
+10:49 < Deathspike> trim was an example.
+10:49 < deoxxa> you're not specifying what those functions are
+10:49 < deoxxa> so what you're asking for is a magical library that does all the things you can think of
+10:49 < deoxxa> but nothing more
+10:49 < deoxxa> if you find that library, please let me know
+10:51 < Deathspike> compare, concat, beginswith, endswith, contains, trim, format, padleft/right, and so forth. BASIC OPERATIONS that are lacking in JS.
+10:51 < Deathspike> There's nothing magical about my request.
+10:51 < deoxxa> well not anymore
+10:53 < deoxxa> compare -> a == b, concat -> a + b, beginswith -> a.match(/^x/), endswith -> a.match(/x$/), contains -> a.match(/x/)
+10:53 < deoxxa> we've already covered "trim"
+10:53 < deoxxa> so you've got "format", "padleft" and "padright"
+10:54 < deoxxa> with no explanation of "format", i'll assume you mean printf style formatting
+10:54 < deoxxa> and you're in luck, because there's a printf module on npm
+10:55 < deoxxa> so that leave "padleft" and "padright", each of which are essentially one-liners
+10:55 < deoxxa> for the heck of it, i'll see if there's something on npm
+10:55 < deoxxa> (you can play along with `npm search pad string')
+10:56 < deoxxa> oh my
+10:56 < deoxxa> `npm show pad'
+10:56 < deoxxa> so Deathspike, does that clear things up?
+10:57 < deoxxa> i'll take your silence to mean "yes, you're technically right, but you didn't have to be such a jerk about it"
+10:57 < deoxxa> and on that note i'm going to go get dinner
+11:09 < t0lkman> Hi
+11:09 <@Nexxy> hi t0lkman 
+11:12 < sigwhite> Is there an idiomatic way to "loop" a function call with a callback? I want to call someFunction('foo', callbackFunction) once and then every time callbackFunction is called. I could call it from the callbackFunction, but that seems redundant.
+11:12 < sigwhite> basically, the async equivalent of: while(true) {result = someFunction('foo'); callbackFunction(result);}
+11:18 < saschagehlich> isaacs: ping
+11:18 < saschagehlich> is there any way to put comments into a package.json for a better overview?
+11:18 <@Nexxy> saschagehlich, no
+11:19 <@Nexxy> blame crockford
+11:20 <@Nexxy> saschagehlich, he recommends piping your json through jsmin if you really need comments
+11:20 < saschagehlich> meh :(
+11:20 <@Nexxy> SOL :P
+11:20 < SubStack> blame crockford for lots of things
+11:20 < saschagehlich> with larger projects one will definitely have about 20 packages in their package.json
+11:20 < SubStack> more like 70
+11:21 < SubStack> if you're doing it right
+11:21 < saschagehlich> for more complicated projects, yeah
+11:21 < saschagehlich> meh this is annoying..
+11:21 < saschagehlich> maybe npm should just have its own json format
+11:22 <@Nexxy> oh that sounds compliant
+11:22 <@Nexxy> tell me moar
+11:22 < mmalecki> lol
+11:22 < saschagehlich> :D
+11:22 < mmalecki> make it binary!
+11:22 < saschagehlich> totally compliant
+11:22 < saschagehlich> or just support xml. DUDE, even xml has comments
+11:22 < saschagehlich> dafaq
+11:22 < mmalecki> yaml
+11:22 <@Nexxy> CSV
+11:22 < saschagehlich> or yaml, even better
+11:23 < mmalecki> YES, CSV!
+11:23 <@Nexxy> INI FILES OR NOTHING
+11:23 < saschagehlich> XLS
+11:23 < mmalecki> .psd
+11:23 <@Nexxy> now that's just ridiculous
+11:28 < deoxxa> <mmalecki> make it binary! << lol'd
+11:33 < dz0ny> CrazyLemon: danes je izšla chrome beta http://chrome.blogspot.com/2012/07/beta-ways-to-communicate-and-print.html
+11:33 < dz0ny> sorry, wrong channel 
+11:35 < dscape> SubStack: :D
+11:35 < dscape> sleeping right?
+11:38 < Industrial> I'm using Express3 with haml-coffee with Consolidate.js
+11:38 < Industrial> but I cant't get (haml) layouts to work
+11:39 < Industrial> I have a templates/layout.haml and index.haml and in my app.coffee: app.engine 'haml', consolidate['haml-coffee'] app.set 'view engine', 'haml' app.set 'views', __dirname + '/templates'
+11:40 < SubStack> dscape: I'm on the pavement, thinking about the government
+11:40 < Industrial> but if I request the index route which has res.render 'index', {layout: 'layout.haml'} I get only the index not the layout aroudn it.
+11:41 < SubStack> Industrial: you should probably not use any of the things that you are presently using
+11:41 < SubStack> </unhelpfuladvice>
+11:42 < Industrial> SubStack: Could you point me to a good stack of libraries/thingamawatts that allows me to use the same views on the server and in the client (precompiled)
+11:43 < dscape> so i though you and max might give me some good ideas
+11:45  * Industrial thinks https://github.com/visionmedia/super-sockets is pretty cool but has no idea how to design the system to keep all the nodes healthy/alive and how to be sure no message is able to drop somewhere in the middle of the network or how to test against that :\
+11:45 < dscape> SubStack: I emailed you about it. I've been thinking about solving a problem but haven't got to a conclusion im happy with
+11:46 < dscape> figured you and max could help me out :)
+11:46 < dscape> with an idea
+11:47 < SubStack> Industrial: I think you are fundamentally mistaken about everything unfortunately
+11:47 < SubStack> use the tiniest possible thing
+11:48 < Industrial> SubStack: I'm always right, even though I only know so little about whatever that I'm able to convince myself I know everything about it and thus feel falsely secure in IRC channels.
+11:49 < SubStack> I don't know much about things
+11:49 < SubStack> but I do highly suspect that things that are big are pretty wrong on a lot of counts
+11:50 < SubStack> but that is mostly an aesthetic suspicion
+11:53 < Industrial> I'll take a look at Lo-Dash
+12:11 < saschagehlich> oh my gosh… i did it, don't know whether it feels great or not: https://github.com/saschagehlich/npm-yaml
+12:11 < saschagehlich> i moved away from json… feels good… somehow...
+12:13 < mmalecki> saschagehlich: hahahahhahahha, nice
+12:14 < saschagehlich> omfg i haz commentz in mah package!!!
+12:14 < mmalecki> orgasm!
+12:45 < jarr0dsz> hi everyone i have looked last week into all the websockets/node related techniques but wonder whats the best method to implement an ACK feature
+12:46 < jarr0dsz> im using faye a wrapper for bayoux protocol but not sure how to implement an ack feature i need a method to check if data is delivered from server to client correctly
+13:18 < deoxxa> so um
+13:18 < deoxxa> i made a thing
+13:18 < deoxxa> https://github.com/deoxxa/sh-semver/tree/develop
+13:18 < riven> I like things.
+13:18 < deoxxa> i'm not sure what posessed me to start that project
+13:19 < deoxxa> but i just found it as i was cleaning up my home directory now
+13:41 < jarr0dsz> nice deoxxa what does it do ;p
+13:42 < jarr0dsz> semver routines never heard of that
+13:45 < deoxxa> jarr0dsz: semver - you know it, but you don't realise
+13:45 < deoxxa> see http://semver.org/ for more
+14:00 < ^robertj> hey all, anyone got a recommendation on a good workflow engine?
+14:00 < iksik> deoxxa: or here https://github.com/isaacs/node-semver ;-)
+14:01 < deoxxa> iksik: that doesn't work if you don't have node
+14:01 < deoxxa> specifically, if you're trying to install a semver-satisfying version of node
+14:01 < deoxxa> i.e. install_node.sh 0.8.x
+14:01 < deoxxa> (yes, this is crazy)
+14:02 < iksik> install_node.sh which contains NVM ;-D
+14:02 < AAA_awright> Using "semver" in a really really lose, meaningless context since semver.org defines 0.x as having no semantics whatsoever
+14:03 < deoxxa> AAA_awright: correct
+14:03 < AAA_awright> There's no reason anyone should be releasing software to other people with a 0.x version
+14:04 < AAA_awright> And also, we'd avoid the pointless arguments of how to version the API (Isn't that exactly what semver was supposed to solve?! >_<)
+14:04 < deoxxa> you're absolutely right
+14:04 < AAA_awright> </rant>
+14:04 <@Nexxy> lolwat
+14:05 < iksik> well there is A LOT of companies which has their own 'semver' definition, so... we can also find versions like V1, or V1.3 or V1.3.4.5.6.67-build.43554654646
+14:06 < AAA_awright> er, how to *revise the API. "We can't revise require('util') because it's locked" becomes "We'd have to bump the major revision number to revise require('util')"
+14:07 < AAA_awright> iksik: Companies may have their own versioning scheme, http://semver.org/ being one
+14:09 < AAA_awright> You can get away with some extensions to it I guess... I may use M.m.r.b with build number, once the source code has been tagged with M.m.r in Git
+14:09 < Stephen> morning all
+14:09 < AAA_awright> Ah actually, semver.org defines that, by appending a +build.x.y.z
+14:10 < deoxxa> at work we use M.m.r-b
+14:10 < AAA_awright> ^robertj: Workflow engine, like?
+14:10 < deoxxa> but we never leave out the -b
+14:10 < deoxxa> so it kind of fits
+14:10 < ^robertj> node-workflow
+14:10 < ^robertj> and its ilk
+14:20 < darinc> saschagehlich:  nice job on the npm-yaml.  looks good!
+14:33 < saschagehlich> thanks! :)
+14:52 < eugeneware> I'm having an async problem with a program I'm writing. Ideally I'd like to do an "atomic" update of a value in database/file. I first need to read a value, modify it (eg. increment it), and then write it. As the read and the write operations are both asynchronous, and I'm doing the operations on the on('data') event off a stream, by the time I'm getting the next on('data') event, the write hasn't finished, and it's reading the old valu
+14:52 < eugeneware> e. Here's a cut down example of the kind of problem I'm trying to solve (just using a basic read/write from a file): https://gist.github.com/3111702  What's a good async pattern in node.js to handle this?
+14:53 < eugeneware> It's like the old bank account update problem you learn at university :-)
+14:54 < eugeneware> I'm thinking of adding the "work" (ie. the atomic update operation) into a queue, and then having a queue reader serially read from the queue and do the processing. Am I on the right track? 
+14:57 < prettyrobots> eugeneware: `rename` is atomic.
+14:57 < prettyrobots> You can write to `data.txt.tmp`. Unlink `data.txt`. Then move `data.txt` into place.
+14:58 < prettyrobots> eugeneware: The queue is a good idea, yes.
+14:58 < prettyrobots> You're saying then that you'd only have the queue writing to this data file? That would be good.
+14:59 < prettyrobots> If your program crashes while writiing, you're going to lose your data. 
+15:00 < eugeneware> prettyrobots: I want to do effectively a series of read/modify/write operations to the same piece of data (persisted on a file or in a database), where I have only async operations to do the read/write.
+15:01 < realguess> hi all, I am getting "Error: unauthorized Name or password is incorrect." while doing "npm install" or even "npm search", anyone having the same issue?
+15:01 < prettyrobots> A queue would help with the series part.
+15:01 < eugeneware> prettyrobots: Ie. the classic bank account problem where you need to add 10 amounts to a bank account balance and the order will change time, but the end balance after applying the increments should be the same.
+15:01 < prettyrobots> eugeneware: Use a transational database.
+15:02 < prettyrobots> Have the database manage those transactions.
+15:02 < Gloorian> Hello. I'm trying to make my node.js bot. I'd like to add a feature but I don't really know how. I want the bot to execute the code the user enters. So I don't want him to be able to use require and I have to find a way to do it in a separate thread so that if there is an error, the bot won't crash
+15:02 < Gloorian> any idea ?
+15:02 < prettyrobots> Is that not acceptable? Use PostgreSQL with ROLLBACK and COMMIT.
+15:02 < eugeneware> prettyrobots: I'm actually writing my own database. I'm building a nosql database on top of leveldb. It doesn't allow multiple operations to be wrapped in a transaction.
+15:03 < prettyrobots> Oh, well. That's complicated. I don't have the head space to think about all that right now.
+15:03 < prettyrobots> I'm working on a database of my own for Node.
+15:03 < prettyrobots> Starting here.
+15:03 < eugeneware> prettyrobots: I don't have semaphores in node.js, so I need a way to serialize read/write operations.
+15:04 < prettyrobots> https://github.com/bigeasy/strata
+15:04 < prettyrobots> I created semaphores in https://github.com/bigeasy/strata.
+15:06 < eugeneware> prettyrobots: awesome. I'm building a mongodbish json query interface on top of any key value store (can point it to leveldb, redis, sqlite, etc).
+15:06 < eugeneware> prettyrobots: where in the code is the semaphore bit?
+15:06 < prettyrobots> eugeneware: see `lock`.
+15:07 < prettyrobots> eugeneware: I'm converting it to JavaScript, so keep an eye on it.
+15:07 < prettyrobots> Then I'm going to work on this:
+15:07 < prettyrobots> https://github.com/bigeasy/memento
+15:08 < prettyrobots> Biggest problem so far has been perfectionism, but I'm getting over it. :P
+15:11 < eugeneware> Looks awesome. I found the code. Answers my question. You add workers to an array of callbacks and then call them back once the lock is released. I'll go with that for now. Thanks! Looks like an awesome project.
+15:12 < eugeneware> prettyrobots: Thanks for your help!
+15:13 < prettyrobots> eugeneware: Yes. That's how that works. Good. I'm glad it helped. 
+15:13 < prettyrobots> Sorry if I sounded dismissive. I didn't relish trying to explain it over IRC. I'm glad the code was illustrative.
+15:15 < eugeneware> prettyrobots: code is the universal language :-)
+15:17 < Brandon_R> Hey guys
+15:17 < Brandon_R> what's up?
+15:18 < Brandon_R> ANyone here know when the node.conf 2012 videos will be up?
+15:59 < ben_alman> anyone gotten 0.8.2 to install via nave in 10.8 GM?
+15:59 < ben_alman> i can't seem to build anything :/
+15:59 < ben_alman> well any node
+16:36 < ben_alman> does building node.js on os x require xcode, or will it work with the xcode command-line tools package?
+16:39 < taterbase> Is there an api call for searching npm?
+16:39 < taterbase> By keyword, title, etc...
+16:40 < iksik> ben_alman: node is not related with xcode by itself... it need some tools from it - only... like (g)make
+16:41 < ben_alman> apparently gyp uses xcode
+16:41 < ben_alman> i just found this
+16:41 < ben_alman> https://github.com/joyent/node/issues/3681
+16:43 < iksik> oh, right... cause everything need to be 'simple' under OSX :-P
+16:43 < ben_alman> meh
+16:55 < TheGabspectacle> Come one, come all! ##gabsplace is now open for business! The BEST utility bot ever around, Cadence, will cater to your every English, math, and reference lookup needs! The room has the most versatile academic bot you have EVER seen on Freenode! Come to ##gabsplace today! :-D
+16:57 < austinbv> does make test not run all the tests
+17:22 < prettyrobots> router recommenations?
+17:22 < prettyrobots> Would like it work in Node.js and the browser.
+17:23 < Deathspike> tj's tiny router might fit the bill perfectly
+17:25 <@maxogden> flatiron/director, saambarati/mapletree, blohowiak/routes
+17:25 < Karmaon> how about you buy 20 different domains
+17:25 < Karmaon> each for a part of your site
+17:26 < Karmaon> thats a good router
+17:30 < iksik> Karmaon: there are free subdomains out there! ;-P
+17:37 < prettyrobots> @maxogden: Have you used all three?
+17:37 <@maxogden> yep
+17:38 < prettyrobots> They don't seem very different. 
+17:38 < prettyrobots> They all have the same basic patterns to match. Flatrion kind of goes nuts.
+17:43 < austinbv> isaacs: if exports is this in modules how does that work?
+17:44 < ben_alman> that's a pretty vague question
+17:44 <@maxogden> austinbv: require it and console log it
+17:44 < ben_alman> i mean, it works pretty well
+17:44 < austinbv> I did, and ben_alman its to a pull request comment he had
+17:44 < austinbv> https://github.com/austinbv/node/commit/53bf5c883d8746fdc7d82c7aeb44e8067af63601#commitcomment-1581416
+17:45 < austinbv> maxogden: I logged it it's true this is exports but I am confused on how that code worked then
+17:45 < austinbv> I don't disbelieve anyone :)
+17:46 < ben_alman> austinbv: whil this === global in the global scope, inside of required files, node sets this explicitly to module.exports
+17:46 < ben_alman> so this !=== global
+17:46 < austinbv> ben_alman: I see
+17:46 < austinbv> but in the case of that pull request it works
+17:47 < austinbv> because it's the global scope
+17:47 < ben_alman> when you console.log this.Date what does it log?
+17:47 < ben_alman> (inside lib/timers.js)
+17:52 < austinbv> ben_alman: cant log in there blows up with a stack error
+17:52 < ben_alman> heh
+17:52 < ben_alman> then set a prop you check later, like exports.foo = this === global;
+17:52 < ben_alman> i dunno
+17:53 < austinbv> log in someplace other than timers and it works
+17:53 < austinbv> pretty clear this in a required module is Global
+17:54 < ben_alman> austinbv: http://benalman.com/grab/2042fb.png
+17:55 < ben_alman> http://benalman.com/grab/599ee5.png
+17:56 < austinbv> ben_alman: I did the same :)
+17:56 < austinbv> are you the boulder ben?
+17:56 < ben_alman> no i'm the cowboy ben
+17:56 < austinbv> nope
+17:56 < austinbv> ha cool
+17:57  * chrisdickinson waves at cowboy of tribes 1 fame.
+17:57 < ben_alman> haha hi
+17:57 < ben_alman> chrisdickinson: every once in a while, someone is like "tribes?" and i have a chuckle
+17:57 < chrisdickinson> every time i hear someone complain about JS, i point them at torquescript and cackle a little to myself.
+17:57 < ben_alman> ugh
+17:58 < ben_alman> .cs baby
+17:58 < chrisdickinson> wonder if anyone's made libuv bindings for torquescript.
+17:58 < prettyrobots> Routers.
+17:58 < prettyrobots> Blech.
+17:58 < ben_alman> chrisdickinson: i actually gisted mHUD.cs a while back https://gist.github.com/375615
+17:58 <@maxogden> http://www.planettribes.com/presto/news.shtml#NEWS0041 :D
+17:59 < chrisdickinson> ben_alman: radical :D i had a couple of mods for T1, based off of the starsiegecraft / warhammer40k codebases
+17:59 < ben_alman> cool
+18:00 < ben_alman> man if that game was out now i would've have written such better code
+18:00 < ben_alman> heh
+18:00 < ben_alman> like all my silly WoW LUA scripts
+18:01 < ben_alman> although i was more interested in meta programming lua than making anything useful
+18:01 < chrisdickinson> tribes 1 was pretty much my introduction to programming.
+18:01 < ben_alman> same
+18:02 < chrisdickinson> i remember the windfall moment that was switching from notepad.exe to wordpad.exe
+18:02 < ben_alman> lol
+18:02 < chrisdickinson> "oh *this* is probably how they write windows!"
+18:02 <@maxogden> my intro to programming was starcraft
+18:02 < ben_alman> i used some java ide a friend recommended that sucked SO HARD
+18:02 <@maxogden> http://maxogden.com/little-coders
+18:02 < ben_alman> it was called like "visual assfuck"
+18:04 < chrisdickinson> i remember getting into C++ a couple years later and loving it, in a stockholm-symdrome-y way; when a friend recommended python to me i wrote it off because "that'll never be fast enough!"
+18:04 <@maxogden> hah
+18:04 < chrisdickinson> oh, capricious youth.
+18:05 < ben_alman> os x really needs xcode installed by default
+18:05 < ben_alman> the people who doen't need it will never miss the space
+18:12 < jrajav> Write in Objective C if you want speed
+18:12 < jrajav> C++ is just >_>
+18:13 < ankit> Do someone know how to play better with ejs framework in nodejs
+18:14 < austinbv> do people checkin node_modules
+18:15 < ben_alman> austinbv: often for apps they need to deploy to remote server etc, but not for modules published to npm
+18:15 < ben_alman> dunno what the current best practice is on apps
+18:18 < dzajdband> Hi. I have a question about persistent http requests. If I have a persistent connection with another server, and the other server drops the connection. How do I notice about that?
+18:27 < benatkin> ben_alman: I'm the Boulder ben that austinbv got you mixed up with. not because I'm notable, just because my last name is also five letters long & starts with an a
+18:27 < ben_alman> nice to meet you
+18:28 < benatkin> ben_alman: nice to meet you too, I think the first library of yours I used was the querystring parser for the browser :)
+18:29 <@maxogden> dzajdband: on('close')
+18:29 < ben_alman> man i've written a few of thise over the years
+18:29 < dzajdband> maxogden: Only on close or it may be on end?
+18:29 < benatkin> that was one of many odd things about javascript, that it wasn't baked into popular js libraries
+18:29 <@maxogden> dzajdband: i dont think end will fire in that case
+18:30 < dzajdband> maxogden: Thanks!
+18:30 < benatkin> or built in to the browser
+18:30 < ben_alman> yeah, query string parsing should've been builtin into a standard lib in the browser
+18:30 < ben_alman> not JS
+18:30 <@maxogden> dzajdband: p.s. comin to the bay any time ssoon?
+18:31 < dzajdband> maxogden: I went to SF a couple of weeks ago. I'll be there in October
+18:31 < yawnt> yo
+18:31 <@maxogden> dzajdband: ahh cool
+18:31 < Karmaon> oh dear, this might mean nodejs is actually blocking...
+18:31 < Karmaon> my productivity!
+18:31  * maxogden <rimshot>
+18:31 <@maxogden> tip your waitstaff ladies and gentlemen
+18:32 < ben_alman> womp womp
+18:32 < dzajdband> maxogden: I'm leaving. Thank you again
+18:33 < benatkin> austinbv: I thought about whether to check in node_modules recently and had the idea of using a separate repo for all node_modules
+18:34 < benatkin> austinbv: the main advantage is it shows in your git diffs; the main disadvantage is that it shows up in your git diffs
+18:35 < ben_alman> version / module changes in your package.json can show in your git diffs without having to commit the modules themselves
+18:36 < benatkin> yeah true, there's also npm shrinkwrap
+18:37 < nlf> where having node_modules in your repo bites you, is if you use anything that's compiled via waf or gyp and intend to use the repo on more than one platform
+18:37 < benatkin> but I agree with mikeal that diffs on dependencies are nice to have http://www.mikealrogers.com/posts/nodemodules-in-git.html
+18:37 < austinbv> benatkin: that's what I was thinking
+18:38 < austinbv> I think I will keep it checked in
+18:39 < austinbv> well maybe not... package.json locks your deps down
+18:39 < benatkin> austinbv: I think he makes a good case in the faq. basically comes down to, do you really want to know about changes to your deps?
+18:40 < austinbv> yeah but for a repo that will be a lib included by people everywhere :/
+18:40 < austinbv> the hard part is the requires
+18:42 < zenista> hi guys a newbie trying node.js... i want to build an CRUD app... which framework should i use...or which modules, please guide. and i need a simple DB that doesn't require installation... the db which can handel < 50,000 to 100,000 rows 
+18:43 < zenista> and is it possible to complile or make an .exe of the whole project and send to ... the guys on other side and just double click it and start using it
+18:43 < zenista> it will be used mostly on 2 or 3 terminals only
+18:48 < benatkin> zenista: I like express. For the db, sqlite. For app bundling on windows, if that's important, you might be better off building the backend in python. Node is excellent for packaging up the js & css though.
+18:48 < zenista> thanks... u mean use python as server side
+18:49 < zenista> and nodejs on client side
+18:49 < austinbv> it doenst sound like its a web app
+18:49 < benatkin> zenista: yes, that's what I mean
+18:49 < sabermonk> how to handle multiple connections using node_redis client and redis?
+18:50 < zenista> its basically a client/server architecutre
+18:50 < zenista> 3 termainals will connect to a server which i think is node.js
+18:50 < benatkin> austinbv: it does to me, it's like pydoc -g
+18:50 < zenista> for db as suggested... i can use sqlite... but can it hande 50,000 to 100,000 rows
+18:51 < benatkin> zenista: it can handle millions of rows
+18:51 < zenista> wow
+18:52 < zenista> as ther are only 3 termainals requiested and writing data .. concurrency wouln't be that much big issue... as i google and learned... sqlite allows only 1 write at a time to db
+18:53 < benatkin> zenista: most sqlite libraries take care of that, I think
+18:53 < zenista> cool
+18:53 < zenista> may i ask whats the reaons we can't use nodejs as server instead of python on server side
+18:54 < benatkin> zenista: if you can get them to do a more normal way of deploying, node becomes a good option again
+18:54 < benatkin> zenista: I only suggest it because you wanted a one-click install, and way to run it
+18:54 < zenista> k
+18:55 < zenista> could we just zip whole node.js folder and ship it as it is... and when unziped can run as it is?
+18:55 < benatkin> zenista: if you can so much as get them to run the automated node installer, and unzip it and type npm start, it will be easy
+18:55 < zenista> cool
+18:55 < zenista> for that i think i can use batch files or something like that...
+18:55 < benatkin> zenista: yeah...to me pydoc -g isn't any more usable than pydoc -s
+18:56 < _Tristan> I have a complicated-ish question. I'm using net to connect to a chat server which ends all of it's packets with \0. When data is received, I first check if that chunk is equal to "ping\0" which I need to respond to. However, is it possible that two packets would arrive in that one chunk, causing me to miss that ping? Or is it possible that only half of the packet would arrive in that chunk, the other half arriving in the next?
+18:56 < zenista> what u guys suggest stylus or less for CSS?
+18:57 < benatkin> zenista: if you're new, less has a larger community, maybe use bootstrap
+18:57 < zenista> thanks
+18:57 < zenista> i check express... framework also
+18:57 < ljharb> zenista: i suggest CSS
+18:58 < zenista> but found railway.js more beginner friendly as it has db layer also... with express i could not find docs or tuts to handel db CRUD stuff there in
+18:58 < benatkin> zenista: and yeah, since you clarified on the requirements, look into express. just have 'em go to the nodejs.org site, download/run the automated installer
+18:59 < zenista> but found railway.js more beginner friendly as it has db layer also... with express i could not find docs or tuts to handel db CRUD stuff there in
+19:01 < benatkin> zenista: sqlite might not be the best db for your problem, as it has to be compiled
+19:01 < zenista> k... what r other options... berkly db?
+19:02 < sabermonk> hi, how many clients connecctions can be created when using node_redis to talk to different redis servers?
+19:03 < nykac> how reccomended is having an nginx proxy in front of node?
+19:03 < benatkin> zenista: I wish I had a simple answer for that
+19:03 < zenista> just put few names... i will google fu them
+19:04 < benatkin> zenista: but my simple answer is not having non-devs run web apps on their own computers
+19:06 < benatkin> zenista: I might use files containing json. there's some libraries for that. I don't remember their names though
+19:06 < zenista> k
+19:07 < aroman> is anyone working on building an HTML form system that shares validation logic between client and server?
+19:08 < gildean> zenista: wouldn't couchdb be just what you're looking for?
+19:08 < gildean> it sound like it to me, but i might be wrong
+19:08 < zenista> is it file based or demon based
+19:09 < TimeTurner> aroman: node-validator can be used with node and in the browser
+19:10 < gildean> zenista: http://couchdb.apache.org/
+19:10 < zenista> thanks
+19:13 < jhsto> im having hard time making a route for a new page on express, where do i have to state the views and stuff. I've made it like the index page, but the page just wont appear. Giving me 404 Cannot Get page.js
+19:13 < gildean> jhsto: page.js?
+19:14 < jhsto> yes
+19:14 < jhsto> Well, it used to be without .js
+19:14 < jhsto> but it did not work either
+19:14 < gildean> jhsto: i just started using node about a week ago, i built my first app using express, you might find some clues in how i made this: https://github.com/gildean/NodeBlog
+19:15 < Deathspike> jhsto: You don't call files directly as you would in, say, PHP. Instead, your server runs the file you specified and runs through it and that's it, so you need to have it load 'routes' with a handler that executes whatever code you want.
+19:15 < gildean> i don't know much about best practices but i tried to make it abstract enough and comment thing so other people can understand it easily
+19:15 < insin> has new.npmjs.org switched to using "keywords" instead of "tags" in package.json?
+19:17 < jhsto> gildean deathspike, thanks for help
+19:42 < nykac> hey, can someone help me build node from source?
+19:43 <@Nexxy> nykac, quite possibly yes
+19:43 < nykac> http://pastebin.com/TVz5k4uu
+19:43 < nykac> it built yesturday w/o problems
+19:46 <@Nexxy> nykac, did you make clean?
+19:46 < nykac> yes
+19:47 < aroman> TimeTurner: right, i guess what i'm asking is if there are any form libraries for node that are designed to let me write validation once and have it work on both the client and the server
+19:49 < aroman> frankly i'm kind of surprised there aren't any really complete form libraries for node at all
+19:49 < insin> aroman: https://github.com/caolan/forms https://github.com/insin/newforms
+19:50 < ljharb> i use caolan/forms
+19:50 < aroman> i looked into the former, but the rendering process didn't seem globally flexible
+19:51 < aroman> i.e adding an entirely new renderer
+19:51 <@Nexxy> I use a module of my own making and dnode/browserify
+19:51 < aroman> the latter looks like it's trying to be exactly what I want, however
+19:51 < insin> newforms has the same problem with inflexibility as Django's (it's still very much a port), but you can do thing at the field level with it in templates
+19:52 < insin> s/thing/things/
+19:52 < aroman> that's what I'm looking for. I have used django and its form api extensively, and that's what I ended up doing
+19:52 < aroman> i think it's far easier than trying to generate HTML in JS/CS
+19:57 < aroman> insin: i'm very much looking forward to the future work on DOM hooks/browser-side real-time validation, but in the meantime, how do you recommend I power browser-side validation with newforms?
+19:58 <@Nexxy> the future is now
+19:59 < prettyrobots> @Nexxy And now that's that past.
+19:59 <@Nexxy> prettyrobots, but the future keeps reinventing itself
+19:59 < prettyrobots> s/reinventing/repeating/
+20:00 <@Nexxy> prettyrobots, but the future keeps reinventing itself
+20:00 < insin> there's a method in the utils module which will give you an object containing the form data which would have been submitted for a given form - you could validate against that and use the error object to display validation errors/whatever you need to do with it
+20:00 < prettyrobots> :P
+20:00 < prettyrobots> Wait. Wrong emoticon.
+20:00 < prettyrobots> :)
+20:01 < prettyrobots> @Nexxy: Do you have a favorite URL router?
+20:01 <@Nexxy> not particularly
+20:01 <@Nexxy> I just use connect
+20:01 <@Nexxy> but most of my apps are over websocket
+20:02 < insin> I have another project I'm using to investigate ways to share more code, but it's not anywhere near ready for human consumption yet :)
+20:02 <@Nexxy> or TCP
+20:02 < jhsto> gildean: thank you so much for your project examples - with the help of it i got my problem solved
+20:02 <@Nexxy> insin, luckily no one here is human
+20:03 < aroman> insin: how would I use that on the browser, though?
+20:03 < prettyrobots> Here's my day so far: http://pinboard.in/u:alan/t:stencil/t:router/
+20:03 < gildean> jhsto: np, i'm glad at least one person got something out of it
+20:03  * prettyrobots evaluating
+20:09 < aroman> oh I see, you actually ship the whole project onto the client side as well
+20:10 < insin> it, and all its dependencies, are written to work in both places
+20:22 < Proditor> What MVC web frameworks forn Node are considered stable enough for production?
+20:23 < thanpolas> express
+20:24 <@Nexxy> geddy?
+20:26 < vrlogrs> hey guys
+20:26 <@Nexxy> mde, my wife told me to tell you that there is a Rush documentary on netflix
+20:26 <@Nexxy> ... "and it's good"
+20:27 < Aria_> Proditor: What do you mean by 'mvc'? There's a lot of things that phrase means.
+20:27 < vrlogrs> ive been learning node.js these past few weeks
+20:27 < vrlogrs> and i got a fully functional multiplayer chess game going with it: http://209.141.47.151/chess
+20:27 < Proditor> Aria_: well, something similar to Rails, Symfony2 or Django. 
+20:28 < Aria_> Ah, so the server-side, request/render/response stuff.
+20:28 < Aria_> Node is mostly smaller tools -- express and flatiron are both used for things like that, to good effect.
+20:28 < tbranyen> flatiron is small?
+20:28 < Aria> (There's really no Controller, and "View" is mostly "Template plus glue code" in those systems.)
+20:29 < Aria> Compared to rails? Yes it is.
+20:29 < vrlogrs> im really liking node.js
+20:29 < vrlogrs> fast and responsive
+20:29 < tbranyen> https://github.com/flatiron does not seem it
+20:29 < Aria> Flatiron is a bunch of tiny pieces.
+20:30 < tbranyen> ah so you mean the individual pieces are small
+20:30 < tbranyen> but flatiron as a whole is not
+20:30 < Aria> Yeah. And even as a whole, it's a LOT smaller than Rails.
+20:30 < tbranyen> that makes more sense
+20:30 < aroman> vrlogrs: doesn't look like its workibg
+20:31 < vrlogrs> ?
+20:31 < vrlogrs> what do you mean aroman?
+20:31 < AviMarcus> Anyone use angular.js with their node stuff? it looks like a great client side framework
+20:31 < aroman> i'm guest_799 and I can't move my bishop or rook
+20:31 < vrlogrs> cause ur in Check
+20:31 < aroman> LOL
+20:31  * aroman hasn't played chess in a long time
+20:31 < vrlogrs> lol
+20:31 < vrlogrs> np
+20:31 < vrlogrs> i made tictactoe first
+20:31 < vrlogrs> and now chess
+20:31 < vrlogrs> im gonna try some card games next
+20:32 < vrlogrs> and battleship
+20:32 < AviMarcus> just to learn ?
+20:32 < vrlogrs> yah
+20:32 < vrlogrs> and why not, make the site public too
+20:32 < voodootikigod> hey
+20:32 < vrlogrs> eventually
+20:32 < AviMarcus> vrlogrs, maybe you can spread out to some html5 canvas stuff and draw some awesome stuff on the screen? :)
+20:32 < voodootikigod> i know I saw an article about providing pre-compiled binaries as part of an npm release
+20:32 < voodootikigod> specifically for windows
+20:32 < voodootikigod> anyone have that link
+20:33 < vrlogrs> AviMarcus: i could, but i think that'll just be too much unneccessary fanciness
+20:33 < vrlogrs> i think the site right now is simple and to the point
+20:33 < vandenoever> somehow node can fine jslint-core when run as 'node' but not when run from vim
+20:33 < vrlogrs> i like that
+20:33 < vandenoever> i've set NODE_PATH, to no avail
+20:33 < AviMarcus> voodootikigod, you saw https://github.com/isaacs/npm/issues/1891 ?
+20:33 < vrlogrs> if anyone else wants to check it out as well: http://209.141.47.151/chess
+20:33 < vrlogrs> i might make my code open-source someday as well
+20:33 < gildean> vrlogrs: is your code somewhere public, i was just thinking about creating a small turn-based game as a lerning experince and a demo
+20:34 < gildean> ah, i take that as a no
+20:34 < vrlogrs> yah, sorry gildean - not yet
+20:34 < voodootikigod> is it still in feature req stage?
+20:34 < AviMarcus> voodootikigod, I think it says firefox is doing it? I dunno, I just googled and got that.
+20:34 < vrlogrs> gildean: what kind of game?
+20:34 < voodootikigod> got that as well
+20:35 < gildean> vrlogrs: i'm not sure yet, i was thinking about something along the lines of advanced wars (but simpler)
+20:35 < AviMarcus> is there a defacto test suite that people use? I've seen several
+20:35 < vrlogrs> im considering making this a place where people can host their javascript games
+20:35 < vrlogrs> and i can use the node.js to make the backend for them
+20:36 < gildean> vrlogrs: at least as a first demo, then maybe something more complex
+20:36 < vrlogrs> i see
+20:36 < vrlogrs> ive been contemplating whether or not to extend this site to a games site
+20:36 < AviMarcus> gildean, so.. "simple wars" ? :)
+20:36 < gildean> AviMarcus: heh, that's quite good
+20:37 < vrlogrs> maybe i can have people submit their games and i would host them for them.. and they could make some money :)
+20:37 < gildean> AviMarcus: i might have to use that
+20:37 < vrlogrs> btw, whoever is Guest_799 is running out of time
+20:37 < AviMarcus> heh. Not sure that's quite an appealing name, though.
+20:37 < gildean> yeah
+20:37 < AviMarcus> so.. testers? anyone got their favorite..?
+20:38 < AviMarcus> vows? shoulda?
+20:38 < prettyrobots> Proof.
+20:39 < Aria> For testing, I prefer node-tap
+20:39 < Aria> Oldschool and simple.
+20:39 < prettyrobots> I've created my own testing framework.
+20:39 < prettyrobots> Ugh, the README is so out of date.
+20:39 < prettyrobots> https://github.com/bigeasy/proof
+20:39 < prettyrobots> I shouldn't even mention this until it's fixed.
+20:41 < prettyrobots> Yup, shouldn't have mentioned it. Need to fix the `README`.
+20:41 < AviMarcus> prettyrobots, is proof good for non-coffee too? seems all examples are coffee
+20:41 < prettyrobots> AviMarcus: Yes. Actually, ugh! The big thing is that I rewrote it to be pure JavaScript and JavaScript friendly.
+20:42 < prettyrobots> It has a control flow library built in that works like Step.
+20:42 < prettyrobots> So, you can write async tests really easily.
+20:42 < prettyrobots> But, the key thing is that it is a bunch of little programs, operating system does parallelism for you.
+20:42 < prettyrobots> And the programs emit tap, so they can be in any language.
+20:43 < prettyrobots> But, there is a harness for writing tap emitting programs for JavaScript.
+20:44 < prettyrobots> https://github.com/bigeasy/arguable/blob/master/t/glob/class.t
+20:44 < prettyrobots> Normal, no async.
+20:44 < prettyrobots> https://github.com/bigeasy/stencil/blob/master/t/template/each.t
+20:45 < prettyrobots> Async calls, without the temple of doom.
+20:45 < prettyrobots> Also, runs on Windows and Travis CI without much fuss.
+20:46 < prettyrobots> http://travis-ci.org/#!/bigeasy/cadence/jobs/1857605
+20:47 < AviMarcus> cool. Just you need to completely rewrite your readme? :P
+20:47 < prettyrobots> Totally.
+20:47 < prettyrobots> Well, the intro is pretty much correct.
+20:48 < ben_alman> can anyone tell me what i have to set with nave to log much, much less when compiling?
+20:48 < prettyrobots> Well, maybe I should go do that, rewrite that `README`.
+20:48 < ben_alman> i see the --debug in NAVE_CONFIG but nothing i do seems to change this
+20:48 < benatkin> prettyrobots: hi there :)
+20:49 < prettyrobots> benatkin: Hello benatkin .
+20:49 < benatkin> prettyrobots: checking out proof
+20:49 < prettyrobots> Yeah. That README. Grr...
+20:50 < ben_alman> or better yet, does anyone have a "node.js virtual enviroment manager" recommendation?
+20:50 < ben_alman> nave is really driving me crazy
+20:50 < prettyrobots> It's embarassing to share with someone who just started watching https://github.com/isaacs/coffee-cleanse.
+20:51  * prettyrobots rewriting
+20:51 <@isaacs> prettyrobots: haha
+20:51 <@isaacs> ben_alman: what's your beef with nave?  maybe i can make it better.
+20:51 < ben_alman> hi!
+20:51 < ben_alman> ok lessee
+20:51 < prettyrobots> @isaacs Off to change all my examples to pure JavaScript. (Because the library is now pure JavaScript.)
+20:52 < ben_alman> if i do nave install latest, it works as i'd expect
+20:52 < ben_alman> but then when i do nave usemain latest it re-fetches and re-builds
+20:52 < ben_alman> instead of just installing
+20:52 <@isaacs> ben_alman: nave is sort of designed around picking a specific version
+20:52 < ben_alman> yes i love the idea
+20:52 <@isaacs> ben_alman: also, the refetch is unnecessary for usemain.  patch welcome (probably not hard, just haven't gotten to it, and i don't use it for that)
+20:52 < ben_alman> yeah it definitely doesn't need to refetch OR rebuild
+20:52 < ben_alman> if it's already built
+20:53 < ben_alman> it should just link it or copy it or whatever
+20:53 < ben_alman> then yoiu can just change your main version trivially
+20:53 <@isaacs> ben_alman: well, it does need to ./configure and make install
+20:53 < ben_alman> ok sure
+20:53 <@isaacs> ben_alman: since you're changing the --prefix
+20:53 < ben_alman> but it doesn't need to totally make the whole thing
+20:54 <@isaacs> but really, it'd be better if nave just did a DESTDIR install, and set the PATH to $NAVEDIR/usr/local/bin
+20:54 < ben_alman> and it definitely doesn't need to re-fetch
+20:54 <@isaacs> er, $NAVEDIR/$NAVE/usr/local/bin
+20:54 < Leemp> Anyone know of Optimist has anything built in to show -h/--help ? Or do you need to define arguments for -h/--help yourself, then check/print them?
+20:54 < ben_alman> that'd be great
+20:54 <@isaacs> ben_alman: anything else?
+20:54 < ben_alman> can i get it to log much, much less while building? without killing all the output?
+20:54 <@isaacs> Leemp: check out nomnom maybe
+20:54 <@isaacs> Leemp: but i think optimist might have already gotten that recently..
+20:55 <@isaacs> ben_alman: well, no.
+20:55 <@isaacs> ben_alman: not without piping it somewhere
+20:55 <@isaacs> ben_alman: that's just node's build process and "make"'s default behavior
+20:55 < ben_alman> right
+20:55 <@isaacs> ben_alman: to say nothing of Waf
+20:55 < Leemp> isaacs: I mean, i see it has .help() which outputs help, but that just returns it, rather than giving it to the user. I'll google nomnom though, ty :)
+20:55 < ben_alman> gotcha, i usually don't see it so much because i'm used to homebrew
+20:55 <@isaacs> Leemp: npm docs nomnom
+20:55 <@isaacs> Leemp: it'l open right up in your browser :)
+20:56 <@isaacs> ben_alman: i consider that a serious problem with homebrew.
+20:56 < ben_alman> it's nice to have an option
+20:56 <@isaacs> ben_alman: "I'm using your CPUs.  I'm going to be using them for a while.  No, I won't tell you why, it's none of your concern.  Go make a sandwich or something."
+20:56 <@isaacs> ben_alman: you do have an option :)
+20:56 <@isaacs> ben_alman: nave use whatever >/dev/null
+20:56 < ben_alman> well, i think there's an expectation that when you're making stuff it's going to take a while :P
+20:57 < ben_alman> yeah i'm looking at stout and stderr right now to see what i want to see
+20:57 < ben_alman> this is just for a little automated script
+20:57 < ben_alman> but anyways, i love the idea of nave prepending the proper local install dir to the path
+20:58 < ben_alman> then it never needs to be installed "globally"
+20:58 < ben_alman> but i can do that manually
+20:58 < ben_alman> at least, in the short term
+20:58 < benatkin> haven't looked back since I started using nodebrew instead of homebrew to build node for dev on os x
+20:58 < ben_alman> ah never heard of nodebrew
+20:59 < benatkin> ben_alman: well it's been working great for me, along with pythonbrew and perlbrew. phpbrew is nice too but php is a bit more complicated.
+20:59 < ben_alman> inot sure i like what i'm seeing just poking around at nodebrew
+21:00 <@isaacs> ben_alman: well, that's basically what it already does
+21:00 < ben_alman> if you install it and tell it to "use 0.6.0" for example is that just for the current shell?
+21:00 <@isaacs> ben_alman: i mean, you don't ever *have* to install it globally
+21:00 <@isaacs> ben_alman: i always have a development version installed globally
+21:00 < ben_alman> isaacs: yeah i'm just trying to be able to set up a "Default" version
+21:00 <@isaacs> ben_alman: i only use nave to install specific versions in nave envs for testing
+21:00 < ben_alman> so when i first log in, i get the latest or whatever
+21:01 <@isaacs> ben_alman: nave use default v0.8.2
+21:01 <@isaacs> ben_alman: then `nave use default` to load that bversion
+21:01 < ben_alman> so that names v0.8.2 as "default"
+21:01 <@isaacs> ben_alman: but short of puting a `nave use default` in your bashrc or something, there's no way to "automatically" be in a nave subshell
+21:01 < ben_alman> and then you can use default
+21:01 < ben_alman> well yeah
+21:01 <@isaacs> ben_alman: yeah, the name is arbitrary
+21:02 < ben_alman> i want the auto thing without spawning a new bash
+21:02 <@isaacs> nave use foo 0.6.20
+21:02 < ben_alman> just the 1st time
+21:02 < ben_alman> sure
+21:02 <@isaacs> ben_alman: well, that's not how nave works
+21:02 < ben_alman> i know
+21:02 <@isaacs> it spawns a new bash instance :)
+21:02 < ben_alman> heh
+21:02 < ben_alman> right
+21:02 <@isaacs> ben_alman: you can put ~/.nave/0.8.2/bin in your PATH if you want
+21:02 < ben_alman> PATH=~/.nave/$NAVE_DEFAULT/bin:$PATH
+21:03 <@isaacs> er ~/.nave/installed/0.8.2/bin i guess
+21:03 < ben_alman> maybe i'll just doe something like that
+21:03 < ben_alman> then i'll have a "default" that i can override with nave use, right?
+21:04 < benatkin> ben_alman: yeah when you run nodebrew use it changes it on all shells for me. not great if you switch a lot.
+21:04 < ben_alman> benatkin: that's a REALLY bad thing
+21:04 < ben_alman> it should only ever change it for the current shell unless you explicitly say so
+21:04 <@isaacs> benatkin, ben_alman: well, that's  because it's just installing in the "real" location
+21:04 <@isaacs> nave does some PATH environ trickery
+21:04 < ben_alman> ya
+21:04 <@isaacs> butit actually installs many copies
+21:05 < ben_alman> yeah, i <3 that model
+21:05 <@isaacs> so, if you're using tha tmodel, there's basically 3 ways you can accomplish it:
+21:05 <@isaacs> 1. nave's way, with subshells.
+21:05 <@isaacs> 2. replace "node" with a shell function that calls /path/to/version/bin/node
+21:06 <@isaacs> 3. source a script into your current shell that creates a function to update environs for you
+21:06 <@isaacs> imo, #1 is the cleanest
+21:06 < ben_alman> yeah
+21:06 < ben_alman> it's so simple
+21:06 <@isaacs> #2 is crazy hazardous
+21:06 <@isaacs> (like, npm will break, #!/bin/env node is wrong, etc.)
+21:06 < ben_alman> yep
+21:06 < benatkin> ben_alman: well, nodebrew does quickly switch between different versions of node
+21:07 <@isaacs> #3 is ok, but a little less hygenic, and not as simple to install (have to update your bashrc, not just put a script somewhere)
+21:07 < ben_alman> benatkin: the problem is that if you're running multiple node-related tasks concurrently something in a nother shell might all of a sudden start using the wrong version of node
+21:07 < ben_alman> like what if you have cron jobs that use a specific version of node etc
+21:07 < benatkin> ben_alman: but when it switches, it switches everywhere. not universally a bad thing, but definitely a bad thing for some tasks
+21:07 <@isaacs> right, so, #4 is: `which node` is a symlink to /path/to/version/bin/node
+21:07 <@isaacs> or just keep a lot around, adn `make install` over one another
+21:08 < ben_alman> i don't like the make install; i've done that
+21:08 <@isaacs> i don't prefer that method, because you aren't really keeping the versions separate
+21:08 < ben_alman> too slow
+21:08 <@isaacs> ben_alman: make install is pretty fast if you don't have to recompile
+21:08 <@isaacs> cd /path/to/new/node; make install
+21:08 <@isaacs> cd /path/to/other/node; make install
+21:08 < ben_alman> i thin kther'e a ton of value of being able to use multiple different versions simultaneously
+21:08 <@isaacs> i mean, i do this all the time to switch between stable and master
+21:08 < ben_alman> which is easiest with #1
+21:08 <@isaacs> ben_alman: yeah
+21:08 <@isaacs> the fact that usemain refetches is shitty.
+21:09 <@isaacs> ben_alman: you're pretty good at bash.  you should send me a pull req :)
+21:09 < ben_alman> isaacs: so like, i've been updating my dotfiles for like 8 hours
+21:09 <@isaacs> haha
+21:09 < ben_alman> and i'm not done
+21:09 < ben_alman> i'm prepping them for 10.8
+21:09 <@isaacs> you need a 12-step program
+21:09 <@isaacs> maybe we can be sponsors
+21:10 < ben_alman> a big thing is that XCode 4.3 dropped support for non-LLVM gcc
+21:10  * isaacs is a recovering dotfile tinkerer
+21:10 < ben_alman> which i dealt with before
+21:10 < ben_alman> but the homebrew recipe disappeared
+21:10 < ben_alman> i FINALLY found another, yay
+21:10 <@isaacs> yeah, i kinda cant' stand using homebrew for anything i actually care about
+21:10 < ben_alman> well i try to avoid it
+21:10 <@isaacs> gotta run
+21:10 < ben_alman> cya
+21:10 <@isaacs> have fun messing around with your configs :)
+21:10 < ben_alman> yeah, fun.
+21:10 < ben_alman> heh
+21:10 < ben_alman> thx
+21:25 < Industrial> Anoyne got partials/layouts working with Hogan.js with Consolidate.js with Express 3 ?
+21:34 < benatkin> Industrial: that's what half the Consolidate.js pull requests are about (so no, not with stock consolidate)
+21:35 < darrenlooby> Hello. Anyone good with connection pooling, or keep alive for mysql in node.js?
+21:37 < Industrial> benatkin: I see
+21:39 < prettyrobots> https://github.com/bigeasy/proof/tree/readme
+22:05 < bawigga> Does the node installer for windows not automatically add node to the PATH? 
+22:06 < insin> it does, IIRC
+22:06 < bawigga> ok then maybe im not thinking about this correctly
+22:07 < bawigga> after I install, I assume I should be able to type node in a cmd shell or powershell and get something...
+22:08 < riven> Indeed.
+22:08 < bawigga> and I shouldn't need to reboot or logout and login or anything, right?
+22:08 < riven> Correct.
+22:09 < Deathspike> bawigga: It doesn't add it to PATH.
+22:09 < insin> bawigga: which version of windows?
+22:09 < Deathspike> bawigga: Instead, it adds a shortcut that sets up a cmd with node configured.
+22:09 < bawigga> 7
+22:10 < insin> should work as soon as you open a new cmd
+22:10 < Deathspike> bawigga: You can find it in your 'all programs' stuff under start.
+22:10 < Deathspike> "node.js command prompt"
+22:10 < Deathspike> you'll get a "Your environment has been set up for using Node.js 0.8.0 (ia32) and NPM"
+22:10 < Deathspike> then use that.
+22:10 < bawigga> Deathspike: Ah I see, so by default it's not activated for normal cmd shells?
+22:11 < riven> Yes it is.
+22:11 < bawigga> sorry if these is basic stuff, I'm usually working on a mac, windows is sort of new to me in this respect
+22:11 < Deathspike> Installer doesn't register, but the command prompt shortcut does. Once you run it once, you can use node forever.
+22:11 < riven> …
+22:11 < Deathspike> riven: Might have changed since 0.8, since that doenst reg.
+22:12 < riven> Yes it does.
+22:12 < Deathspike> Jep. You must be right. I must be wrong. No doubt about it.
+22:12  * riven rolls his eyes
+22:12 < riven> Are you always this obnoxious?
+22:13 < Deathspike> Most of the time.
+22:13 < bawigga> So I just looked at my Environment Variables, and the nodejs dir was added to Path
+22:14 < bawigga> Deathspike: You mentioned once I run that command prompt, it should work for all prompts?
+22:14 < Deathspike> bawigga: That's how it worked for me, yup.
+22:14 < bawigga> Deathspike: hmm
+22:14 < Deathspike> win7 64-bit
+22:14 < bawigga> same
+22:15 < dmilith> ugly by design
+22:15 < bawigga> So maybe a dumb question, but why wouldn't node just automatically add itself to the PATH? Any reason?
+22:15 < riven> Funny, it did so for me.
+22:16 < bawigga> hmm
+22:16 < Deathspike> *Shrug* perhaps UAC preventing it?
+22:16 < bawigga> are those variables case sensitive in windows?
+22:16 < riven> And presumably for almost everyone else too, given the lack of questions regarding this subject.
+22:16 < bawigga> is PATH different from Path
+22:16 < riven> Makes sense, eh? :)
+22:16 < bawigga> totally agree :)
+22:16 < Deathspike> There should be questions here since there's a huge booming Windows community here? Yeah, that was sarcastic.
+22:17 < riven> Oh, are there techies with UAC enabled? :)
+22:17 < Deathspike> Yes, there are.
+22:17 < dmilith> restart your ugly by design
+22:17 < riven> Rhetorical question, but thanks for answering.
+22:17 < dmilith> after install
+22:18 < dmilith> it's too ugly by design to reload %PATH% after installation
+22:18 < riven> Funny, wasn't a problem for me.
+22:18 < dmilith> and node does change this variable in install process
+22:19 < riven> And all this silly Windows bashing, does it makes you feel like big boy?
+22:19 < bawigga> and new shells don't reload this variable when they startup?
+22:19 < riven> make*
+22:21 < dmilith> i don't really have fucking idea why nodel started to support "ugly by design". It may only get node worse
+22:22 < dmilith> idea of*
+22:22 < Deathspike> Because of a partnership with MS perhaps?
+22:22 < riven> dmilith ignored. Annoying twat.
+22:22 < dmilith> Deathspike: look @ corel, look at skype
+22:22 < Deathspike> FYI, Node runs on Windows Azure nowadays.
+22:22 < riven> Life's so shitty he must resort to bashing Windows to feel like a man. Instead, it shows how immature he is. congrats.
+22:23 < dmilith> riven: yea.
+22:23 < bawigga> lotta hostiility here...
+22:23 <@maxogden> no fighting kiddos. read the channel topic :)
+22:23 < bawigga> so is this a bug then? Node installer doesn't reload the PATH or is it a bit deeper than that?
+22:24 < riven> Node officially supports Windows, so any continuous Windows bashing in here must surely be considered trolling.
+22:24 <@maxogden> riven: what is the first rule of trolls?
+22:24 < riven> And eve if it isn't, it's annoying and disruptive.
+22:24 < riven> maxogden: set them on fire?
+22:24 <@maxogden> riven: nope. dont feed them
+22:25 < dmilith> riven: let's say I'm anti-windows by design.
+22:25 < riven> D'oh, I knew that one!!
+22:25 < dmilith> and I have lots of reasons.
+22:25 < insin> bawigga: I think it's a Windows thing. Every version prior to 7 I've had to log off and on to get PATH changes to take
+22:26 < bawigga> insin: is that the norm windows users? or do other installers manage to make this happen?
+22:26 < bawigga> norm for*
+22:26 < insin> Node's PATH change worked for me on W7, no idea what governs PATH changes taking effect
+22:27 < bawigga> wtf... now it's working in all shells
+22:27 < riven> All you need to do is start a new shell for path changes to be picked up.
+22:27 < dmilith> it will stop working someday.. the only similarity in result will be that "wtf" ;]
+22:28 < dmilith> (I just can't stop myself ;D)
+22:28 < bawigga> riven: ok then, maybe I had another shell open that prevented the new PATH from being picked up...
+22:28 < dmilith> ok sorry. no more real things.. um.. jokes
+22:28 < riven> bawigga: nah, doesn't work like that
+22:28 < riven> Must be something else.
+22:28 < bawigga> riven: k
+22:29 < bawigga> going to install and see if i can repro this
+22:29 < bawigga> uninstall*
+22:31 < benatkin> prettyrobots: nice readme update. still find the positional arguments hard to understand though
+22:31 < benatkin> prettyrobots: seems the names of the args vary on how many args get passed to it
+22:31 < prettyrobots> benatkin: I *Just* pushed a new update.
+22:31 < prettyrobots> benatkin: Yes. That is new.
+22:31 < prettyrobots> Errr….
+22:32 < prettyrobots> benatkin: Would you do me the favor of putting feedback into a GitHub Issue.
+22:32 < prettyrobots> Because I could write a paragraph explaining it on a GitHub Issue. Here it would be annoying to all.
+22:33 < prettyrobots> https://github.com/bigeasy/proof/issues/105
+22:34 < prettyrobots> I'll try to answer your question in the comments there.
+22:35 < benatkin> prettyrobots: oops, was writing an issue when you posted yours so there's a dupe nao
+22:35 < prettyrobots> No problem. 
+22:35 < prettyrobots> And thank you.
+22:36 < bawigga> riven, dmilith, Deathspike: thanks for the help, seems like it was a fluke. reinstalled and everything is available now.
+22:38 < benatkin> prettyrobots: I like to keep the total # processes to a minimum, even when testing, so I'm not sure about using spawn for each test
+22:38 < benatkin> prettyrobots: or rather, test suite
+22:38 < prettyrobots> Ah, well, bummer. 
+22:38 < bawigga> insin: thanks as well
+22:39 < prettyrobots> Proof likes to create processes.
+22:39 < benatkin> prettyrobots: that's cool, just a diff approach
+22:39 < prettyrobots> Yeah, the idea is that the operating system is the "test runner".
+22:40 < benatkin> prettyrobots: it's hard not to be a premature optimizer these days
+22:40 < prettyrobots> Each test gets a clean slate. It makes it easier to isolate a problem too.
+22:40 < prettyrobots> I find it very nice that when a test fails, I can just run the test directly.
+22:43 < benatkin> yeah that's nice, mocha uses regexes for that
+22:53 < prettyrobots> The roughest bit about that library is that I converted it from CoffeeScript using the generated JavaScript. I'm slowly cleaning up that mess. I won't do that again.
+22:54 < prettyrobots> I still like CoffeeScript. But, this library made more sense as JavaScript.
+23:00  * vandenoever would like a type js protolanguage
+23:00 < vandenoever> s/type/typed
+23:07 < perezd> anyone know what the current state of socket.io + redis pub/sub is?
+23:14 < ben_alman> for node, what's the difference between latest and stable?
+23:15 < ben_alman> is stable the most recent even-numbered minor version?
+23:16 < prettyrobots> ben_alman: Correct.
+23:16 < ben_alman> ok great
+23:16 < prettyrobots> And od numbered is API shifting development.
+23:40 < Leemp> Anyone familiar with any decent packages to write/read JSON off of disk? (before i roll my own :P)
+23:40 < Leemp> I figure there *has* to be one lol.
+23:41 < SubStack> Leemp: require() can do that
+23:41 < Leemp> SubStack: *head explodes*
+23:42 < Leemp> SubStack: How exactly would it write?
+23:42 < ben_alman> very carefully
+23:42 < SubStack> oh just the read part
+23:42 < Leemp> Gotcha
+23:42 < SubStack> do you need to write asynchronously or synchronously?
+23:43 < Leemp> either. Though, async is usually better in my book. Not that this is hard of course, i just started writing a module for it and then realized this has to be somethin done quite frequently
+23:43 < Leemp> .. but i'm having trouble finding a project for it, so who knows
+23:44 < Leemp> Perhaps it's one of those "too simple to write a package for" things :)
+23:44 < SubStack> it's not about better or worse
+23:44 < Leemp> No worries
+23:44 < SubStack> it's about whether your code will be in the same loop that's handling requests from the network or not
+23:44 < Leemp> SubStack: By better, i mean more flexible :). I often don't *need* sync IO
+23:45 < Leemp> And by more flexible, i mean *for my current uses* :P
+23:45 < SubStack> anyways just use JSON.stringify and fs.writeFile or fs.writeFileSync
+23:45 < Leemp> Anyway, `require 'fs'` incoming.
+23:45 < Leemp> Yea
+23:46 < SubStack> async: fs.writeFile('file.json', JSON.stringify(obj), cb)
+23:46 < SubStack> sync: fs.writeFileSync('file.json', JSON.stringify(obj))
+23:46 < Leemp> yup
+23:49 < alex4nder> hey
+23:52 < ccowan1> hey
+--- Log closed Sun Jul 15 00:00:17 2012
