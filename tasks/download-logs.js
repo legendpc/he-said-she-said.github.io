@@ -9,7 +9,7 @@ module.exports = function() {
   var async = require('async');
 
   function fname(url) {
-    return options.logsdir + '/' + _.last(url.split('/'));
+    return options.logdir + '/' + _.last(url.split('/'));
   }
 
   var q = async.queue(function(url, done) {
@@ -30,8 +30,8 @@ module.exports = function() {
     });
   }, 20);
 
-  if (!shell.test('-e', options.logsdir)) {
-    shell.mkdir(options.logsdir);
+  if (!shell.test('-e', options.logdir)) {
+    shell.mkdir(options.logdir);
   }
 
   urls.slice(0, 3).forEach(function(url) {
@@ -50,4 +50,4 @@ module.exports = function() {
   }
 };
 
-module.exports.description = 'download the daily logs from @isaacs site';
+module.exports.desc = 'download the daily logs from @isaacs site';

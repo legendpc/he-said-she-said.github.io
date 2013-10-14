@@ -5,7 +5,8 @@ module.exports = function(grunt) {
   var config = {};
   var globalOptions = {
     urls: 'etc/urls.json',
-    logsdir: 'logs'
+    logdir: 'logs',
+    docdir: 'docs'
   };
   var tasks = shell.ls('tasks').map(function(taskFile) {
     var name = taskFile.split('.')[0];
