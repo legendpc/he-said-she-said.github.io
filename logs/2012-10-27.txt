@@ -1,0 +1,2334 @@
+--- Log opened Sat Oct 27 00:00:18 2012
+00:08 < Dedyedy> hi
+00:08 < Dedyedy> is node good for streaming realtime data?
+00:09 < gkatsev> yes
+00:15 <@konobi> janmower: node-libdtrace?
+00:16 <@konobi> janmower: background?
+00:17 < janmower> konobi: trying to include sdt.h (systemtap) dtrace probes alongside the dtrace (usdt) probes in node
+00:17 < janmower> konobi: and right now my solution is hacky macro guards
+00:17 < janmower> konobi: #ifdef HAVE_SYSTEMTAP like 17 times
+00:19 <@konobi> janmower: my not just map them?
+00:20 <@konobi> *why
+00:21 < janmower> konobi: how do you map function macros?
+00:22 < janmower> er macro functions
+00:22 < janmower> all the probes are macro functions
+00:22 < janmower> konobi: how do you map those?
+00:23 <@konobi> janmower: NODE_NET_SOCKET_READ and _ENABLED
+00:23 <@konobi> nothing screams either dtrace or systemtap there
+00:24 < janmower> except when my systemtap .d dtrace generates macros with the exact same name
+00:24 <@konobi> sure, so make it one or the other
+00:25 < owen1> i have a package in foo/bar/node_packages.  how to require it from foo?
+00:26 <@konobi> owen1: ./bar/
+00:26 < janmower> it's one or the other with the guards, if the preprocessor sees any of the solaris/dtrace it no compiles
+00:27 <@konobi> janmower: but the guards should be around node_dtrace.h or node_systemtap.h
+00:27 <@konobi> at which point either can fill in the implementation for the macros
+00:28 < janmower> but node_dtrace.cc explicitly calls the NODE_PROBE macros
+00:29 <@konobi> so don't compile it
+00:29 < janmower> and if i've seen my systemtap.h files, and then i see _ENABLED, then the whole thing doesn't compile
+00:30 <@konobi> janmower: split out common stuff to node_trace.cc
+00:30 <@konobi> then have your dtrace/systemtap guards in there
+00:30 < janmower> konobi: that's what's there in the pull request now
+00:31 < janmower> i was hoping someone knew of something more brilliant than macro guards
+00:31 < janmower> like some sort of macro function template
+00:31 < daleharvey> does anyone use qunit with node?
+00:32 < daleharvey> I want to get all the log data as a string / stream
+00:32 < owen1> konobi: thanks
+00:32 <@konobi> janmower: no... you're just adding the strace stuff, not pulling out the common tracing components
+00:33 <@konobi> janmower: think "node_trace.cc" along with "node_dtrace.cc" and "node_systemtap.cc"
+00:33 <@konobi> and "node_<insert other tracing here>"
+00:34 < janmower> konobi: then i totally misread bnoordhuis' comments on that pull request
+00:35 <@konobi> the etw stuff was mentioned too
+00:35 < owen1> konobi: require('./node_modules/poet/node_modules/json-front-matter/lib/json-front-matter.js')   this works. not sure if it's the best way to do that.
+00:36 <@konobi> janmower: by "merge" i think he meant pull out the common code and then use the compile chain to deal with the specifics
+00:36 < TooTallNate> owen1: just add it as a dependency to your project, that way both modules will share it
+00:36 <@konobi> bbl
+00:37 < bnoordhuis> konobi, janmower: actually, the systemtap and dtrace has enough commonality that splitting things up probably isn't necessary
+00:37 < bnoordhuis> etw however is another story
+00:37 < bnoordhuis> one that piscisaureus is much more qualified to comment on :)
+00:37 < bnoordhuis> or maybe sblom, i think he's working on that
+00:38 < janmower> bnoordhuis: cool then.  that's what's on that pull request
+00:40 < bnoordhuis> janmower: do you work for redhat?
+00:41 < janmower> bnoordhuis: nope :) just a linux guy
+00:41 < bnoordhuis> janmower: ah okay. redhat expressed some interest in adding stap support, i thought that was you
+00:42 < janmower> bnoordhuis: i was getting some help from Frank (fche) who works over there
+00:42 < bnoordhuis> janmower: right. he's a systemtap maintainer, isn't he?
+00:43 < janmower> bnoordhuis: yea i think he's been lead on it for awhile
+00:43 < janmower> at least he's always doing the merges
+00:54 < Dedyedy> hi
+00:54 < darach> Dedyedy. Node is good for streaming rt data
+00:56 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+00:59 < deoxxa[grumpy]> node is the realest
+01:00 < tjmehta> hi all quick question about spawn
+01:01 < owen1> TooTallNate: got it. thanks!
+01:01 < tjmehta> im trying to caret the output of a git show to a file with the following line
+01:01 < tjmehta> spawn('git', ['show', 'master:package.json', '>', packageJsonPath]);
+01:01 < tjmehta> and I am getting the following output on stderr
+01:01 < tjmehta> fatal: ambiguous argument '>': unknown revision or path not in the working tree.
+01:03 < tjmehta> i realize the issue is that the caret is not meant to be an argument on git show
+01:03 < tjmehta> but i am unsure how to achieve the functionality above with spawn
+01:05 < tjmehta> would i pipe the output to the file instead?
+01:29 < deoxxa[grumpy]> darn it, i need 64 bit integers
+01:29 < deoxxa[grumpy]> this is lame
+01:31 < garbagecolletio_> what happens if you do module.exports and then call the function
+01:31 < niix> sup noderz
+01:31 < garbagecolletio_> but other module.exports has same function
+01:31 < deoxxa[grumpy]> garbagecollectio: that makes no sense - can you provide an example?
+01:31 < garbagecollectio> ok
+01:32 < niix> any module recommendations for user auth?
+01:32 < deoxxa[grumpy]> niix: i've had success with passport, but there are plenty of options if you search npm (https://npmjs.org/) for "auth" or "authentication" or any related terms
+01:33 < niix> deoxxa[grumpy]: ah I have heard of passport, I'll give that a shot
+01:33 < niix> thanks
+01:34 < garbagecollectio> deoxxa[grumpy] : exports = module.exports = blah = function () { etc etc} in one .js file and exports = module.exports = blah = function() { etc etc}
+01:34 < garbagecollectio> in another js file
+01:34 < garbagecollectio> and both files get required in
+01:35 < deoxxa[grumpy]> garbagecollectio: well, you shouldn't be using global variables (when you do `blah = ...' that's a global variable)
+01:36 < garbagecollectio> thats sort of missing the point
+01:36 < deoxxa[grumpy]> garbagecollectio: you'd be better off with something like `var blah = module.exports = function blah() {};' - that way you can still access the `blah' variable in that scope, and you don't end up with global leaks and other weird things
+01:36 < garbagecollectio> in a separate .js file that is required in?
+01:36 < garbagecollectio> and then in the app itself do blah() ?
+01:37 < deoxxa[grumpy]> then in the app itself you do `var blah = require("./blah");'
+01:38 < deoxxa[grumpy]> garbagecollectio: there's nothing stopping you from doing something like `var blah1 = require("./blah1"), blah2 = require("blah2");' and having blah1.js and blah2.js both be identical files. this is all just regular javascript scoping, are you familiar with how that works?
+01:38 < garbagecollectio> well say i give the function a name
+01:38 < garbagecollectio> yes if i do blah()
+01:38 < garbagecollectio> which function does it call
+01:38 < deoxxa[grumpy]> neither
+01:38 < deoxxa[grumpy]> when you give a function a name, it just sets the .name property on the function (mostly)
+01:39 < deoxxa[grumpy]> unless you don't assign it to a variable
+01:39 < garbagecollectio> hold on if i did this in blah1.js and same exact thing in blah2.js
+01:39 < garbagecollectio> exports = module.exports = blah = function () { etc etc} i
+01:39 < deoxxa[grumpy]> i.e. `function a() {}' will create a new function with its name set to "a", and will attach that function to the current global scope as "a"
+01:39 < garbagecollectio> and then called blah()
+01:39 < deoxxa[grumpy]> no
+01:39 < deoxxa[grumpy]> no no no.
+01:39 < garbagecollectio> ur saying nothing happenes?
+01:39 < garbagecollectio> doesn't that expose the functions out into the app?
+01:40 < deoxxa[grumpy]> see the problem is that you're doing `exports = module.exports = blah = function() {};' - and that sets the "blah" variable *globally*
+01:40 < deoxxa[grumpy]> also that's just not now modules work
+01:40 < garbagecollectio> so say i did var blah
+01:40 < garbagecollectio> and did the same thing in the second .js file
+01:40 < garbagecollectio> and then called blah() in the app
+01:41 < deoxxa[grumpy]> you'd get a ReferenceError because blah will be undefined
+01:41 < deoxxa[grumpy]> you need to attach it to module.exports, then require() it
+01:41 < deoxxa[grumpy]> so `var blah = function() {}; module.exports = blah;'
+01:41 < deoxxa[grumpy]> module is already defined for you when you're in module context (which is always in node)
+01:42 < deoxxa[grumpy]> so that `module' is different to the `module' you'll have in another file
+01:42 < garbagecollectio> so how do i call that example from above
+01:42 < garbagecollectio> in the app
+01:43 < deoxxa[grumpy]> https://gist.github.com/3962616 like that
+01:44 < garbagecollectio> so how would i call another function from the blah.js?
+01:45 < deoxxa[grumpy]> https://gist.github.com/3962616 like that
+01:45 < deoxxa[grumpy]> (it's updated)
+01:49 < garbagecollectio> right but i want to use module.exports with all those
+01:49 < garbagecollectio> not blah.read
+01:49 < garbagecollectio> but just the function name
+01:49 < deoxxa[grumpy]> no you don't
+01:49 < deoxxa[grumpy]> you think you do, but you really don't
+01:49 < garbagecollectio> i mean how would i do that if i wanted to
+01:50 < deoxxa[grumpy]> assign the functions you want available to variables
+01:50 < deoxxa[grumpy]> var read = blah.read, the = blah.the, docs = blah.docs;
+01:50 < garbagecollectio> ok
+01:50 < deoxxa[grumpy]> read(); the(); docs();
+01:50 < deoxxa[grumpy]> etc
+01:50 < garbagecollectio> in the .js file?
+01:50 < deoxxa[grumpy]> ...they're both .js files
+01:50 < garbagecollectio> the blah.js?
+01:50 < deoxxa[grumpy]> no.
+01:51 < deoxxa[grumpy]> sigh
+01:51 < deoxxa[grumpy]> i've explained it, i'm not explaining it again
+01:51 < garbagecollectio> yeah I'm talking about using module.exports
+01:51 < garbagecollectio> in the blah.js
+01:51  * deoxxa[grumpy] going back to work
+01:51 < garbagecollectio> its ok if you don't know how to do it
+01:52 < niix> how do url's work in ejs?
+02:00 < TehShrike|Work> Man, I like JavaScript
+02:01 < phork> javascript is for real hackers!
+02:01 < TehShrike|Work> I think you mean "hax0rz"
+02:01 < TehShrike|Work> But yeah, for realz
+02:01 < phork> does anyone know of an irc client with a javascript scripting language?
+02:01 < phork> s/hax0rz/h4x0rZ/
+02:01 < TehShrike|Work> :-)
+02:02 < phork> i remember when bluebeep was the thing and leet speak really meant you are leet
+02:03 < TehShrike|Work> eh, phreaking was pretty much over by the time I could do anything
+02:03 < phork> now even being a hacker isnt enough, you have to get arrested and do time or be a fugitive from justice to be leet
+02:04 < phork> phreaking's glory days ended after the 80's
+02:04 < phork> i was a 90's child
+02:04 < phork> it was on its way out
+02:05 < phork> after the 90's it became all about phone conf's, pranking, and superiority contents
+02:05 < phork> contests*
+02:05 < niix> this may be a stupid question, I'm working with node and express for the first time.  All I'm trying to do is create another view, I made myview.js, myview.ejs and in my app.js I did app.get('/myview', routes.myview);  Now when I link to "myview" in the head.ejs it comes back as 404
+02:05 < TehShrike|Work> Yeah, reading 2600 is about as close as I've gotten to that stuff
+02:06 < deoxxa[grumpy]> phork: oh man, bluebeep... wow
+02:06 < deoxxa[grumpy]> phork: remember how much of an insult it was to be called a lamer?
+02:06 < g00nPrawnz> anyone using the request module? it's giving me a hard time when trying to post to an nginx server. it's not setting the content-length header so the request bombs out with a 411 status code
+02:06 < phork> deoxxa: i never minded much, better than snitch
+02:07 < TehShrike|Work> Hah!
+02:07 < phork> adrian is now dealing with that title for life
+02:07 < deoxxa[grumpy]> ha yeah
+02:07 < deoxxa[grumpy]> what an idiot
+02:08 < deoxxa[grumpy]> adrian lamez0rz
+02:08 < TehShrike|Work> Oh sweet, here we go http://www.youtube.com/user/lxjs2012
+02:08 < phork> hes a cool guy hes just an attention/media whore. but hes a homo so what do you expect
+02:09 < phork> i have not been on irc in years its good to see its still alive
+02:09 < g00nPrawnz> anyone using the request module by mikeal? it's giving me a hard time when trying to post to an nginx server. it's not setting the content-length header so the request bombs out with a 411 status code
+02:09 < deoxxa[grumpy]> g00nPrawnz: 1) paste code 2) ??? 3) profit!
+02:10 < g00nPrawnz> @deoxxa[grumpy]: are you asking me to paste my code in here? sorry if i'm being dense...
+02:11 < deoxxa[grumpy]> g00nPrawnz: on a pastebin site would be good - gist.github.com is popular
+02:11 < g00nPrawnz> okay cool rgr that :) just a moment
+02:11 < TehShrike|Work> deoxxa[grumpy]: why are you grumpy?
+02:11 < deoxxa[grumpy]> g00nPrawnz: it gives what you're saying some context is all - there's a few different situations that could cause what you're describing
+02:11 < deoxxa[grumpy]> TehShrike|Work: because Nexxy said so
+02:11 < TehShrike|Work> huh
+02:12 < deoxxa[grumpy]> she called me grumpy, so this is in protest
+02:12 < deoxxa[grumpy]> (or affirmation)
+02:12 < deoxxa[grumpy]> (not sure anymore)
+02:12  * TehShrike[tipsy] hugs deoxxa[grumpy]
+02:12 < deoxxa[grumpy]> \o/
+02:13 < g00nPrawnz> here you go, grumpy: http://pastebin.com/ukpfuChx
+02:14 < g00nPrawnz> many thanks for taking a moment!
+02:15 < deoxxa[grumpy]> eeeeep coffeescript
+02:15 < g00nPrawnz> lol take a sip, man
+02:16 < deoxxa[grumpy]> ok, the short version is that you need to provide all the data to request at connection time, but right now you're providing it after the connection is already open
+02:16 < deoxxa[grumpy]> request.post({uri: "https://...", form: {a: "b", c: "d"}}); // if i remember the options correctly
+02:16 < g00nPrawnz> hmmmm… https://github.com/mikeal/request#forms
+02:16 < g00nPrawnz> maybe i'm a bonehead, but they have the pattern laid out like I do
+02:17 < deoxxa[grumpy]> yep
+02:17 < deoxxa[grumpy]> and that'll send a chunked request
+02:17 < deoxxa[grumpy]> works perfectly fine in most cases, but if the other side of the connection doesn't like it, that's too bad
+02:18 < g00nPrawnz> so when I'm passing the form argument, what is a: "b"… etc.?
+02:18 < deoxxa[grumpy]> that's your form data
+02:18 < g00nPrawnz> okay lemme give that a quick go here. :)
+02:19 < g00nPrawnz> so in my case… form:{'token': token, …}?
+02:20 < deoxxa[grumpy]> something like that
+02:22 < niix> why is my view not working? http://pastie.org/5121766 all I'm trying to do is route to another page
+02:24 < niix> and I'm doing <a href="login"> for the link
+02:27 < niix> weird, n/m - but why would my exports.login live in my index.js file?
+02:28 < g00nPrawnz> grumpy: no dice, still
+02:28 < g00nPrawnz> inspecting the request shows that it's failing to attach the form data
+02:28 < g00nPrawnz> okay so here is plan B. using the node-form-data module I am able to submit the form successfully
+02:29 < g00nPrawnz> i get a status code 200, my API dashboard shows a successful upload, but I can't access the request body :/
+02:29 < g00nPrawnz> https://github.com/felixge/node-form-data
+02:29 < g00nPrawnz> i'm using the submit method seen at the bottom of this page
+02:30 < g00nPrawnz> any idea how to get the body from the response parameter?
+02:34 < niix> hmm, is it not recommended to create different route js files for each view?
+02:39 < mscdex> g00nPrawnz: https://github.com/felixge/node-form-data#install
+02:40 < g00nPrawnz> i like to live on the wild side… ;)
+02:40 < mscdex> niix: i don't see anything wrong with it.... I'd think it'd keep things more organized
+02:40 < mscdex> or at least all related routes together
+02:40 < niix> mscdex: ok, I'm going to keep doing it.  I'm thinking I could have an auth.js for my login and register views
+02:41 < niix> and maybe a general.js for index, about, etc..
+03:05 < airtanah> does a websocket die if the underlying tcp socket closes, or is there a built-in reconnection protocol?
+03:55 < TehShrike> substack: so you're a vi guy?
+03:56 < mscdex> nano ftw!
+03:57 < TehShrike> mscdex: :-)
+03:57 < TehShrike> I'm just watching substack code in the lxjs video
+03:57 < TehShrike> He looks so leet
+04:00 < mscdex> i'm not sure vi handles streams though
+04:01 < TehShrike> I think substack shoved a stream at it, and vi just figured that it was easier to deal with streams than to deal with substack
+04:03 < blazes816> dude needs to get to work on a halting lib then
+04:03 < hoborick> Anyone know why you can't just assign exports (in a module) with a JavaScript class or function? Why you have to set module.exports for this?
+04:03 < hoborick> What's the rationale?
+04:04 < blazes816> well (keep in mind I'm a total Node n00b), but if there's a object that represents the module, and the module exports something, it only makes sense for it to be a property of said object.
+04:05 < TehShrike> I'm sorry, I don't understand the question hoborick
+04:05 < TehShrike> You can export either a class or a function as it is
+04:05 < TehShrike> err, sorry, either an object or a function
+04:05 < TehShrike> Though the function could of course be a class function meant to be used with "new"
+04:06 < TehShrike> What is your question exactly?
+04:08 < blazes816> I think he was asking why set it on module.exports instead of (I assume a new object) exports
+04:08 < hoborick> TehShrike: I don't know if you can put a function into exports... I think I tried that. If you can do that, why do they have module.exports?
+04:08 < blazes816> %s/new/hypothetical/
+04:09 < blazes816> yeah you can
+04:09 < TehShrike> hoborick: right, so there is a different between module.exports and exports when you're referring to it in the module
+04:10 < TehShrike> I'm actually not the best person to speak about that, so I'll tell you the tiny bit that I know: if you want to export a function, you do module.exports = myFn; and if you want to export an object with properties, you do exports.myProperty = whatever;
+04:10 < hoborick> TehShrike: But why have both of them? Why not just have it so you set exports to whatever?
+04:10 < TehShrike> That I can not say.
+04:11 < hoborick> Hrm... yeah, there's probably some underlying technical rationale.
+04:11 < TehShrike> For any more intelligent words on the subject, somebody smarter would need to say something.  Though I will note this incidental fact: everyone I respect considers exporting a single function to be the correct way to write a module.
+04:11 < hoborick> Interesting.
+04:11 < TehShrike> Here is a potentially controversial post related to that incidental fact: http://www.mikealrogers.com/posts/coffee-perspective.html
+04:13 < hoborick> Nice.. thanks for that!
+04:13 < TehShrike> (I liked that post, even if I'm not sure I agree with it completely)
+04:13 < TehShrike> <3 mikeal
+04:13 <@Nexxy> omg omg omg wait
+04:13 <@Nexxy> THE mikeal ?!
+04:13 < mikeal> haha
+04:13 < TehShrike> OH SHIT DO YOU KNOW HIM SRSLY?
+04:14 <@Nexxy> DUDE
+04:14 <@Nexxy> I met him once
+04:14 < TehShrike> WHAT WAS HE LIEK?
+04:14 <@Nexxy> he asked to use my macbook charger
+04:14 < TehShrike> lol
+04:14 <@Nexxy> I'm never washing it again.
+04:14 < mikeal> i'm met you like 4 times :)
+04:14 < mikeal> er i've
+04:14 <@Nexxy> rofl :P
+04:14 < TehShrike> But seriously, I did like that post mikeal
+04:14 < mikeal> emily is too cool to remember meeting me most of those times :P
+04:15 <@Nexxy> almost
+04:15 < TehShrike> Over the years, there have been multiple points where I considered to myself "someone who hadn't put in the effort to appreciate this type of thing wouldn't care whether or not it was any good"
+04:15 <@Nexxy> nodeconf 2011, nodeconf 2012, JSConfEU, NodeDublin, Realtime
+04:15 <@Nexxy> mikeal, looks like *you* forgot one
+04:16 < TehShrike> And then there's always the question, why put in the effort to build up all that pickiness?
+04:16 < mikeal> oh sheeeit
+04:16 < mikeal> yeah, jsconfeu/nodedublin/realtime are almost merged together
+04:16 < TehShrike> And I even hear that from programmers about code at times
+04:16 <@Nexxy> hah yeah
+04:16 <@Nexxy> I'm still recovering from that whole jaunt
+04:17 < TehShrike> On the whole, I think I agree with the idea behind your post a good deal more than I disagree with it
+04:17 < mikeal> TehShrike: you just get spoiled with stuff being good and/or working properly
+04:17 < mikeal> sometimes, being spoiled is a good thing :
+04:17 < mikeal> :)
+04:17 < mikeal> if we can get our expectations higher it means we're making progress
+04:17 < TehShrike> "Correct" vs "it depends" is still something I'm thinking about a lot though
+04:18 < mikeal> "it depends" isn't an answer
+04:18 < mikeal> there has to be a goal, right
+04:19 <@Nexxy> unless the question is about adult diapers
+04:19 < mikeal> and there is a "best" way to accomplish it
+04:19 < TehShrike> Sorry, that's a weird way to phrase the dichotomy in my mind
+04:19 <@Nexxy> bah dum tshh
+04:19 < TehShrike> "There is a correct way to solve this problem" vs "sometimes this way is right, sometimes this other way is right, it depends"
+04:19 < mikeal> "it depends" means "well, we'll do a bunch of things and have 5 goals so we can enable all of them but achieve none of them"
+04:19 <@Nexxy> everything depends
+04:19 < TehShrike> "sometimes cheap coffee is the correct solution, sometimes excellent coffee is the solution"
+04:19 < TehShrike> That's what I mean by "it depends"
+04:19 < mikeal> bad coffee is wrong
+04:20 <@Nexxy> cheap coffee is good for plants
+04:20 <@Nexxy> and mailing drugs
+04:20 < mikeal> someone fucked up somewhere along the way
+04:20 < mikeal> haha
+04:20 < TehShrike> And like I said, I think I agree that there is a correct solution in any given case
+04:20 < mikeal> the thing about the module pattern
+04:20 < TehShrike> Though I'm not sure I accept it as a constant yet
+04:20 < mikeal> that pattern is the "right way" to build a large module community of small easily understandable components
+04:20 < TehShrike> When it comes to a module pattern, I'm fairly convinced that exporting a single function is the correct pattern :-P
+04:21 < TehShrike> No argument there
+04:21 < TehShrike> I'm only talking in general
+04:21 < mikeal> other features enable you to do all kinds of things that aren't building an ecosystem of small components
+04:21 < mikeal> those features are "right" at accomplishing other goals
+04:21 < mikeal> but those aren't our goals
+04:21 < TehShrike> Define the group you mean by "our"
+04:22  * TehShrike crosses his finger that mikeal will include him in the group
+04:22 <@Nexxy> nodes js
+04:22 < mikeal> this is the problem with standards and standards bodies, a lot of people with different goals, and the very missplaced belief that adding all the features can achieve all the goals
+04:22 < TehShrike> Yes. I understand that well.
+04:22 < mikeal> our goal, as in "the node.js community"
+04:22 < mikeal> is to build an ecosystem
+04:22 < mikeal> to build on all of each others work
+04:22 < mikeal> and continue to build more value that can be leveraged by more people
+04:22 <@Nexxy> I like to think that the . is pronounced 's'
+04:22 <@Nexxy> in node.js
+04:23 < mikeal> max pronounces it "node point javascript
+04:23 <@Nexxy> I did that on some slides once
+04:23 <@Nexxy> I think nodes JS was max's idea actually
+04:23 <@Nexxy> ;
+04:24 < mikeal> i don't think there was a single js related conference after nodeconf that didn't have jifasnif in at least one slide :)
+04:24 < TehShrike> hah
+04:24 < TehShrike> nifbjsif
+04:24 <@Nexxy> #jifasnif
+04:25 <@Nexxy> [00.23.48] [freenode] -ChanServ(ChanServ@services.)- Channel #jifasnif is not  registered.
+04:25 < TehShrike> Hey, curious, how many people here have used Lua?
+04:26 < mikeal> i've played with it, nothing serious tho
+04:27 < TehShrike> I've been talking to a friend of mine who's loved it, and has been moving into JS lately
+04:27 < TehShrike> So he's always comparing JS to Lua
+04:27 < TehShrike> And I'm interested in it because I know a lot of game engines use it, and I'm thinking of scouting some game engines out at some point
+04:27 < TehShrike> And I wanted to see if any experienced JS users had felt out Lua a bit
+04:28 <@Nexxy> lua feels like a kick in the face
+04:28 < TehShrike> In a good way or a bad way? 8-|
+04:28 <@Nexxy> there's a good way to feel that?
+04:29 < TehShrike> Nexxy: <-- elaborate plz
+04:29 < reza> hey guys - i've read @Raynos answer on stackoverflow about frameworks [http://stackoverflow.com/questions/5683916/node-js-express-vs-geddy]
+04:29 <@Nexxy> I just remember briefly going through it and just being horrified by the syntax and
+04:29 <@Nexxy> tuples everywhere
+04:29 < reza> he says "Note, I would advise against using any other library I mention below the line."
+04:30 < reza> is it common to skip using express these days and be a real man?
+04:30 < reza> is it better to just learn connect and use it directly?
+04:30 <@Nexxy> "real man"?
+04:30 <@Nexxy> ilol'd
+04:30 < TehShrike> I'M A REAL BOY
+04:30 < reza> lol
+04:30 <@Nexxy> reza, what does express have to do with gender?
+04:30 < TehShrike> now *I* lold
+04:30 < reza> i'm just playing with his words
+04:31 <@Nexxy> I think that express is very widely used
+04:31 <@Nexxy> if you are suffering from NIH then by all means
+04:31 <@Nexxy> skip it
+04:31 < TehShrike> I think that for some things I might like to build, Express is really handy
+04:31 < reza> NIH?
+04:31 <@Nexxy> not invented here
+04:32 < reza> i've done that far too much in the past
+04:32 <@Nexxy> express has always been geared toward spinning up and iterating quickly
+04:32 <@Nexxy> you can replace parts of it with your own code after you understand your architecture and problem domain, etc etc
+04:32 < TehShrike> I might not make everything into an Express plugin, but if I have some site that's a small variation on serving static files, or a small variation on some other thing that's easily worked into Express, I'd turn to it pretty gladly
+04:34 < TehShrike> Nexxy: what's your favorite of the "stupid code" you've written?
+04:34 < TehShrike> Like, code just for fun, for some stupid puzzle or something
+04:34 <@Nexxy> nice-package
+04:35 <@Nexxy> https://github.com/nexxy/nice-package
+04:35 < TehShrike> Huh, I haven't seen this before
+04:35 <@Nexxy> it's dumb
+04:35 < TehShrike> lol
+04:36 < TehShrike> I'll figure out a reason for it any minute now, just let me keep reading it
+04:37 <@Nexxy> browserify already does most of that on its own
+04:37 <@Nexxy> but I added other stupid stuff like hotloading
+04:37 <@Nexxy> and automagic rebundling
+04:38 <@Nexxy> when source files change
+04:38 <@Nexxy> it's just the wrong way to do it
+04:38 < AAA_awright> When Source Code goes Bad
+04:38 < SomeoneWeird> lol Nexxy 
+04:38 < TehShrike> What made it most fun?
+04:39 <@Nexxy> playing with event emitters
+04:39 < reza> thanks @Nexxy/@TehShrike that's helpful
+04:40 < reza> i wanted to use hogan templates and in my research i found out this thing about partials
+04:40 < TehShrike> Man, my relationship with events weird
+04:40 < TehShrike> Like, I'd played around with node.js a decent bit in my free time, and never found a use for events
+04:40 < reza> i'm used to creating tempaltes that wrap other pages
+04:40 < reza> and i'm not sure how to do that with express and hogan
+04:40 < TehShrike> Even though I read about them in node while I was reading about the language, I never used events
+04:41 < reza> i've done partials with mustache with test code
+04:41 < TehShrike> But just the last couple months, I needed to have some different modules talk to each other in a client-side framework, and events were just the obvious way to do it
+04:41 < TehShrike> And it's made my life in that client-side app just so much more reasonable
+04:42 < reza> how are people making master templates that wrap views?
+04:46 < TehShrike> And very related, I would like to say that smokesignals is excellent library https://github.com/bentomas/smokesignals
+04:46 < TehShrike> Seriously, it's about my favorite module
+04:47 <@Nexxy> TehShrike, its an entirely different model 
+04:47 <@Nexxy> events
+04:47 < nlf> buahahahaha
+04:47 <@Nexxy> and streams
+04:47 < nlf> best line from a readme ever
+04:47 < nlf> jack.off('say hello', listener);
+04:47 < TehShrike> Nexxy: oh, for sure
+04:48 <@Nexxy> but it's very powerful when you do find an appropriate way to use them
+04:48 < TehShrike> Events have been very excellent for this little framework I've been building
+04:49 < nlf> Nexxy: i'm told by a coworker (adam baldwin) that you were working on a riak library?
+04:49 < TehShrike> Though I can't deny that I've been writing in an environment that used messages for quite a while, so I may be predisposed
+04:49 <@Nexxy> nlf, yeah
+04:49 < nlf> he told me he thought you may be interested in the protobuf implementation i had been working on
+04:50 < TehShrike> I started writing MFC 6 years ago
+04:50 <@Nexxy> nlf, ohh yeah
+04:50 < nlf> https://github.com/nathan-lafreniere/protobuf.js that's the raw protobuf specific stuff, and https://github.com/nathan-lafreniere/riakpbc is the client i wrote on top of it
+04:50 <@Nexxy> nlf, very nice, thanks :D
+04:51 < nlf> no problem, i hope it's of use
+04:51 <@Nexxy> are you in pdx too then?
+04:51 < nlf> if you find bugs, please send pull requests, i've not really put it through the ringer much
+04:51 < nlf> nah, i work for &yet in richland, wa
+04:51 <@Nexxy> O rly? were you @ realtime?
+04:52 < nlf> i wasn't, no
+04:52 <@Nexxy> aww
+04:52 < nlf> i stayed behind to be billable while everyone else went
+04:52 <@Nexxy> well I met a lot of your team! awesome guys
+04:53 < nlf> yeah, it's a pretty great group of people
+05:01 < airtanah> ZeroMQ anyone using it?
+05:04 < TehShrike> Please, some other programmers watch this http://youtu.be/My7woPSoZwM
+05:04 < TehShrike> Tell me if I'm crazy
+05:04 < TehShrike> Or if that's not the most amazing thing ever
+05:05 <@Nexxy> TehShrike, I want my money back
+05:05 < TehShrike> That video just blows my mind
+05:07 <@Nexxy> you can see the guy in the back on the right
+05:07 <@Nexxy> he's all like...
+05:07 <@Nexxy> "alright, guy... wrap it up..."
+05:08 < phork> TehS, i want my bandwidth back :/
+05:08 < reza> i never needed dave chapelles wrap it up box more
+05:09 < TehShrike> ah, I was afraid it wouldn't be very accessible
+05:09 < TehShrike> That is sad, but I suppose it is pretty weird
+05:10 < reza> i'm reminded of primus for some reason
+05:10 < TehShrike> It does get a bit abstract there
+05:40 < milani> anyone from node-webkit guys here?
+06:08 < trp> join me for comedy http://synchtu.be/LJdG
+06:16 < chovy> i seem to have mongoose issues when i added a sub-document, old objects, that don't have the sub-documents array are causing problems.
+06:27 < firebalrog> That sucks
+06:28 < chovy> Can someone spot the error, why item is null just after the item.save() ? https://gist.github.com/b5a3edacdeb3b403cee0
+06:28 < chovy> it only happens in some cases, existing objects that don't have comments[] array yet
+06:32 < deoxxa[grumpy]> lol orm
+06:32 < chovy> deoxxa[grumpy]: yup. still having issues.
+06:39 < chovy> i found the problem
+06:39 < chovy> Item.findOne(item) didn't get the right item.
+06:39 < chovy> Item.findById(item) did
+07:20 < samholmes> is there better docs for knox than the readme?
+07:23 < RLa> the SOURCE? :)
+07:34 < hoborick> Hello good people of the night. I'm wondering why, when defining a module, there are two separate mechanisms for exposing module functionality: exports and module.exports. I understand how they're different, but why doesn't exports just server both roles?
+07:34 < samholmes> Is an HTTP res.statusCode an number or a string?
+07:35 < samholmes> js>require
+07:35 < purr> samholmes: ReferenceError: require is not defined
+07:36 < RLa> samholmes, i expect it to be a number
+07:37 < samholmes> RLa: why isn't it documented as such?
+07:39 < RLa> samholmes, maybe you mean this? http://nodejs.org/api/http.html#http_response_statuscode_1
+07:39 < samholmes> RLa: Right, it doesn't mention if it's a number type or string.
+07:40 < RLa> then create an issue on unclear documentation
+07:41 < RLa> tho i think most would expect it to be a number
+07:41 < RLa> there are no 0xx codes so this is reasonable
+07:43 < cryptopsy> this line in the typical chat app doesn't prompt when i run my server locally socket.emit('user', prompt("What's your name?");
+07:44 < cryptopsy> how can i sniff the socket to see if that emit is happening?
+07:48 < samholmes> RLa: Right.
+07:48 < samholmes> I'm sure someone here has used knox?
+07:48 < samholmes> I'm getting a "Must specify content-length header" error message when using putFile.
+07:48 < RLa> i want node module supporting glacier too :)
+07:48 < samholmes> Could this because I'm specifying a header parameter?
+07:49 < RLa> so far have to use some java crap
+07:49 < samholmes> http://pastie.org/5122514
+07:50 < RLa> line 15, 16, isn't that syntax error
+07:50 < RLa> looks like not
+07:50 < RLa> js> {a:b:2}
+07:50 < purr> RLa: (number) 2
+07:51 < munichlinux> I am trying to read password and print * on keypress. http://jsfiddle.net/DDFDL/ Looks like listener never got registered. What am i doing wrong?
+07:52 < samholmes> RLa: I fixed that.
+07:52 < samholmes> RLa: I copied over a version that I was about to edit.
+07:52 < samholmes> RLa: I noticed that and immediately fixed it.
+07:52 < RLa> otherwise the header is specified there as i see
+07:53 < samholmes> RLa: The content-length header?
+07:53 < samholmes> RLa: The problem is that the putStream method requires a content-length header.
+07:53 < samholmes> How do I get the content length from the gm stream method?
+07:55 < RLa> no idea but you need the byte syze
+07:55 < RLa> size*
+07:55 < RLa> maybe s3 supports chunked transfer encoding too
+07:56 < RLa> that should not ask for content-length
+07:56 < cryptopsy> ?
+07:57 < samholmes> RLa: knox has the content-length check hard-coded into the putStream function.
+07:58 < samholmes> From AWS docs "Length of the message (without the headers) according to RFC 2616. This header is required for PUTs and operations that load XML, such as logging and ACLs."
+07:58 < samholmes> Damn, I  need the byte size of the image I'm working on with gm.
+07:58 < RLa> samholmes, according to googling s3 supports multipart (chunked) transfer
+07:59 < RLa> then again, no idea if knox supports it :/
+07:59 < samholmes> RLa: I could replicate knox's putStream method, but that's sloppy.
+08:00 < RLa> anther way is to obtain the size from gm somehow
+08:00 < samholmes> looking into that
+08:10 < cryptopsy> what part of my program is causing this?    info  - unhandled socket.io url
+08:11 < deoxxa[grumpy]> cryptopsy: it's line 36
+08:12 < samholmes> Anyone here use gm?
+08:12 < samholmes> Turns out gm.filesize only gives me a string like "104.2K"
+08:13 < samholmes> That's some bullshit.
+08:23 < gavin_huang> does mocha have a method like 'expect(n)'  that ensures there are particular number of asserts have passed before declaring the test passed?
+08:25 < samholmes> Here's my issue on this regarding knox https://github.com/LearnBoost/knox/issues/112
+08:26 < Turquesa> hi all, is it possible to interconnect two different node.js servers by using socket.io?
+08:27 < deoxxa[grumpy]> samholmes: "So give me a good explanation or remove the condition within the method's definition."
+08:27 < deoxxa[grumpy]> samholmes: that's a bit impolite :/
+08:34 < kramutils> Turquesa: sure, you can use redis as global store for socket.io servers.. - https://github.com/LearnBoost/socket.io/wiki/Configuring-Socket.IO
+08:34 < cryptopsy> deoxxa[grumpy]: fuck you
+08:34 < deoxxa[grumpy]> ...
+08:35 < samholmes> deoxxa[grumpy]: It wasn't intended.
+08:35 < deoxxa[grumpy]> cryptopsy: u mad bro?
+08:36 < deoxxa[grumpy]> samholmes: mmm, you probably just don't want to give them the wrong idea
+08:37 < samholmes> deoxxa[grumpy]: I put it in question form, which makes everything better.
+08:37 < deoxxa[grumpy]> :D
+08:38 < deoxxa[grumpy]> cryptopsy: http://i.imgur.com/qlugj.jpg
+08:38 < cryptopsy> yes, you're a dickhead piece of shit and if wish nothing but your painful demise
+08:41 < deoxxa[grumpy]> rofl
+08:41 < deoxxa[grumpy]> so mad
+08:42 < ujjwalt> People why do I get an error on process.stdin.setRawMode
+08:42 < ujjwalt> it says TypeError: Object #<Socket> has no method 'setRawMode'
+08:48 < ujjwalt> actually got i
+08:48 < ujjwalt> using key press module
+08:49 < ujjwalt> *it
+08:50 < whiskers75> readline and sockets is very buggy
+08:51 < chovy> i want to send an email from my web app to a user when they do something on the site, but sending it as it happens makes the response hang for too long...what's the best way to queue an email to be sent by a cronjob later.
+08:51 < graeme_f> chovy: have you tried using process.nextTick? that might work
+08:52 < whiskers75> why doesn't this work: https://github.com/whiskers75/creativemud/blob/master/server.js - readline with sockets should play nicely
+08:52 < whiskers75> node can be irritating sometimes :)
+08:53 < chovy> graeme_f: what is process.nextTick?
+08:53 < whiskers75> read docs :)
+08:54 < graeme_f> chovy: check the docs :)
+08:54 < graeme_f> chovy: it'll let you defer some work until you've finished what you're doing (i.e. sending the response)
+08:54 < whiskers75> anyone know how to fix my problem? :)
+08:56 < chovy> graeme_f: so i can do res.render(); process.nextTick(sendEmail);
+08:56 < chovy> something like that?
+08:56 < whiskers75> chovy: I believe so
+08:56 < whiskers75> give it a whirl
+08:56 < whiskers75> what's to lose? :)
+08:57 < whis[frustrated]> why doesn't this work: https://github.com/whiskers75/creativemud/blob/master/server.js - readline with sockets should play nicely
+08:57 < chovy> whiskers75: that may work for sending 1 email, but what if i want to send 10
+08:57 < chovy> or 100
+08:57 < whis[frustrated]> chovy: erm..
+08:58 < whis[frustrated]> chovy: TONS OF process.nextTick's?
+08:58 < whis[frustrated]> :0
+08:58 < chovy> it seems to me, emails should be queued and let some other process handle sending them.
+08:58 < whiskers75> child processes?
+08:59 < whiskers75> maybe wueue
+08:59 < whiskers75> *queue
+08:59 < whiskers75> emails and send them there
+09:00 < chovy> i was thinking storing the email in a db, and then having a cronjob check for pending emails every 2 minutes or something.
+09:01 < chovy> but i think process.nextTick will work when i just need to send one, and want to return right away.
+09:01 < whiskers75> ooh, it looks like IRCbot_Master etc are allowed back on :) - chovy: hmm, store them and then send them to a child process using setTimeout()
+09:01 < chovy> whiskers75: what do you mean child process?
+09:01 < whiskers75> http://nodejs.org/api/child_process.html, chovy
+09:02 < whiskers75> why doesn't this work: https://github.com/whiskers75/creativemud/blob/master/server.js - readline with sockets should play nicely
+09:05 < zezikaro> Hi does anyone know if you can get any of the support like what grails has, out of the box?
+09:05 < zezikaro> Like sortable lists etc
+09:05 < whiskers75> arrays?
+09:05 < zezikaro> html tables
+09:05 < whiskers75> oh
+09:10 < zezikaro> whiskers75 any idea? :)
+09:10 < zezikaro> I just wonder if nodejs is built in the same way grails is
+09:13 < whiskers75> zezikaro: nope
+09:13 < whiskers75> why doesn't this work: https://github.com/whiskers75/creativemud/blob/master/server.js - readline with sockets should play nicely
+09:13 < whiskers75> this is driving me mad
+09:15 < demonfire> http://brig.co
+09:17 < whiskers75> http://brig.co/77.
+09:17 < whiskers75> there.
+09:17 < zezikaro> o.o
+09:17 < zezikaro> what
+09:18 < whiskers75> why doesn't this work: http://brig.co/77 - readline with sockets should play nicely
+09:19 < zezikaro> whiskers75 I believe that was just a random spammer
+09:19 < zezikaro> the person just entered then left
+09:19 < whiskers75> zezikaro: meh.
+09:20 < whiskers75> zezikaro: thanks, though
+09:20 < RLa> what's the business model of url shorteners?
+09:20 < whiskers75> RLa: no idea
+09:20 < whiskers75> maybe "BUY PREMIUM AND GET 50 FREE LINKS SHORTENED"
+09:20 < whiskers75> and they limit you to 10 per month
+09:20 <@Nexxy> skimming affiliate links
+09:20 < zezikaro> No, more likely that they have ads
+09:20 <@Nexxy> ppc ads
+09:20 < whiskers75> :)
+09:21 < whiskers75> why doesn't this work: http://brig.co/77 - someone please help me with this
+09:21 < zezikaro> 'doesnt work'
+09:21 < zezikaro> not a good question
+09:21 < whiskers75> why doesn't readline with socket as input and output work: http://brig.co/77 - someone please help me with this
+09:22 < RLa> maybe socket encoding screws it up
+09:22 < RLa> control characters and those
+09:23 < whiskers75> how do I remove that stuff and get one plain line for readline?
+09:25 < whiskers75> we should get my IRCbots in here, minus the opper part :D
+09:25 < whiskers75> they really help with link shortening
+09:26 < whiskers75> one only has to type !shorten (link)
+09:26 < whiskers75> npmbro
+09:26 < npmbro> Powered by http://jit.su/         Available commands: npm search | npm docs | npm install | npm stats | npm help | npm node | npm credits
+09:26 < whiskers75> npm search irc
+09:27 < whiskers75> npmbro search irc
+09:27 < npmbro> whiskers75: Please see http://eirikb.github.com/nipster/#irc
+09:30 < whiskers75> methinks I'll bring a bot in here
+09:31 < whiskers75> erm...
+09:31 < zezikaro> I'm not sure if that's allowed?
+09:31 < whiskers75> bots?
+09:32 < whiskers75> well, the opper bots were banned :) Mine is an opper bot, but it has many other features besides opping
+09:37 < whiskers75> I have bots on the Node Bot Channel
+09:38 < whiskers75> would you like me to take down npmbro?
+09:47 <@Nexxy> whiskers75, npmbro should be fine as long as it only responds to commands prefixed with its nickname
+09:50 < SoulRaven> hello
+09:50 < SoulRaven> is posibile to have module inside another module?
+09:50 < whiskers75> Nexxy: is it fine for the IRCbots to be here - they respond to stuff prefixed with !
+09:50 < whiskers75> obviously opme wont do anything, they won't be opped :)
+09:52 < SomeoneWeird> SoulRaven, hm?
+09:52 <@Nexxy> whiskers75, those should proably stay in the bot channel :P
+09:53 <@Nexxy> npmbro is nice tho
+09:53 < npmbro> Nexxy: Please see npm's documentation at https://duckduckgo.com/?q=site%3Ahttp%3A%2F%2Fnpmjs.org%2Fdoc%2F%20is%20nice%20tho
+09:53 <@Nexxy> yes thank you
+09:53 < SomeoneWeird> lol.
+09:53 < deoxxa[grumpy]> SoulRaven: yes
+09:53 < whiskers75> lol
+09:53 < whiskers75> npmbro shut it
+09:53 < npmbro> whiskers75: Please see npm's documentation at https://duckduckgo.com/?q=site%3Ahttp%3A%2F%2Fnpmjs.org%2Fdoc%2F%20shut%20it
+09:53 < whiskers75> :)
+09:54 < SomeoneWeird> you should check its an actual module
+09:54 < SoulRaven> deoxxa[grumpy]: how, inside a node_modules folder?
+09:54 < SomeoneWeird> yap SoulRaven 
+09:54 < deoxxa[grumpy]> SoulRaven: yep
+09:54 < whiskers75> i might bring the IRCbots here to show off :)
+09:54 < SomeoneWeird> whiskers75, leave them in the bot channel
+09:54 < deoxxa[grumpy]> whiskers75: please don't.
+09:54 < SoulRaven> so node_modules/geocoder/node_modules/tinygeocoder
+09:55 < SomeoneWeird> yep SoulRaven 
+09:55 < SoulRaven> nice :)
+09:55 < SoulRaven> thx
+09:55 < deoxxa[grumpy]> SoulRaven: that's how it'd end up, yep, but you'd probably want to let npm take care of that for you
+09:55 < whiskers75> k
+09:55 < whiskers75> you can come to the bot channel
+09:55 <@Nexxy> whiskers75, as much fun as the bots can be it's also important to keep excess line noise to a minimum
+09:55 < SoulRaven> deoxxa[grumpy]: i don't know how to use npm for that
+09:55 <@Nexxy> there are already a lot of us here and sometimes it's hard to get help with all the extra static
+09:55 < whiskers75> hm. maybe pm instead of giant wall of text
+09:55 < deoxxa[grumpy]> SoulRaven: so long as that geocoder module has a package.json with tinygeocoder specified, it'll be installed for you automatically
+09:56 <@Nexxy> whiskers75, it'd also be cool if you could make an ignore list for the bot
+09:56 < SoulRaven> is not installed, now i am create the modules, for my app
+09:56 <@Nexxy> whiskers75, that way people that don't want to get PMs from the bot can just tell it not to anymore
+09:56 < whiskers75> Nexxy: oh, ok
+09:56 < whiskers75> well it doesn't unless told
+09:56 <@Nexxy> that's true
+09:57 < whiskers75> finally got the bots working again :)
+09:58 < elkorn> ahoy ppl
+09:58 < elkorn> anybody could spare some info on how to cinfugre Jasmine-task under Grunt?
+09:59 < elkorn> configure*
+09:59 < whiskers75> ok, come to ##node-irc-bots for a demo of the new bot, including weather, bit.ly and calculator
+09:59 < whiskers75> :)
+10:04 < SomeoneWeird> a calculator!
+10:04 < SomeoneWeird> lol
+10:10 < aandy> does you watch also have a calculator by any chance?
+10:10 < aandy> ;)
+10:10 < elkorn> !calc
+10:10 < elkorn> does anything of essence happen in this chatroom ?
+10:11 < aandy> personally i prefer my own "bot", which in retrospect has a similar design to github's hubot
+10:11 < aandy> hubot is actually a good read if you haven't seen cs before
+10:11 < aandy> elkorn: define the context - helping people with node related issues and questions? yes
+10:12 < elkorn> that could be enough of a context... anything besides?
+10:12 < elkorn> projects, meetups, plans?
+10:13 < aandy> meta discussions of projects and design yeah. plans for node.js core dev? not so much
+10:14 < elkorn> sounds like what I'm looking for - need to spend some time with the community 
+10:15 < cryptopsy> where's a working example of socket.emit('user', prompt( .. ?
+10:16 < elkorn> have you tried http://nodetuts.com/tutorials/7-embracing-all-with-socketio.html#video ?
+10:16 < cryptopsy> not watching  video
+10:16 < elkorn> combined with the 6th episode and related comments
+10:17 < elkorn> there's a tut on socket.io
+10:17 < cryptopsy> not what i asked for
+10:18 < samholmes> How do I buffer data from a stream?
+10:21 < whiskers75> hello all
+10:24 < whiskers75> :)
+10:26 < samholmes> whiskers75: hi
+10:26 < samholmes> whiskers75: are you experienced in buffers?
+10:26 < whiskers75> samholmes: well, no, i don't like buffers :) but you can read the docs
+10:27 < samholmes> whiskers75: Well, maybe I don't need buffers per-se.
+10:27 < samholmes> whiskers75: how would you go about buffering the chunks of data from a stream?
+10:27 < whiskers75> erm, buffers i suppose
+10:28 < whiskers75> i do not have much experience with buffers and streams
+10:28 < RLa> Buffer api not giving any clue?
+10:29 < samholmes> RLa: the problem I'm facing is not knowing the length of the buffer to create for the stream.
+10:29 < whiskers75> that's tricky/
+10:30 < RLa> can't you grow a Buffer?
+10:30 < samholmes> RLa: I wasn't aware that I could. How do I do so?
+10:30 < cryptopsy> hi, wheres working example of shittiest node chat app?
+10:31 < RLa> hm
+10:31 < samholmes> cryptopsy: Can't remember, it's been awhile since I spoke with her.
+10:31 < RLa> i can't find any easy way than just allocating buffer in 2x size and copying over
+10:32 < cryptopsy> samholmes: no idea what ur talking about
+10:32 < samholmes> cryptopsy: Your mom.
+10:32 < cryptopsy> why would i give a shit if you're fucking a woman in her 60s
+10:32 < samholmes> RLa: so, you're saying just to make my buffer a new buffer with the length of the old buffer plus the new content's length.
+10:32 -!- samholmes was kicked from #Node.js by Nexxy [samholmes]
+10:32 -!- cryptopsy was kicked from #Node.js by Nexxy [cryptopsy]
+10:32 < Raydiation> is there a way to pass a "global" variable to a required file?
+10:33 < Raydiation> i got jsdom and want to include angularjs, but angularjs complains about having no window object
+10:33 < cryptopsy> every teenager and their grandmother wanna take cheap shots at me becaue im asking a simple question
+10:33 < cryptopsy> yet no one seems to have a problem with this
+10:33 <@Nexxy> cryptopsy, it's not acceptable
+10:33 < cryptopsy> hurr durr we're the leetest tech geeks, lets harass the newbies
+10:33 <@Nexxy> you're welcome to ask questions :)
+10:33 < cryptopsy> Nexxy: ban me, i don't give a shit
+10:33 < cryptopsy> been asking for a century
+10:33 <@Nexxy> why are you being aggressive toward me?
+10:33 < RLa> cryptopsy, good guy got kicked because of you
+10:33 < cryptopsy> got nothing but BULLSHIT
+10:33 < whiskers75> please BAN HIM
+10:34 < cryptopsy> whiskers75: go fuck your pathetic bots in the ass :)
+10:34 -!- mode/#Node.js [+b *!*cryptopsy@*.cpe.net.cable.rogers.com] by Nexxy
+10:34 -!- cryptopsy was kicked from #Node.js by Nexxy [cryptopsy]
+10:34 < whiskers75> finally
+10:34 < whiskers75> what is it with him?
+10:34 < elkorn> omg, the internet
+10:35 < Raydiation> and angular is basically: (function(window, document, undefined) { //code })(window, document);
+10:35 <@Nexxy> wb :P
+10:35 < samholmes> Nexxy: ty
+10:35 < Raydiation> so if i require this file, how can i pass window and document to it?
+10:36 < samholmes> Raydiation: this is the wrong channel. Try #javascript
+10:36 < Raydiation> samholmes: ty
+10:37 <@Nexxy> query isaacs 
+10:37 <@Nexxy> +/
+10:37 <@Nexxy> lewlz
+10:37 < SomeoneWeird> lol
+10:37 < deoxxa[grumpy]> lol Nexxy, it's ok. i know you have plenty more than just bullshit. bullshit is merely the beginning!
+10:38 < deoxxa[grumpy]> there's all sorts of assorted ingredients needed to construct a Nexxy
+10:38 <@Nexxy> it's true
+10:38 < whiskers75> lol :)
+10:39 <@Nexxy> I'm shopping for a professional fog machine
+10:39 <@Nexxy> any suggestions?
+10:39 < SomeoneWeird> wut
+10:39 < whiskers75> what?? :)
+10:39 <@Nexxy> I'm making a javascript-powered rave
+10:40 < SomeoneWeird> lawl
+10:40 <@Nexxy> and (hopefully) getting node to control DMX devices such as fog machines and stage lights
+10:41 < whiskers75> lol
+10:42 < Snoopah> Hello
+10:43 < Snoopah> nice idea Mexxy :)
+10:43 < RLa> Nexxy, what hw are you using for generating dmx control signals?
+10:44 <@Nexxy> I will have to figure that part out
+10:44 <@Nexxy> arduino should work
+10:44 < Snoopah> try cloud9's node blog, they made a basic joystick driver :)
+10:44 <@Nexxy> there are already some libs for DMX512 signalling w/ arduino
+10:44 < Snoopah> oh, that's interesing
+10:45 <@Nexxy> http://arduino.cc/playground/DMX/DMXShield
+10:45 <@Nexxy> that's actually a lot easier than I was expecting
+10:45 < Snoopah> kewl
+10:45 < whiskers75> :) Snoopah is a bot :)
+10:45 < whiskers75> I am controlling :)
+10:46 < Snoopah> Hello! I am a bot!
+10:46 <@Nexxy> http://www.skpang.co.uk/catalog/arduino-dmx-shield-p-663.html
+10:46 < whiskers75> I set up a system so that I would get node.js channel in mine
+10:47 < whiskers75> and, I can reply via Snoopah :)
+10:47 < RLa> i played yesterday with raw avr, got it reading temperature through adc and send to node through rs 232 :)
+10:48 < Snoopah> Although, it does not display ops, so Nexxy looks like a non-op at my channel :)
+10:48 <@Nexxy> RLa, that's pretty sweet
+10:48 < whiskers75> wait, my channel
+10:48 <@Nexxy> RLa, just using avrdude directly?
+10:48 <@Nexxy> or...
+10:48 < RLa> uisp
+10:48 < whiskers75> i'm making the bot talk for me :D
+10:48 <@Nexxy> oh neat
+10:48 < RLa> i made the dasa bitbanging programmer
+10:48 < Snoopah> /msg whiskers75 test
+10:48 <@Nexxy> I'm afraid of bricking things
+10:48 < whiskers75> no, that didn't work
+10:49 < Snoopah> Nexxy: Bricking is the only thing stopping us from experimenting :)
+10:49 <@Nexxy> doesn't stop me
+10:49 < RLa> http://imgur.com/gEmrV <- that's my standalone programmer, with atmega324 in it
+10:49 < Snoopah> oh k :)
+10:50 < Snoopah> argh chat spam in whisk's channel from node.js :D
+10:50 <@Nexxy> RLa, jayzus
+10:50 < RLa> i will soon make another, with usb and isp interfaces
+10:50 < Snoopah> not really spam
+10:50 <@Nexxy> cool
+10:51 <@Nexxy> keep me updated
+10:51 < RLa> usb ones do not need external power, less ways to get electrocuted
+10:51 < whiskers75> gtg
+10:51 <@Nexxy> RLa, yeahhhh
+10:53 < onr> RLa: there's a cassette player?
+10:53 < RLa> that's old one, with integrated fm player
+10:54 < RLa> haha, found it during dumpster diving :)
+10:54 < onr> heh
+10:54 < RLa> it's now sitting on my desk and wasting space
+10:55 < RLa> fm is too noisy near the pc and i have no casettes
+11:00 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+11:30 < SoulRaven> is posibile to get the description of a module loaded?
+11:30 < SoulRaven> i am refering to the description from the package.json file
+12:04 < abrkn> i'm stuck on installing bcrypt under windows (again) after switching to win8(x64): "windowssdkdir variable" missing from registry. sounds familiar to anyone?
+12:30 < SomeoneWeird> anybody know of any disassemblers that support x64 elf apart from IDA?
+12:34 < jjjl> is there any mongodb library where i get greater visibility over 'errors'? Just simple things like being able to have a DuplicateKeyError instead of a generic object where I have to check the numeric code against what it says in the mongo source code
+12:35 < abrkn> how do i debug "CL.exe" exited with code -1073741515." during bcrypt install on windows? (the code means dll not found, but without more logs i cant understand which dll)
+12:40 < whiskers75> hello
+12:51 < Wherypt> yo
+12:52 < Snoopah> <whiskers75> hi
+12:52 < Wherypt> is the windows iocp true file async where unix epoll/select etc needs to be simulated in a thread pool?
+12:52 < Wherypt> i was reading this and got confused http://www.reddit.com/r/programming/comments/124jdr/asynchronous_disk_io_in_libtorrent_and_its_sad/
+12:53 < Snoopah> <whiskers75> I don't know, maybe someone else can answer
+12:54 < whiskers75> By the way, I am talking through my bot, if you were wondering
+12:54 < Snoopah> <whiskers75> See?
+12:55 < Wherypt> which bot?
+12:55 < SomeoneWeird> whiskers75, erm, why?
+12:55 < Snoopah> <whiskers75> Me, Snoopah :D
+12:55 < Snoopah> <whiskers75> Meh, no reason
+12:56 < Snoopah> <whiskers75> Testing, really
+12:56 < jjjl> Wherypt: complicated. unix is optimised differently. iocp is good in concept but i suspect on a low level it's no more efficient
+12:56 < whiskers75> I'll talk in person.
+12:56  * jjjl has written IOCP code before
+12:56  * whiskers75 has no idea what IOCP is
+12:56 < jjjl> I/O Completion Ports
+12:56 < whiskers75> oh
+12:57 < jjjl> a low level win32 way of being notified when data is ready on a filehandle
+12:57 < whiskers75> The bot is there to relay messages to the bot channel
+12:57 < jjjl> the joy of unix is there are so many ways to solve the same problem
+12:58 < whiskers75> :)
+12:58 < whiskers75> I STILL haven't got my Node program working
+12:58 < whiskers75> https://github.com/whiskers75/creativemud/blob/master/server.js
+12:58 < jjjl> i'm still dismayed that people don't look twice at comparing numeric error codes in production code as being a bad thing
+12:58 < whiskers75> I'll get my bot to shorten that...
+12:59 < whiskers75> There: <@IRCbot_Master> Shortened URL: http://bit.ly/VuUsZe
+12:59 < SomeoneWeird> whats wrong with it whiskers75 ?
+12:59 < whiskers75> Readline and sockets do not play well
+13:00 < whiskers75> When I type in data after the first rl.question(), it carries through to the other questions
+13:00 < whiskers75> I think I have an idea...
+13:00 < SomeoneWeird> https://github.com/whiskers75/creativemud/blob/master/server.js#L189
+13:00 < SomeoneWeird> that won't even work
+13:01 < SomeoneWeird> neither will any of the other .replaces() like that
+13:01 < whiskers75> ah
+13:01 < whiskers75> but that does not fix anything
+13:02 < whiskers75> I'mma try creating a new Writable Stream and putting the data in there
+13:02 < SomeoneWeird> heh
+13:03 < whiskers75> wait, HOW do I remove newlines then, if the replaces do not work>
+13:03 < whiskers75> is it data = data.replace(that thing)?
+13:03 < SomeoneWeird> yes
+13:03 < whiskers75> ah ok, thanks
+13:04 < sebastian_o|> hey guys... there is a express.js channel somewhere?
+13:04  * whiskers75 shrugs
+13:04 < SomeoneWeird> #expressjs
+13:04 < sebastian_o|> :D
+13:04 < SomeoneWeird> or #express
+13:04  * whiskers75 is educated
+13:04 < SomeoneWeird> i think ^
+13:04 < sebastian_o|> mm nobody there
+13:04 < SomeoneWeird> #express
+13:05 < whiskers75> Can I use stream = new Stream?
+13:05 < whiskers75> that do anything usefuL?
+13:05 < jjjl> do exceptions cause enormous performance degradation in v8? seems noone uses them in their libraries
+13:05 < sebastian_o|> ah yeah thanks SomeoneWeird
+13:07 < jjjl> does it have some sort of implication with async code?
+13:07 < whiskers75> How do I make a Writable+Readable Stream?
+13:07 < SomeoneWeird> https://github.com/substack/stream-handbook
+13:07 < whiskers75> thanks
+13:11 < SomeoneWeird> hm I need something to code, suggestions anyone?
+13:11 < whiskers75> SomeoneWeird: I'm doing a MUD, maybe a web based game?
+13:13 < whiskers75> There, NOW the code should work - pushed the changes
+13:14 < whiskers75> erm: TypeError: Object #<Stream> has no method 'setEncoding'
+13:14 < EuroNerd> SomeoneWeird, what kind of project are you interested in?
+13:14 < whiskers75> oh
+13:14 < whiskers75> oopsies
+13:15 < whiskers75> readline.js:78
+13:15 < whiskers75>   input.resume();
+13:15 < whiskers75>         ^
+13:15 < whiskers75> TypeError: Object #<Stream> has no method 'resume'
+13:15 < whiskers75> huh?
+13:16 < whiskers75> aah oopsies (oops number 2)
+13:18 < whiskers75> ok. *NOW* it should work
+13:19 < whiskers75> guess what happened.
+13:19 < whiskers75> it failed.
+13:19 < SomeoneWeird> EuroNerd, eh anything, need to take my mind of this project im doing :P
+13:20 < whiskers75> now?
+13:20 < whiskers75> Place your bets here: will it work or not work?
+13:21 < deoxxa[grumpy]> SomeoneWeird: make a thing with dissolve :3
+13:21 < whiskers75> SomeoneWeird: why isn't it working now? I used the guide, but it still says TypeError: Object #<Stream> has no method 'resume'
+13:21 < whiskers75> deoxxa[grumpy]: why are you STILL [grumpy]? :)
+13:21 < SomeoneWeird> no idea whiskers75, ask deoxxa[grumpy] 
+13:21 < SomeoneWeird> lol
+13:21 < SomeoneWeird> deoxxa[grumpy], no u
+13:21  * SomeoneWeird hates streams still
+13:21 < deoxxa[grumpy]> i already did
+13:21 < deoxxa[grumpy]> so
+13:21 < deoxxa[grumpy]> go
+13:21 < SomeoneWeird> shoosh
+13:21 < deoxxa[grumpy]> lol
+13:22 < whiskers75> deoxxa[grumpy]: why isn't it working now? I used the guide, but it still says TypeError: Object #<Stream> has no method 'resume'
+13:22  * whiskers75 HATES streams
+13:22 < deoxxa[grumpy]> whiskers75: i have no idea what you're doing or what you're talking about
+13:22 < whiskers75> deoxxa[grumpy]: ask SomeoneWeird 
+13:22 < deoxxa[grumpy]> also, streams are awesome
+13:22 < SomeoneWeird> -.-
+13:22 < whiskers75> deoxxa[grumpy]: https://github.com/whiskers75/creativemud/blob/master/server.js
+13:22 < EuroNerd> SomeoneWeird, well, if you want to help out a complete newbie write his first node app... ;)   
+13:23 < SomeoneWeird> DONT BELEEV U deoxxa[grumpy] 
+13:23 < SomeoneWeird> sure EuroNerd 
+13:23 < Ingdira> hi
+13:23 < whiskers75> EuroNerd: ya, this project is to see how badly I fail at node
+13:23 < SomeoneWeird> whiskers75, i think he was talking about himself, lol
+13:23 < Snoopah> <whiskers75> deoxxa[grumpy]: remove the [grumpy] tag!
+13:24 < deoxxa[grumpy]> no, it's mine and i like it
+13:24 < whiskers75> SomeoneWeird: oh. oopsies :)
+13:24 < Snoopah> <whiskers75> deoxxa[grumpy]: remove the [grumpy] tag!
+13:24 < Snoopah> <whiskers75> deoxxa[grumpy]: fine
+13:24 < whiskers75> sorry, hit Enter twice :D
+13:24 < SomeoneWeird> heh
+13:24 < whiskers75> so. why isn't it working now? I used the guide, but it still says TypeError: Object #<Stream> has no method  'resume'
+13:25 < Ingdira> express 3.0 released :)
+13:25 < whiskers75> npmbro info express
+13:25 < npmbro> whiskers75: Please see npm's documentation at https://duckduckgo.com/?q=site%3Ahttp%3A%2F%2Fnpmjs.org%2Fdoc%2F%20info%20express
+13:25 < whiskers75> npmbro
+13:25 < npmbro> Powered by http://jit.su/         Available commands: npm search | npm docs | npm install | npm stats | npm help | npm node | npm credits
+13:25 < whiskers75> npmbro docs express
+13:25 < npmbro> whiskers75: Please see http://github.com/visionmedia/express#readme
+13:25 < whiskers75> npmbro is handy
+13:25 < npmbro> whiskers75: Please see npm's documentation at https://duckduckgo.com/?q=site%3Ahttp%3A%2F%2Fnpmjs.org%2Fdoc%2F%20is%20handy
+13:26 < whiskers75> very funny.
+13:26 < SomeoneWeird> stop spamming -.-
+13:26 < whiskers75> ok
+13:27 < whiskers75> https://github.com/whiskers75/creativemud/blob/master/server.js - help me out with the streams! I made it readable!
+13:28 < Ingdira> npmbro express
+13:28 < npmbro> Ingdira: Please see npm's documentation at https://duckduckgo.com/?q=site%3Ahttp%3A%2F%2Fnpmjs.org%2Fdoc%2F%20express
+13:28 < Ingdira> npmbro info express
+13:28 < npmbro> Ingdira: Please see npm's documentation at https://duckduckgo.com/?q=site%3Ahttp%3A%2F%2Fnpmjs.org%2Fdoc%2F%20info%20express
+13:28 < whiskers75>  - npmbro *docs* express, Ingdira 
+13:29 < whiskers75> :)
+13:29 < Ingdira> npmbro docs express
+13:29 < npmbro> Ingdira: Please see http://github.com/visionmedia/express#readme
+13:29 < Ingdira> kool
+13:29 < Ingdira> is this written in node?
+13:29 < whiskers75> npmbro is, but it's not mine
+13:29 < npmbro> whiskers75: Please see npm's documentation at https://duckduckgo.com/?q=site%3Ahttp%3A%2F%2Fnpmjs.org%2Fdoc%2F%20is
+13:29 < whiskers75> it's by DTrejo
+13:29 < whiskers75> hosted by me
+13:30 < Ingdira> npm install express
+13:30 < Ingdira> npmbro install express
+13:30 < whiskers75> nice try
+13:30 < SomeoneWeird> heh
+13:30 < whiskers75> For my next bot, I'll make a node eval bot
+13:30 < whiskers75> and dump it in here
+13:31 < jjjl> way to open a security hole on your server
+13:31 < whiskers75> I don't host it, AppFog do
+13:32 < jjjl> and when someone evals an infinite loop?
+13:32 < whiskers75> oh. on second thoughts, scrap thAT
+13:33 < Ingdira> just make it have a timeout?
+13:33 < jjjl> fork bomb?
+13:33 < whiskers75> maybe have the channel vote it
+13:35 < whiskers75> oops crashed my bot
+13:37  * jjjl remains blissfully ignorant as he doesn't see joins and parts
+13:37  * whiskers75 follows jjjl's lead
+13:39 < deoxxa[grumpy]> whiskers75: test it in another channel
+13:39 < whiskers75> deoxxa[grumpy]: what, Snoopah?
+13:42 < whiskers75> deoxxa[grumpy]: if you feel so strongly, /ignore Snoopah
+13:43  * whiskers75 needs to invent a 'Go Away' feature into Snoopah: if more than 5 people type 'snoopah goaway', Snoopah leaves for 2 minutes
+13:44  * whiskers75 is angry
+13:44 < SomeoneWeird> 2 minutes? that's gunna spam even more.
+13:44  * VesQ is also angry because he does not appreciate the level of spam on this channel right now
+13:45 < whiskers75> ok, me and S will shut it
+13:45 < VesQ> more specifically, the /mes are annoying
+13:45 < whiskers75> OH ok
+13:45 < whiskers75> just use /ignore whiskers75 and /ignore Snoopah, then VesQ
+13:45 < VesQ> so whiskers75 what are you trying to do?
+13:46 < whiskers75> VesQ: with the bots, or my other project?
+13:46 < VesQ> I already ignore parts and joins on this channel so this isn't too bad
+13:46 < VesQ> with the bots or whatever you're doing related to IRC right now :)
+13:46 < whiskers75> Learn about Node and IRC.
+13:46 < SoulRaven> i ok, if i use try catch, for require
+13:46 < SoulRaven> to determine what module is loaded and what module is not?
+13:47 < VesQ> we have an unfinished project with tuhoojabotti where we're implementing IRC as a streaming module to nodejs
+13:47 < whiskers75> cool
+13:47 < whiskers75> LOL, if I put Snoopah in my own channel, where Snoopah is relaying, MASSIVE CHAT SPAM
+13:47 < VesQ> you can take a look at it to get some inspiration :) https://github.com/jslush/node-irc-stream
+13:47 < whiskers75> Thanks!
+13:48 < whiskers75> I use the IRC module :)
+13:49 < whiskers75> I need to make sure that Snoopah can't chat spam itself...
+13:49 < VesQ> we also created a bot at one point using the IRC module
+13:49 < whiskers75> Otherwise, you get ##node-irc-bots:<IRCbot_Master> <Snoopah> <whiskers75> test - and then it GROWS
+13:49 < VesQ> but we didn't like the API of node-irc so we decided to do our own
+13:50 < whiskers75> VesQ: It's fine for me
+13:50 < whiskers75> npmbro search irc
+13:50 < npmbro> whiskers75: Please see http://eirikb.github.com/nipster/#irc
+13:50 < whiskers75> npmbro search ircbot
+13:50 < npmbro> whiskers75: Please see http://eirikb.github.com/nipster/#ircbot
+13:50 < SomeoneWeird> heh.
+13:50 < whiskers75> There's also a module that makes bots RIDICUOLSLY EASY
+13:51 < whiskers75> (misspelling)
+13:51 < whiskers75> basically, (pseudocode) listenFor('Hello') {Respond('Hello')}
+13:52 < SomeoneWeird> heh.
+13:52 < VesQ> whiskers75:  http://git.io/FkUMsA there's the bot
+13:52 < VesQ> the version before we erased the contents to start fresh :-)
+13:53 < whiskers75> AARGH COMPLICATED :)
+13:53 < VesQ> well actually, this is better: https://github.com/tuhoojabotti/tuhBot
+13:53 < whiskers75> :) yeah
+13:53 < VesQ> yup and it got too complicated so we decided to create a new streaming module
+13:54 < whiskers75> hey, this isn't ##node-irc-bots :)
+13:54 < VesQ> so we could just write IRC.join('#Node.js').on('join', function (ch) { ch.write('Hello, world!); } );
+13:54 < whiskers75> WOW, simple
+13:54 < VesQ> yup. That's why we're building the new streaming IRC-module
+13:54 < VesQ> because streams are quite powerful
+13:55 < whiskers75> In ##node-irc-bots, there's a stream of #node.js messages, but without joins/parts
+13:55 < VesQ> you can just call IRC.use('floodprotection').join.... to use middleware, in this case floodprotection middleware
+13:55 < whiskers75> :) good
+13:55 < VesQ> same for logs and stuff
+13:55 < VesQ> and you can build your own middlewares with ease
+13:55 < whiskers75> that's handy
+13:55 < VesQ> yup
+13:55 < VesQ> and the core is quite lightweight, thanks to the mw-system
+13:56 < VesQ> basically almost everything is a mw
+13:56 < whiskers75> I might consider that.
+13:56 < VesQ> and we have unit tests of some sort, too :)
+13:56 < whiskers75> What it looks like from ##node-irc-bots:
+13:56 < whiskers75> 14:54 < IRCbot_Slave> #Node.js: <whiskers75> I might consider that.
+13:56 < whiskers75> that's nice
+13:57 < VesQ> yup
+13:58 < whiskers75> Would the peoples in here like a bot that pm's you with the last 10 things said if you ask it to? (for when you've just joined)
+13:58 < VesQ> if you want to join our teams channel, it's here on freenode
+13:58 < whiskers75> oh.
+13:58 < whiskers75> cool
+13:58 < whiskers75> what is it?
+13:58 < VesQ> it's #jslush
+13:58 < whiskers75> :D
+13:59 < whiskers75> nice name
+14:00 < VesQ> yup, we like it, too :P
+14:02 < whiskers75> let's see if I can switch Snoopah to my channel and test the spam protection
+14:02 < VesQ> heh
+14:02 < VesQ> but I've g2g now so cya :)
+14:02 < whiskers75> cya
+14:02 < whiskers75> there
+14:03 < whiskers75> WOAH the spam protection DID NOT WORK
+14:03 < whiskers75> < IRCbot_Slave> ##node-irc-bots: <IRCbot_Slave> ##node-irc-bots: <IRCbot_Slave> ##node-irc-bots: <IRCbot_Slave> ##node-irc-bots:  <IRCbot_Slave> ##node-irc-bots: <IRCbot_Slave> ##node-irc-bots: <IRCbot_Slave> ##node-irc-bots: <IRCbot_Slave>  ##node-irc-bots: <IRCbot_Slave> ##node-irc-bots: <IRCbot_Slave> ##node-irc-bots: <whiskers75> SPAM TEST
+14:04 < whiskers75> That kind of stuff happened
+14:04 < SomeoneWeird> yeah, now you're spammin
+14:05 < Snoopah> <whiskers75> I can still talk here
+14:06 < Snoopah> <whiskers75> Want Snoopah to leave?
+14:07 < Snoopah> <whiskers75> I'm coming back
+14:08  * whiskers75 is now AFK
+14:14 < whiskers75> hello
+14:18 < SomeoneWeird> -.-
+14:19 < whiskers75> what?
+14:20 < SomeoneWeird> http://pastie.org/5123524
+14:20 < SomeoneWeird> that's what.
+14:20 < whiskers75> oh
+14:22 < jjjl> why do you see joins and parts? life is much more peaceful without them
+14:22 < whiskers75> I'mma code a timer
+14:27 < SoulRaven> with is better to use readFileSync or readFile
+14:28 < Ingdira>   how does node.js compare to go?
+14:29 < whiskers75> Well, readFileSync is synchronous, so it'll run aside your program, which is not really ideal in most cases. readFile reads it and runs a callback when done.
+14:29 < SoulRaven> is far i know, go has not a verry good suport for mysql
+14:30 < tuhoojabotti> hmm
+14:30 < tuhoojabotti> I know this guy
+14:30 < SoulRaven> whiskers75: i don't knwo what to use, because i have to use inside a ForEach call
+14:31 < whiskers75> SoulRaven: readFile.
+14:31 < tuhoojabotti> SoulRaven: async module
+14:31 < whiskers75> tuhoojabotti is the exper
+14:31 < whiskers75> listen to him :)7
+14:31 < whiskers75>   if(message == "start timer") {
+14:31 < whiskers75>     var timer = 0;
+14:31 < whiskers75>     botMaster.say(sender, 'Timer at 0, started');
+14:31 < whiskers75>     var timerId = setInterval({timer = timer + 1}, 1000);7
+14:31 < tuhoojabotti> it makes making async loops etc easy
+14:31 < whiskers75>   }oopsies
+14:31 < whiskers75> sorry
+14:32 < SomeoneWeird> omfg
+14:32 < SomeoneWeird> stop spamming
+14:32 < whiskers75> what I meant to say is, why doesn't   if(message == "start timer") {
+14:32 < whiskers75>     var timer = 0;
+14:32 < whiskers75>     botMaster.say(sender, 'Timer at 0, started');
+14:32 < whiskers75>     var timerId = setInterval({timer = timer + 1}, 1000);7
+14:32 < whiskers75> AAAAAAAA
+14:32 < tuhoojabotti> yeah
+14:32 < whiskers75> why did that happen
+14:32 < tuhoojabotti> flood actually
+14:32 < SoulRaven> tuhoojabotti: ok, but the loop will not finish before the readFile finish the callback?
+14:33 < tuhoojabotti> with async library it calls a last callback when the loop finishes, check it out 
+14:33 < SoulRaven> and will end up with the same value of the last loop
+14:34 < SoulRaven> async not blocking, so will not stop the loop
+14:34 < SoulRaven> for each iteration
+14:35 < tuhoojabotti> no 
+14:35 < whiskers75> SoulRaven: sync doesn't block either AFAIK
+14:35 < tuhoojabotti> it won't block the event loop 
+14:35 < Ingdira> is node or go better for writing scalable http servers?
+14:35 < tuhoojabotti> sync version does block 
+14:36 < tuhoojabotti> Ingdira: yes, no, depends. 
+14:36 < whiskers75> Ingdira: Node?
+14:36 < whiskers75> Ingdira: I haven't tried Go
+14:36 < SoulRaven> that the ideea, async will not block the loop so, even if the callback from readFile is not finished, the loop will be finished 
+14:36 < Ingdira> are they even comparable?
+14:36 < tuhoojabotti> SoulRaven: async library allows parallel and serial processing without blocking 
+14:37 < Ingdira> not 100% true
+14:37 < Ingdira> if you block inside a serial function in async, it blocks the loop
+14:37 < tuhoojabotti> SoulRaven: yeah it will continue right away so you need to continue in the callback after the loop 
+14:38 < SoulRaven> http://bin.cakephp.org/view/1060255069
+14:38 < tuhoojabotti> Ingdira: well duh, you can always block it's easy 
+14:40 < SoulRaven> i do something wrong, or is the async problem, because in bin the callback return the last values from the loop
+14:40 < tuhoojabotti> SoulRaven: if you need to do stuff after that loop, then async library will help 
+14:40 < SoulRaven> i nead a loop, because i have to iterate each module path for finding out the data from package.json
+14:41 < tuhoojabotti> of course
+14:41 < SoulRaven> so readFile will be allways inside a loop
+14:41 < tuhoojabotti> sure
+14:41 < tuhoojabotti> and yes
+14:42 < Ingdira> can u have multiple event loops in node?
+14:42 < tuhoojabotti> workers 
+14:42 < tuhoojabotti> child processes 
+14:42 <@mbalho> spawn multiple process
+14:42 < whiskers75> ya
+14:43 < tuhoojabotti> SoulRaven: you could use a closure, but with async module it's very easy. 
+14:43 < SoulRaven> tuhoojabotti: how
+14:43 < whiskers75> read the docs :)
+14:43 < whiskers75> http://nodejs.org/api/child_process.html
+14:44 < whiskers75> I have an idea - how would you guys like a 
+14:44 < whiskers75> doc bot
+14:44 < tuhoojabotti> SoulRaven: look at the repo 
+14:44 < tuhoojabotti> good read me
+14:44 < whiskers75> for example: docbot docs childprocess
+14:44 < tuhoojabotti> caolan/async
+14:44 < tuhoojabotti> google
+14:44 < tuhoojabotti> I'm on mobile, so can't link 
+14:45 < SoulRaven> https://github.com/caolan/async
+14:45 < tuhoojabotti> that
+14:46 < tuhoojabotti> look at the examples
+14:49 < sinclair_> hey all
+14:50 < tuhoojabotti> Hello!
+14:50 < sinclair_> when doing IO, (specifically directory and file IO) do you typically opt for synchronous methods, or still roll async?
+14:50 < tuhoojabotti> async, absolutely.
+14:50 < djazz> hello
+14:50 < sinclair_> this in the context of say, express
+14:50 < tuhoojabotti> Yes
+14:50 < tuhoojabotti> definitely
+14:51 < SomeoneWeird> async is explicitly made, for IO
+14:51 < tuhoojabotti> sinclair_: if you use sync, it will stop processing new connections while it reads IO
+14:51 < tuhoojabotti> handles IO*
+14:51 < sinclair_> tuhoojabotti: so, async 100%
+14:51 < tuhoojabotti> yes.
+14:51 < tuhoojabotti> Only init (like require) can be sync
+14:51 < sinclair_> tuhoojabotti: regardless of the use case?
+14:51 < SomeoneWeird> yes
+14:51 <@mbalho> never use sync code inside of an event loop
+14:51 < djazz> yet another awesome node.js + raspberry pi project! http://djazz.mine.nu:7000/ (web interface for webradio/youtube using omxplayer)
+14:52 < djazz> try youtube ;)
+14:52 < tuhoojabotti> trying
+14:52 < RLa> who will hear it?
+14:52 < tuhoojabotti> djazz: how does it work?
+14:52 < sinclair_> djazz: is this running on a raspberry pi?
+14:52 < djazz> write something and press enter
+14:53 < djazz> yes, rpi with wifi
+14:53 < tuhoojabotti> right
+14:53 < tuhoojabotti> missing buttons are confusing
+14:53 < djazz> its in the kitchen, and the GUI is made to work from mobile browsers
+14:53 < tuhoojabotti> you like that?
+14:53 < djazz> yay Space Debris <3!
+14:53 < tuhoojabotti> ♡
+14:54 < tuhoojabotti> >:D
+14:54 < tuhoojabotti> djazz: nice project
+14:54 < djazz> :D
+14:54 < djazz> check out the source if interested
+14:54 < tuhoojabotti> oh, zip
+14:54 < tuhoojabotti> Y U no github
+14:54 < djazz> NOT YET
+14:54 < djazz> i made it today
+14:55 < tuhoojabotti> not an excuse!
+14:55 < djazz> :l
+14:55 < djazz> the page uses only XHR to communicate to the node.js http server
+14:55 < RLa> what's omx?
+14:55 < djazz> OpenMAX
+14:55 < tuhoojabotti> djazz: Like this repo ;D https://github.com/jslush/tuhBot
+14:55 < abrkn> anyone care to look over my travis setup? cant spot my error: https://travis-ci.org/#!/abrkn/mouth
+14:55 < djazz> http://elinux.org/Omxplayer
+14:56 < tuhoojabotti> abrkn: Tests failing?
+14:56 < abrkn> not starting
+14:56 < tuhoojabotti> abrkn: if you run phpunit locally does it work?
+14:56 < abrkn> i dont know what phpunit is
+14:57 < tuhoojabotti> :D
+14:57 < djazz> tuhoojabotti: how should I publish it? I edited a lot in a module that I npm installed
+14:57 < tuhoojabotti> abrkn: It runs tests and your code fails!
+14:57 < abrkn> tuhoojabotti: the tests work fine locally (mocha and mocha-phantomjs), however travis does not seem to do much
+14:57 < tuhoojabotti> You're not running phpunit tests.
+14:58 < tuhoojabotti> look at the log output
+14:58 < tuhoojabotti> phpunit --coverage-text tests
+14:58 < tuhoojabotti> Failed asserting that two strings are equal.
+14:58 < tuhoojabotti> /home/travis/builds/tolien/gas/tests/UserObjTest.php:117
+14:59 < abrkn> tuhoojabotti: where are you seeing this?
+14:59 < tuhoojabotti> travis
+14:59 < tuhoojabotti> click at the failing build
+15:00 < abrkn> all i see is "no rakefile found"
+15:00 < tuhoojabotti> wait a second
+15:00 < tuhoojabotti> I was probably looking at the wrong travis, damn hashbang urls
+15:00 < abrkn> aye. i dunno what rakefile is, but has nothing to do with my app
+15:00 < tuhoojabotti> sorry
+15:01 < tuhoojabotti> abrkn: Right, it thinks it's Ruby
+15:01 < tuhoojabotti> abrkn: mv travis.yml .travis.yml
+15:01 < abrkn> omg
+15:01 < tuhoojabotti> we had the same problem. :P
+15:01 < abrkn> i would never have spotted that
+15:01 < tuhoojabotti> hehe
+15:02 < abrkn> very excited about this setup =)
+15:02 < abrkn> browserified front-end tests (backbone.js)
+15:03 < tuhoojabotti> Yeah, travis is cool. :)
+15:03 < tuhoojabotti> abrkn: so what does your module do?
+15:04 < abrkn> it's a blackjack game for the web browser
+15:04 < tuhoojabotti> nice
+15:04 < abrkn> im making it to learn some technologies (socket.io and browserify mostly)
+15:04 < tuhoojabotti> yeah
+15:06 < abrkn> browserify is great so far
+15:09 < tuhoojabotti> I haven't use it yet, but it sounds great.
+15:13 < darthdeus> any tips for testing/structuring larger node/socket.io app?
+15:13 < tuhoojabotti> modules
+15:13 < tuhoojabotti> lot's of module
+15:13 < SomeoneWeird> yap
+15:15 < darthdeus> like internal npm modules?
+15:16 < darthdeus> i've tried abstracting some things, but i find that most of the code relies on the `socket` object
+15:16 < darthdeus> like for example if a moderator wants to kick a user, i need to catch the event, check if the user is a moderator, and then send a message to the respective client
+15:17 < darthdeus> most of the app looks like that :\
+15:17 < darthdeus> but it's impossible to test
+15:17 < whiskers75> why?
+15:18 < whiskers75> you can make a 'new Socket()'
+15:18 < darthdeus> nope, i get the socket in a "on connection" callback
+15:19 < whiskers75> yes but if you dont want to start the server, make a temp fake socket
+15:20 < darthdeus> but that fake socket would need to have expectations on callbacks
+15:20  * darthdeus here's an example
+15:20 < darthdeus> https://gist.github.com/3965051
+15:21 < whiskers75> ok. i seem to be lagging
+15:22 < darthdeus> take a look at the example,  "io" is something i get from starting the server, then i specify a callback for a "connection" event, which gives me the user's socket, and i have to work with that in the whole app
+15:22 < darthdeus> i'll show simpler example
+15:22 < whiskers75> no, its fine. i cant help here.
+15:23  * tuhoojabotti threw up
+15:23 < darthdeus> oh :\
+15:23 < darthdeus> https://gist.github.com/3965058
+15:23 < tuhoojabotti> I don't like coffeescript, even though it's cool.
+15:24 < whiskers75> I dont like Node when it doesnt work
+15:24 < darthdeus> there yo ugo https://gist.github.com/3965058 :p
+15:24 < darthdeus> javascriptified
+15:24 < sinclair_> tuhoojabotti: why not coffeescript?
+15:24 < tuhoojabotti> I mean I like python.
+15:24 < djazz> tuhoojabotti: https://github.com/daniel-j/omxradio
+15:24 < sinclair_> tuhoojabotti: i also like python
+15:25 < tuhoojabotti> but not coffeescript
+15:25 < tuhoojabotti> something in it
+15:25 < sinclair_> tuhoojabotti: i like TypeScript
+15:25 < djazz> :P
+15:25 < darthdeus> what about iced coffeescript? :P
+15:25 < Snoopah> <whiskers75> This is #node.js, not #programming-languages
+15:26 < sinclair_> tuhoojabotti: i can't imagine not coding in TS nowadays
+15:26 < tuhoojabotti> djazz: I might have done var log = process.stdout.write; :P
+15:26 < djazz> hm?
+15:26 < tuhoojabotti> sinclair_: I haven't looked at typescript, but it sounds cool.
+15:26 < darthdeus> how's typescript better?
+15:26 < djazz> too long lines for ya?
+15:26 < tuhoojabotti> djazz: repetition yeah
+15:26 < sinclair_> tuhoojabotti: its ok, but it helps to know another language to help build it how you want
+15:26 < tuhoojabotti> djazz: make your own require that logs ;-)
+15:27 < sinclair_> in fact, i suppose node could happily build TS for you, but i use C#
+15:27 < djazz> tuhoojabotti: yeah
+15:27 < tuhoojabotti> sinclair_: I know languages other than js.
+15:27 < sinclair_> tuhoojabotti: i figured you would
+15:27 < tuhoojabotti> I don't really follow you thought
+15:28 < tuhoojabotti> sorry
+15:28 < tuhoojabotti> I haven't had time to experiment
+15:28 < darthdeus> is there a "write node like this and it'll be easy to test" kind of guide?
+15:28 < sinclair_> tuhoojabotti: the thing with TS, is you need to have a toolset there to build it how you want to build it
+15:28 < tuhoojabotti> darthdeus: modules, basically.
+15:28 < tuhoojabotti> sinclair_: sure
+15:29 < tuhoojabotti> darthdeus: make small single-purpose modules and write tests for them.
+15:29 < Ingdira> hey guys
+15:29 < tuhoojabotti> that's the main idea, I suppose.
+15:29 < darthdeus> :\
+15:30 < sinclair_> tuhoojabotti: for example, i have separate tools (i had to write them myself) to build TS in particular ways (for node, or for the browser),... that's not necessarily a bad thing, tho i would have preferred better tools in visual studio.
+15:30 < sinclair_> tuhoojabotti: aside from that, TS is a great language to work in
+15:30 < tuhoojabotti> sinclair_: I think they should write typescript support to web matrix, which is used to develop node on windows/azure, right?
+15:30 < sinclair_> tuhoojabotti: nope
+15:30 < tuhoojabotti> I've only tried it briefly
+15:31 < sinclair_> tuhoojabotti: node is installed up on Azure now (iisnode), you just need to rangle the web.config to point at your node entry point
+15:31 < tuhoojabotti> yes
+15:31 < sinclair_> thats it really, just works, i don't use web matrix at all
+15:32 < abrkn> tuhoojabotti: woot! https://travis-ci.org/#!/abrkn/mouth/builds/2953890
+15:32 < tuhoojabotti> it's certain that we need tools for typescript for node
+15:32 < sinclair_> tuhoojabotti: not necessarily 
+15:32 < mscdex> node.js rules!
+15:32 < tuhoojabotti> mscdex: point taken
+15:33 < milani> I want feedbacks for AppJS. 
+15:33 < SoulRaven> i have try with async module: http://bin.cakephp.org/view/1047104355
+15:33 < Ingdira> mscdex you got aim or skype?
+15:33 < milani> anyone here have any experience with appjs that can help me make it better?
+15:33 < tuhoojabotti> abrkn: gratz :)
+15:33 < milani> features, workflow etc.
+15:33 < mscdex> Ingdira: nope
+15:33 < abrkn> ty ty
+15:33 < SoulRaven> but something strange is hapened, because return 6 buffers, where the first buffer is something from async back code
+15:33 < sinclair_> tuhoojabotti: i just compile my TS into modules, no need for node tooling outside of that
+15:33 < SoulRaven> anyone use async module and map method?
+15:34 < sinclair_> tuhoojabotti: do you use C# at all?
+15:34 < tuhoojabotti> sinclair_: I have used it with XNA, but not much. Lately I've used Java.
+15:34 < tuhoojabotti> for school :/
+15:35 < sinclair_> tuhoojabotti: http://pastebin.com/d3f6fbiJ
+15:35 < tuhoojabotti> sinclair_: I dislike your style. :)
+15:35 < sinclair_> tuhoojabotti: everyone does
+15:35 < tuhoojabotti> Hehe
+15:36 < SoulRaven> anyone?
+15:36 < sinclair_> tuhoojabotti: regardless, i banged this up the other day to wrap over the top of node, restart it and output node wranings etc to a c# console
+15:36 < tuhoojabotti> yeah
+15:36 < tuhoojabotti> cool
+15:36 < tuhoojabotti> SoulRaven: looking at it
+15:37 < SoulRaven> tuhoojabotti: this is what is return: http://bin.cakephp.org/view/668890458
+15:38 < sinclair_> tuhoojabotti: i hooked it into the build, such that i could build TS output, and restart node on the fly, although, i think there are other "node" solutions out there, its nice to be able to hax up something you need
+15:38 < SoulRaven> for this code: http://bin.cakephp.org/view/1047104355
+15:38 < tuhoojabotti> Yeah.
+15:38 < tuhoojabotti> sinclair_: Why are you telling me this?
+15:38 < tuhoojabotti> :D
+15:38 < sinclair_> tuhoojabotti: well, if you know a bit of C#, maybe you could use it for something?
+15:38 < tuhoojabotti> Maybe
+15:38 < sinclair_> well, just offering it up :)
+15:39 < tuhoojabotti> But currently I don't have a good server to run node on
+15:39 < tuhoojabotti> shared shell server /o\
+15:39 < sinclair_> tuhoojabotti: you can't run it locally?
+15:39 < tuhoojabotti> Sure, but there's no fun in that. ;-)
+15:39 < tuhoojabotti> and I like to develop on light terminals remotely
+15:39 < tuhoojabotti> like a tablet/laptop
+15:39 < tuhoojabotti> etc.
+15:40 < sinclair_> tuhoojabotti: sounds kinda typical 
+15:40 < tuhoojabotti> SoulRaven: Why do use .join('/') and not the path module for working with the paths?
+15:40 < sinclair_> tuhoojabotti: its how i do things at work
+15:41 < tuhoojabotti> Lately I've been busy with school stuff.
+15:41 < tuhoojabotti> also computer was broken
+15:41 < SoulRaven> tuhoojabotti: because i have replace the index.js with package.json
+15:41 < tuhoojabotti> SoulRaven: Yeah, but you could use the path module.
+15:41 < SoulRaven> i want to iterate each loaded module
+15:42 < tuhoojabotti> yeah
+15:43 < SoulRaven> way, the callback from async, add a new element from fs.readFile
+15:44 < tuhoojabotti> yes
+15:44 < tuhoojabotti> that's how it works
+15:44 < SoulRaven> way? i dont't undestand
+15:45 < tuhoojabotti> SoulRaven: instead of fs.readFile do function (f, cb) { fs.readFile(f, function (data) { /* parse data, call cb */ }) }
+15:45 < tuhoojabotti> for each in the loop you call the callback with data and the data is added to the array returned in the last callback
+15:46 < SoulRaven> and the best solution is to shift the first element
+15:47 < EuroNerd> I'm trying to make my little app work over SSL. So I've set up some https express servers (one for static files, other for websockets) and I've created a self-signed cert. Unfortunately, my Firefox doesn't like it. I've tried with Chromium and it gave me a dialog "yeah, I wanna trust this shady cert", or sth to that effect. ;)  But FF doesn't even ask, just says "Connection was reset". Is there a workaround to make my self-signed ce
+15:47 < EuroNerd> rt edible for visitors, or do I have to get a real one from a CA?
+15:51 < yorick> where did destroySoon go?!
+15:53 < EuroNerd> no-one here uses node over SSL?    are all your apps communicating insecurely?  ;)
+15:54 < sinclair_> EuroNerd: hahaha
+15:54 < sinclair_> EuroNerd: wouldn't surprise me if that were the case
+15:55 < leelu> hi
+15:55 < leelu> I want to install node.js on centOS 5.5
+15:56 < leelu> I see the requirement atleast python 2.6 but people are saying they are able to install node.js with just python 2.4
+15:57 < leelu> Are there any known issues of installing node.js with python 2.4
+15:58 < milani> leelu, r u sure you can ? it will fail I guess.
+15:58 < milani> it uses gyp which requires pythong 2.7
+15:58 < leelu> i was just going through this
+15:59 < leelu> http://stuff.blat.co.za/2011/06/03/installing-node-js-on-centos-5-5/
+15:59 < leelu> min requirement is python 2.7 ?
+15:59 < tuhoojabotti> menthos
+16:00 < milani> leelu, it is v0.4.8 :D nodejs changed a lot
+16:00 < milani> it is now v0.8.14
+16:01 < leelu> oh ok , milani. Just trying to find how to install node.js on my centOS 5.5 server
+16:01 < leelu> people are saying to use altinstall option of python
+16:01 < tuhoojabotti> leelu: Interesting nickname, where are you from?
+16:02 < milani> leelu, http://villaroad.com/2010/10/rolling-python-2-6-2-on-centos-5-3/
+16:02 < leelu> but i am bit worried to install it on server , so that i don't break the existing python 
+16:02 < milani> I think pythong 2.7 can coexist 
+16:03 < leelu> Thanks milani, going through it
+16:03 < milani> leelu, better to try on a virtual box first.
+16:04 < leelu> Ok
+16:04 < whiskers75> How do I create a readable and writable stream?
+16:05 <@mbalho> whiskers75: http://github.com/substack/stream-handbook
+16:05 < whiskers75> that did'nt work.
+16:05 < whiskers75> didn't*
+16:06 <@mbalho> post the code you wrote
+16:06 < whiskers75> http://pastie.org/5123905
+16:08 < whiskers75> any idea?
+16:09 < whiskers75> mbalho: any idea?
+16:09 <@mbalho> im tryign to read your code
+16:09 <@mbalho> hold your horses
+16:09 < whiskers75> ok :)
+16:10 <@mbalho> where does bytes come from on line 8
+16:11 < whiskers75> your link
+16:11 <@mbalho> also you can probably just use https://github.com/dominictarr/through
+16:11 <@mbalho> whiskers75: it comes from the stream handbook? the bytes variable?
+16:11 < whiskers75> yes
+16:11 <@mbalho> so it is set to 0?
+16:11 < whiskers75> no...
+16:11 <@mbalho> your code doesnt show it getting initialized
+16:11 < whiskers75> it doesnt
+16:12 < whiskers75> should it?
+16:12 <@mbalho> i dunno, its harder to help debug code when the code isnt all there is all
+16:12 < whiskers75> i copy'n'pasted from your handbook
+16:13 <@mbalho> i am not substack
+16:13 < whiskers75> ok, after defining bytes, .write() does not work
+16:14 < substack> ignore mbalho i am totally the same
+16:14 <@mbalho> whiskers75: use the through stream module i linked
+16:14 <@mbalho> whiskers75: doing it the way you are doing it is very bug prone
+16:14 < whiskers75> I'm trying to filter all the newlines from a socket, and feed the result to readline
+16:14 < substack> BIRDS OF A FEATHER
+16:14 < substack> WHISKERS OF A CAT
+16:14 <@mbalho> FLY LIKE A BUTTERFLY
+16:15 < substack> READING RAINBOW
+16:15 <@mbalho> TACO DELMAR
+16:16 < whiskers75> so, using through, how do I make a stream that fits the bill? educate me.
+16:16 <@mbalho> theres a pretty good readme on the project
+16:16 <@mbalho> and also probably already a module that does what you want on npm
+16:17 < whiskers75> npmbro search stream
+16:17 < npmbro> whiskers75: Please see http://eirikb.github.com/nipster/#stream
+16:17 < whiskers75> as in, modify my code, as I don't see how to implement
+16:19 < whiskers75> help?
+16:21 < mscdex> leelu: if you install the epel repo and then install python26, it installs it separately from the main centos python (2.4)
+16:22 < leelu> great mscdex, one question if we have python 2.6 can we specify node.js when it's running which python version to use ?
+16:22 < whiskers75> How do I create a stream that I can write to, and Readline reads?
+16:22 < mscdex> leelu: then after that what i do to make things easy is create ~/bin and create a symlink ~/bin/python that points to /usr/bin/python26
+16:22 < yorick> why does my net.Server go 'not running' when I try to .close it, while it is in fact running?
+16:23 < mscdex> leelu: and add ~/bin to the beginning of your $PATH
+16:23 < whiskers75> aah I get it
+16:23 < whiskers75> thanks mbalho
+16:23 < leelu> Ok, but this won't break yum pkg manager right ?
+16:23 < mscdex> leelu: no
+16:23 < mscdex> leelu: i've done this many times on many centos 5.x systems
+16:24 < leelu> Thanks mscdex :), I am trying it on a new server instance and will do try it right now, before trying it on server, thank u very much mscdex
+16:24 < mscdex> yorick: do you still have connections to the server?
+16:24 < yorick> mscdex: no.
+16:25 < mscdex> yorick: then it should be closed
+16:25 < yorick> mscdex: of course not, it's still listening
+16:25 < mscdex> yorick: can you provide simple code that shows your problem?
+16:27 < leelu> Hi mscdex, is this mirror correct to use for centOS 5.5 final http://mirrors.ustc.edu.cn/fedora/epel/5/x86_64/ to install epel
+16:28 < mscdex> leelu: http://fedoraproject.org/wiki/EPEL/FAQ#How_can_I_install_the_packages_from_the_EPEL_software_repository.3F
+16:28 < mscdex> ^ that's how i usually add it
+16:28 < yorick> mscdex: no :/
+16:29 < yorick> something else must be happening
+16:29 < mscdex> yorick: i don't know then.... server.close() stops listening
+16:29 < yorick> mscdex: it does. but my socket seems to stop listening somewhere along the way
+16:31 < EuroNerd> Darn, I've added my self-signed cert to Firefox's Certification Manager and it still won't open my web app.
+16:31 < yorick> mscdex: ah, my shutdown gets called multiple times
+16:32 < yorick> yeah, fun things are happening in my shutdown code
+16:33 < mscdex> :-)
+16:33 < yorick> it doesn't expect being called synchronously, apparently
+16:34 < yorick> var l = listeners.length; listeners.forEach(execute_l--==0?then_exit); if (l == 0) exit()
+16:35 < yorick> that works fine if the l==0 check happens before the listeners finish, but not if they return immidiately
+16:45 < whiskers75> is there any way to 'GOTO' in node?
+16:48 < RLa> whiskers75, i think some guys added goto for js
+16:48 < leelu> Hi mscdex, just one quick question, with the steps mentioned here, still do i need to install python 2.6 ?
+16:48 < leelu> http://nodejs.tchol.org/
+16:48 < yorick> whiskers75: functions.
+16:48 < RLa> whiskers75, http://summerofgoto.com/
+16:48 < yorick> whiskers75: why do you need this?
+16:49 < yorick> because you don't.
+16:49 < mscdex> leelu: only if you want to build from source, otherwise you can use the pre-built distribution tarball from nodejs.org
+16:49 < RLa> need != want
+16:49 < RLa> because i want does not mean i need
+16:49 < mscdex> leelu: that website is outdated, the latest stable node version is 0.8.14 now
+16:50 < leelu> hmm ok
+17:02 < bruciasse> Hi, I was wondering if variables declared at the beginning of a module, say var foo, are properties of some object, say bar.foo; like in a browser console you can say "var x = 3" and x is the same as window.x
+17:05 < bruciasse> (I'm just trying to stick to a convention to make it clear when I'm assigning to a variable visible in the whole module, to improve readability.)
+17:06 < mscdex> bruciasse: no
+17:07 < bruciasse> mscdex: Okay, I guess I might then declare var foo and have all module-wide variables be properties of foo, so whenever I access foo.something it's clear I'm referring to a module-wide entity, what do you think?..
+17:08 < mscdex> bruciasse: seems a bit odd to me
+17:09 < clever> the usual method is to just prefix the name, like gFoo and gBar
+17:10 < bruciasse> clever: Sounds good to me, thanks; mscdex would you say you agree on that or would it still seem odd to you?.. Thanks if you can elaborate a bit
+17:11 < mscdex> bruciasse: i'm not fond of adding unnecessary prefixes like that either
+17:11 < mscdex> bruciasse: what is your need for doing this?
+17:12 < mscdex> bruciasse: are these variables constants or what?
+17:12 < bruciasse> Variables that can be read or written by many functions in the module, I guess we could call them "state variables"?
+17:14 < mscdex> bruciasse: well for state variables, i've always contained those within an instance
+17:14 < mscdex> bruciasse: that way the object i exported can be instantiated several times without state variables getting clobbered when all instances are used simultaneously
+17:15 < bruciasse> Yes, thanks, I see your point.
+17:15 < EuroNerd> can anyone recommend a trust-worthy Certificate Authority that provides free SSL certs?
+17:16 < mscdex> EuroNerd: startssl?
+17:16 < EuroNerd> thanks!
+17:16 < mscdex> there's probably others, but that is one i know of off the top of my head
+17:18 < bruciasse> mscdex: Okay I thought a bit about it and yeah you're quite right!, I was a bit confused I guess.  Thanks again!
+17:19 < guybrush_> what couch-client would you recommend? i am just lazy and dont want to do plain http
+17:37 < whiskers75> why doesn't the doesNameExist function in this code work properly? https://github.com/whiskers75/creativemud/blob/master/server.js
+17:38  * whiskers75 is annoyed
+17:38  * whiskers75 is annoyed
+17:43 < TheHippo> what's logic behind which express route will get executed first if multiple routes match the url? first one applies will be called first?
+17:43  * whiskers75 gives up
+17:44 < TheHippo> any way to make sure a certain function will alway called first?
+17:45 < stagas_> whiskers75: it's async
+17:45 < whiskers75> stagas_: thank you so much. finally I can stop freaking out.
+17:46 < TheHippo> okay... first one first..
+17:49 < codingstream> guybrush_: the two big ones are https://github.com/dscape/nano and https://github.com/cloudhead/cradle .
+17:50 < codingstream> guybrush_: both are excellent, but cater to different use-cases. nano is purely a light wrapper around the http interface, cradle has some additional sugar like  caching results in memory
+17:51 < s5fs> hey gang, any suggestions for lightweight distributed databases? i'm looking to host something on a few beagleboards.
+17:52 < coderarity> isaacs: is that stream API cleanup still coming with node 0.10? the stuff to fix node-http-proxy? just wanted to know if that was still planned for stable release in node 0.10
+17:55 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+18:13 < niix> is mongodb the recommended db for node.js?  I see a lot of docs on it
+18:13 < niix> or I guess 'mongoose'
+18:15 < niix> and would things like my scheme live with in app.js?
+18:17 < aho> niix, you can also use postgres if you'd feel more comfy with that
+18:17 < niix> aho: I've used postgres with Django, but I'm always open to new things
+18:18 < niix> I'm having a hard time finding good documentation on things like using a db with node
+18:18 < wltsmrz> Redis suits Node pretty well. It's quite popular.
+18:18 < aho> well, take a look then at various nosql thingies... there is key-value stores, document stores, and graph thingies
+18:18 < niix> I don't know where some of these functions should live, if I should be separating them or putting them all in app.js
+18:19 < aho> all of those are very different from traditional relational databases and each one comes with its very own set of problems (well, relational databases do of course have their very own issues, too)
+18:19 < niix> I'm going through the mongoosejs tutorial right now
+18:22 < tsingi> got node.js serving up svg widgets.  I've been doing this for a while, but it's never been this easy.  node.js rocks.
+18:24 < tsingi> Next thing I'll want is websockets.  I suspect it will be a no brainer.
+18:24 < timeturner> socket.io
+18:24 < tsingi> :)
+18:26 < DarkArgon> hi. how can i get the current rx and tx of an network-interface with node?
+18:27 < DarkArgon> i mean the rx and tx bytes like in ifconfig
+18:27 < s5fs> DarkArgon: run ifconfig and parse the results?
+18:30 < DarkArgon> thats not very efficient, is it?
+18:35 < jugglinmike> Hey all. I'm trying to scale my server logic across multiple cores with the cluster module
+18:35 < jugglinmike> I've been careful to use Redis for storing state, so as I understand it, this should be sufficient: https://gist.github.com/3965600
+18:36 < jugglinmike> Before adding this logic, the single process used about 70% of the core it was assigned to.
+18:36 < jugglinmike> After, all cores are reporting 100% utilization
+18:37 < jugglinmike> I wouldn't expect this, and I'm wondering if this behavior sounds familiar to anyone
+18:38 < airtanah> jugglinmike: are you saying you expect to see 70% across all cores?
+18:39 < jugglinmike> yes, or less given that each will only see a subset of total clients
+18:40 < jugglinmike> (the cpu load I've quoted was measured with 10,000 concurrent connections)
+18:40 < airtanah> okay, when i run os.cpus()
+18:40 < airtanah> it reports 8
+18:40 < airtanah> i have quad-core hyperthreaded
+18:40 < airtanah> so it's quite possible that is started double the processes that you have cores
+18:41 < jugglinmike> ok, I'm pretty sure that it has
+18:41 < jugglinmike> as I'm renting time from Rackspace
+18:41 < jugglinmike> and this package has 2 cores
+18:41 < jugglinmike> but os.cpus().length returns 4
+18:41 < airtanah> easy to check
+18:41 < Cheery> I wonder what I'm doing wrong
+18:42 < Cheery> I've written few shared C libraries and trying to use them through a node addon
+18:42 < Cheery> but it says:
+18:42 < Cheery> node: symbol lookup error: /home/pi/node-video/display/build/Release/display.node: undefined symbol: displayOpen
+18:42 < airtanah> jugglinmike: then that behaviour seems reasonable... 70% -> 50%
+18:42 < Cheery> oh
+18:42 < Cheery> a bug in buildscript :D
+18:43 < Cheery> \o/
+18:43 < jugglinmike> airtanah: when I fork 4 child processes, the server isn't capable of handling the 10,000 concurrents. Do you think that if I limit it to 2, I should see some sort of improvement over using a single process?
+18:44 < airtanah> jugglinmike: easy to check - i can't say what would happen
+18:44 < airtanah> jugglinmike: hyperthreading is magical wizard stuff
+18:44 < jugglinmike> I'll fire up the ec2 instances :)
+18:44 < Cheery> aanyone written node addons  here? it's odd taht I don't get much help here
+18:45 < EuroNerd> is there anyone knowledgeable about Socket.io here?
+18:45 < jugglinmike> yeah! I don't really understand the interaction between virtual cores, such as it is
+18:45 < jugglinmike> EuroNerd: I know a little--try me
+18:46 < EuroNerd> jugglinmike, well, for starters: What is Authorization?  They describe how to do it, but not what it is. https://github.com/LearnBoost/socket.io/wiki/Authorizing
+18:46 < clever> jugglinmike: from what ive seen, hyperthreading has some parts of the pipeline duplicated, and some parts shared between the 2 cores, so it can kinda run 2 threads at once
+18:47 < jugglinmike> clever: I'm curious if scheduling 4 processes for 2 hyperthreaded cores could lead to poor performance
+18:48 < jugglinmike> i.e. is the fact that the machine is using hyperthreading relevant for application programmers
+18:48 < clever> jugglinmike: 2 of the threads may suffer some, depending on how the cpu works internaly
+18:48 < Cheery> I'd need to do a buffer or string from int[3].
+18:48 < Cheery> how to do so?
+18:48 < jugglinmike> (as opposed to 4 physical cores)
+18:48 < Cheery> (in addons)
+18:48 < clever> jugglinmike: the best thing you can do though is to just try it and see what happens
+18:48 < jugglinmike> clever: I hope so, as this stuff is tough to troubleshoot
+18:48 < jugglinmike> roger that--I'll try it out now
+18:49 < clever> ive been fighting with mysql and 'high' loads here too
+18:49 < clever> but the numbers your quoting make my loads seem like nothin :P
+18:49 < airtanah> jugglinmike: from wiki - hyperthreading lets the OS schedule two threads at once, but only one will execute at a time
+18:49 < jugglinmike> EuroNerd: authorization lets you restrict which clients can connect
+18:49 < clever> right now, i'm getting peaks of ~15 hits/second, with ~100 concurrent http connections max
+18:49 < clever> (counting keep-alives)
+18:50 < jugglinmike> EuroNerd: as mentioned toward the bottom of that page, you can also control on a per-namespace basis
+18:50 < EuroNerd> jugglinmike, you mean which IP addresses or which users (as identified by logins) or what?
+18:50 < clever> jugglinmike: what size ec2 are you using?
+18:50 < clever> EuroNerd: you can access cookies from the auth function, and then lookup the session/login info
+18:51 < jugglinmike> EuroNerd: you can use whatever method you want for authorizing, but you authenticate clients via the information in the handshakeData object (also described in that document)
+18:51 < jugglinmike> clever: micro
+18:51 < jugglinmike> usually 10-20 at a time
+18:51 < clever> jugglinmike: ah 10 micro's at once?
+18:52 < jugglinmike> yeah, slightly more realistic
+18:52 < larryapplegate> Anyone interested in using Drupal to provide user authentication for Node testing?
+18:52 < larryapplegate> http://www.lynda.com/Nodejs-tutorials/Nodejs-First-Look/101554-2.html?srchtrk=index%3A1%0Alinktypeid%3A2%0Aq%3Anode.js%0Apage%3A1%0As%3Arelevance%0Asa%3Atrue%0Aproducttypeid%3A2
+18:52 < jugglinmike> Don't want to worry about resource bottlenecks on the client simulator
+18:52 < clever> jugglinmike: i'm using a c1.medium here, and its starting to reach the limits of what it can handle
+18:53 < clever> i think the latest issue was due to putting the mysql temp tables on the same block device as the main db
+18:53 < larryapplegate> it also works for WordPress and Joomla
+18:54 < jugglinmike> clever: just to clarify: I'm using a single Rackspace cloud server to host my application. I'm using ec2 instances to simulate client load
+18:54 < clever> jugglinmike: ah
+18:54 < clever> i'm using ec2 as the main server, with real load from end-users
+18:55 < jugglinmike> We're not deployed yet, so I get to do more radical testing :P
+18:55 < Cheery> could someone tell where to find more documentation on addons?
+18:56 < clever> jugglinmike: :D
+18:56 < Cheery> so I don't need to ask you
+18:56 < Cheery> I want to get stuff done really
+18:56 < jugglinmike> Cheery: try www.npmjs.org
+18:57 < Cheery> jugglinmike: I just end up to same docs that don't tell much
+18:57 < Cheery> http://nodejs.org/api/addons.html
+18:57 < Cheery> and I don't mean modules but addons :)
+18:58 < jugglinmike> ah, sorry!
+18:58 < airtanah> Cheery: i had to delve into the world of add ons once, and there was no real documentation. You will just have to read other modules code, and copy
+18:58 < airtanah> it's a bit ugly
+18:58 < Cheery> airtanah: Actually it's quite clean API from what I can see.
+18:59 < Cheery> the best way to extend a programming language really
+18:59 < Cheery> haven't seen cleaner ever
+19:00 < airtanah> Cheery: the docs, not the api
+19:01 < Cheery> seems like I don't find much.
+19:01 < Cheery> v8::Data might be closest
+19:02 < Cheery> oh it's a base class.
+19:02 < Cheery> -_
+19:04 < Cheery> I need something equivalent of a typed array
+19:04 < Cheery> because I'm passing a display handle from module to another, so that the another module can open a context and get drawing.
+19:04 < ashnur> morning
+19:04 < Cheery> and the display handle may be passed over a socket
+19:05 < EuroNerd> I'm writing an app with two express servers: 1st for serving static files and 2nd for websockets, where all the real traffic will go. User authentication will be required. How should my login form communicate with node - over ajax or sockets? 
+19:05 < EuroNerd>  Initially I thought I'll do everything thru sockets, but maybe I shouldn't let a socket open, before a user is authenticated and authorized?
+19:05 < abrkn> anyone else unable to resolve travis-ci.org?
+19:06 < EuroNerd> abrkn, if you're asking if the website under this address opens, then yes. Over HTTPS.
+19:06 < abrkn> nevermind, my isp had for some reason chosen to tell me it was down. google dns <3
+19:07 < clever> EuroNerd: myself, i do login and authentication purely with old style http (and openid), and then store the session cookie+uid into a db
+19:07 < clever> EuroNerd: the websockets code can read the session cookie, and then lookup the uid on the db
+19:08 < EuroNerd> clever, sure, but I'm wondering if doing everything over sockets is okay.
+19:08 < jugglinmike> EuroNerd: clever's advise sounds good to me. In addition, it might be wise to create a namespace and implement authentication on that namespace alone. That way, if you ever want to use the socket connection for unauthenticated users, you can just make another namespace
+19:09 < EuroNerd> jugglinmike, I actually can't get my head around this Namespace concept. I understand it in code, javascript terms, but here it obviously means something different.
+19:09 < abrkn> EuroNerd: any special reason why you use two express apps?
+19:09 < clever> i havent used socket.io namespaces much yet
+19:10 < clever> and the bulk of my site is served via lighttpd, it was writen before i found node
+19:10 < abrkn> i just used socket.io, no namespaces? well, it has "rooms"
+19:10 < EuroNerd> abrkn, well, I might serve static files over http and sockets over https.
+19:10 < wltsmrz> wss://
+19:11 < airtanah> EuroNerd: if you mix http/https the browser will complain won't it?
+19:11 < EuroNerd> jugglinmike, as I understand namespaces in general, the whole point is to avoid name collisions. What names could collide if not for socket.io namespaces?
+19:11 < wltsmrz> Only if your page is served over HTTPS and you use ws://
+19:11 < euoia> question: how does node know to look in node_modules when I call require? Can I configure this behaviour? For example, I would like to write my app in a modular way. Could I create another directory my_node_modules that would also be searched when calling require?
+19:11 < abrkn> why not just go full https? would solve this problem atleast =)
+19:11 < airtanah> euoia: use 'npm link'
+19:12 < euoia> okay, I'll do that. Thanks.
+19:12 < abrkn> euoia: you can override require, it's in official docs i dont remember the names
+19:12 < EuroNerd> airtanah, yeah, I'm having problems with it. Which probably means I should go SSL all the way, including static files. And just redirect anyone who happens to connect to http, right?
+19:12 < abrkn> well, require.resolve or something
+19:12 < airtanah> euoia: i have a makefile to help with all the 'npm link's
+19:12 < airtanah> EuroNerd: SSL all the way
+19:12 < euoia> airtanah: interesting, could you share an example?
+19:12 < abrkn> agree with ssl all the way
+19:13 < EuroNerd> airtanah, yeah, that's what i'll do. (Just having problems with FF accepting self-signed certs, but that's a different story.)
+19:13 < jugglinmike> EuroNerd: namespaces let you re-use a single socket connection without worrying about the messages being sent in other namespaces
+19:13 < clever> EuroNerd: ive just started doing some raw tcp stuff, with self-signed certs here
+19:13 < jugglinmike> which is a bit of a circular definition, I'll admit
+19:14 < clever> EuroNerd: i was able to hook the invalid cert error, and add an override automaticaly, so the client end is all done (i check the fingerprint before doing override)
+19:14 < jugglinmike> but that way, you can have different parts of you code use the same socket connection, and not worry if they both send a message named (for instance) "update"
+19:14 < clever> now i just need to finish the node end
+19:14 < abrkn> for socket.io i just made my own "namespaces", never knew there were namespaces :)
+19:14 < EuroNerd> clever, and how is Firefox handling that?  I even added my cert by hand to FF's Certification Manager, but still didn't help.
+19:14 < EuroNerd> oh, ok
+19:14 < clever> EuroNerd: its firefox extension level, so i have access to the cert manager
+19:14 < airtanah> euoia: https://gist.github.com/936f3ece10ef460c371a
+19:14 < airtanah> rough cut
+19:15 < clever> not sure, but i suspect i may also be authorizing the cert for https use
+19:15 < abrkn> i mean, var room1 = []; socket.on('connect', room1.push(socket)); _.each(room1, function(s) { s.emit('derp'); }); <--
+19:15 < euoia> airtanah: thanks
+19:15 < clever> abrkn: ive done similar, but more complex, you can join multiple rooms, and recieve messages from all of them
+19:15 < abrkn> clever: aye, mine is for a card game
+19:15 < EuroNerd> jugglinmike, OK, I'm starting to understand... So it's about avoiding name collisions of messages.
+19:15 < jugglinmike> yahh
+19:16 < clever> all of the management is on my code, and it uses the default namespace in socket.io
+19:16 < jugglinmike> EuroNerd: also, events
+19:16 < abrkn> clever: https://github.com/abrkn/mouth/blob/master/lib/server/Table.js#L34
+19:16 < airtanah> euoia: actually there is a mistake - make sure the web line requires the agent
+19:16 < airtanah> sorry i cut that down from a huge file
+19:17 < clever> EuroNerd: i think of it the same as avoiding collisions in id= attributes, just document things properly and you wont need a namespace
+19:17 < EuroNerd> ok
+19:17 < jugglinmike> so, 'myNamespace.on("connect", handleMyNamespaceConnect);'
+19:17 < euoia> airtanah: can you modify it so I can see what you mean?
+19:17 < ashnur> i am still unable to get this thing right. 
+19:17 < airtanah> euoia: https://gist.github.com/936f3ece10ef460c371a
+19:18 < ashnur> I want to authenticate users with passport and then use this auth with dnode
+19:18 < airtanah> to make sure the agent is built before the web package
+19:18 < ashnur> but the whole passport thingie is request based
+19:18 < euoia> airtanah: ah okay, thanks
+19:19 < EuroNerd> abrkn, you were asking earlier why do I use two express apps. So if I go all the way SSL, I should serve static files and also do sockets on the same app?  And if yes, do I use the same port for both?
+19:19 < airtanah> euoia: you can also have your package.json dependenceis point to a git repo
+19:19 < euoia> airtanah: ah that's nice
+19:20 < airtanah> but for development, i would use 'npm link'
+19:20 < abrkn> EuroNerd: i have no idea how socket.io does the sharing, but it works out of the box
+19:20 < airtanah> changes will be live across modules
+19:20 < clever> abrkn: i believe you pass socket.io a copy of your express server at startup
+19:21 < abrkn> clever: aye, just no idea how it works internally
+19:21 < clever> and it hooks the upgrade method for websockets, while also hooking something for the /socket.io/ dir
+19:21 < abrkn> i see
+19:21 < clever> ive wound up having to dig pretty deep into its code
+19:21 < clever> last time, because i upgraded to node 0.9 from git, and the array logic just went out the window
+19:21 < clever> took several hours of fussing to find out socket.io wasnt broken
+19:21 < clever> but node itself
+19:22 < wltsmrz> Isn't 0.9 unstable?
+19:22 < shripadk> socket.io does nothing special. websocket is an HTTP upgrade after all.
+19:22 < clever> wltsmrz: exactly why it didnt work :P
+19:22 < clever> wltsmrz: but the distro had 0.2, so i had to upgrade
+19:22 < wltsmrz> Well, if it is published as "unstable" then I wouldn't call it "broken" when it exhibits instability.
+19:22 < clever> i just didnt look that closely at what i was upgrading to....
+19:23 < shripadk> what was broken in node?
+19:24 < clever> shripadk: in the unstable branch, arrays where acting funny
+19:25 < shripadk> clever: weird
+19:25 < ashnur> frickin wifi
+19:27 < ashnur> at least someone could tell me where I am wrong or something
+19:29 < airtanah> does anyone have experience with message queues?
+19:29 < airtanah> i had a look at ZeroMQ
+19:30 < airtanah> now there is also Axon
+19:30 < shripadk> yes
+19:30 < airtanah> and many more...
+19:30 < airtanah> I am thinking of using ZeroMQ for my server-server communication
+19:30 < shripadk> the only problem with zeromq
+19:30 < airtanah> if anyone has experience, i would love to hear it
+19:30 < shripadk> is that it is not truly non-blocking
+19:31 < shripadk> when it comes to node
+19:31 < airtanah> shripadk: right, i noticed that in their examples
+19:31 < airtanah> the sockets are stateful, and when it coems to REQ/REP you get odd things
+19:31 < shripadk> the file descriptor shared is raw socket
+19:31 < airtanah> it runs in a separate thread right?
+19:32 < shripadk> but the events dispatched are for the zeromq socket
+19:32 < shripadk> yeah internally it does run in a separate thread
+19:32 < shripadk> but anyways that doesn't matter
+19:32 < shripadk> coz the FD it exposes
+19:32 < shripadk> is of the raw socket
+19:32 < shripadk> you need to hook in zmq_poll() with node's libuv
+19:33 < shripadk> but zmq_poll() only implements select()/poll()
+19:33 < airtanah> i tried using the node.js client library
+19:33 < airtanah> i didn't dig into the actual zmq code
+19:34 < clever> that reminds me, i was using a serialport module in node last month
+19:34 < ashnur> seriously, no one here has used passport?
+19:34 < shripadk> the current node module (zeromq.node) is slow
+19:34 < clever> and it was eating 100% cpu, when idle
+19:34 < airtanah> shripadk: do you have another recommendation?
+19:34 < clever> and every time i tried to automate my testing, with a setTimeout to auto-exit
+19:34 < clever> the problem would vanish
+19:34 < shripadk> you mentioned axon right?
+19:34 < shripadk> sounds good to me
+19:34 < airtanah> yes
+19:34 < airtanah> do you use any?
+19:34 < shripadk> i would have gone with zeromq if not for this show stopper
+19:34 < clever> turns out, if the serial port is the only thing keeping the process alive, it eats 100% cpu
+19:34 < shripadk> i wrote my own implementation.. but its in D
+19:35 < clever> but if any timeouts exist, those properly idle the whole thing
+19:35 < shripadk> and not open sourced yet
+19:35 < airtanah> my open zmq question is whether or not i can reply to a socket asynchronously, i don't think you can
+19:35 < shripadk> i dug through the zeromq code
+19:35 < shripadk> nope
+19:35 < airtanah> i believe you have to call send() immediately after an on('message')
+19:35 < airtanah> or it errors
+19:35 < shripadk> you can't
+19:35 < shripadk> no
+19:35 < shripadk> the node module
+19:35 < shripadk> takes care of that
+19:35 < shripadk> but its in a while loop
+19:35 < airtanah> ahhh
+19:36 < airtanah> so it's a hack
+19:36 < airtanah> in a way
+19:36 < shripadk> yes its a hack
+19:36 < shripadk> it just loops until it gets EAGAIN
+19:36 < shripadk> do you need persistence?
+19:36 < airtanah> like storing messages?
+19:37 < airtanah> no
+19:37 < airtanah> like rabbitmq?
+19:38 < shripadk> yeah thought you might want to try rabbitmq
+19:38 < shripadk> but pointless if you don't want persistence
+19:38 < airtanah> i think i'll evaluate axon next
+19:39 < airtanah> thanks
+19:39 < shripadk> this is why i think zeromq is a show stopper for Node : https://github.com/JustinTulloss/zeromq.node/blob/master/lib/index.js#L257
+19:40 < shripadk> either you have to use the event loop provided by zeromq and code all the way in C/C++
+19:40 < shripadk> or use node
+19:46 < ashnur> am I asking the wrong question or what? :)
+19:50 < ashnur> is there a channel where one might get help with nodejs related issues?
+19:52 < shripadk> tjholowaychuk: hey :)
+19:52 < shripadk> tjholowaychuk: for subscription lookup in axon do you use tries?
+19:53 < tjholowaychuk> just regexps for now we dont push back to the publisher
+19:54 < shripadk> its publisher side filtering?
+19:54 < tjholowaychuk> nope sub
+19:54 < tjholowaychuk> will be pub later
+19:54 < shripadk> cool
+19:55 < ashnur> lemme try again then...
+19:55 < tsingi> does node.js have a doc feature or policy?
+19:55 < ashnur> any thoughts on how could I use passport based auth with dnode?
+19:56 < tjholowaychuk> tsingi nope
+19:57 < tsingi> Thanks tjholowaychuk
+19:58  * CptnTerribleCode winks at tjholowaychuk
+20:00 < bor0> hello, node.js newbie here: http://pastebin.com/uYqYaxcV
+20:02 < ashnur> i hate when I am ignored
+20:02 < ashnur> at least you could say something I should frickin change, but no, no frickin answer. i hate this channel.
+20:02 <@mbalho> ashnur: a) people answer questions that they know the answer to b) there is no b
+20:02 < shripadk> bor0: read up on "Javascript: The Good Parts".. especially closures
+20:02 < shripadk> ashnur: sorry but have used neither :(
+20:02 < tjholowaychuk> that's not going to get you replies
+20:03 <@mbalho> bor0: go learn about callbacks!
+20:03 < thinkdevcode> sounds like a spoiled kid >.>
+20:03 < CptnTerribleCode> Smashing Node has a great explanation of that
+20:03 < timeturner> ashnur, your question isn't really that direct either
+20:03 < ashnur> mbalho: i don't feel that this is such a hard question :(
+20:03 < CptnTerribleCode> "it's not like php"
+20:03 <@mbalho> "be excellent to eachother"
+20:03 < EuroNerd> ashnur: I don't know anything about passport or dnode.
+20:03 < timeturner> direct questions are more likely to get an answer
+20:03 < shanse> fuck node. I WANT ASP.NET BACK
+20:04 < bor0> what I need is something to block it, is it possible?
+20:04 < shripadk> lol
+20:04 < CptnTerribleCode> timeturner: What's the average airspeed velocity of an unlaiden swallow?
+20:04 < bor0> I want to display results out of my event function, not in it
+20:04 < shripadk> bor0: then you are using the wrong tool
+20:04 < ashnur> yeah, sry for me being an idiot
+20:04 < CptnTerribleCode> bor0: use a promise or deferred library then
+20:05 < CptnTerribleCode> otherwise learn how to use callbacks :D
+20:05 < timeturner> direct questions, pertaining to node in some fashion, that someone in the channel knows the answer to and feels like answering
+20:05 < bor0> what is the most efficient way to get the results in the main thread (not on the event function) ?
+20:06 < shripadk> well the event function is executing in the main thread
+20:06 < shripadk> its not a separate thread
+20:06 < bor0> I see
+20:06 < CptnTerribleCode> bor0: that's not how things work... its asynchronous
+20:06 < wao> oh hai, some reccomendation for couchbase driver module?
+20:06 < CptnTerribleCode> do what you need to do in the callback
+20:06 < substack> ashnur: you could generate a unique token and verify that behind a dnode call
+20:07 < substack> or a convoy stream
+20:07 < bor0> CptnTerribleCode, and there is no other way? just in the callback?
+20:07 < CptnTerribleCode> I mentioned the other option already
+20:07 < CptnTerribleCode> a promise or deferred library
+20:07 < ashnur> substack: i know how to auth dnode calls. I would like to use the fact that with passport I should know if a user is authenticated or not
+20:07 < CptnTerribleCode> but that's probably a bit too much for this
+20:08 < CptnTerribleCode> so just use the callback
+20:08 < bor0> control flow is just too hard with node.js comparing to other languages :-)
+20:08 < CptnTerribleCode> http://callbackhell.com/
+20:08 < euoia> airtanah: so it's not possible to specify in package.json that the module should be installed with npm link - would that even make sense/
+20:08 < euoia> ?
+20:08 < CptnTerribleCode> read that
+20:08 <@mbalho> bor0: the first you should learn when learning node is how to use callbacks, it isnt hard, its just evented programming
+20:08 < substack> ashnur: you can serve up the dnode stream behind whatever full-duplex streaming abstraction you want
+20:08 < bor0> thanks for the help, will do that
+20:09 < substack> ashnur: it sounds like you're more having a problem with how all websocket fallback libs hide http from you because node's core http library s poorly designed to handle upgrades
+20:09 < tjholowaychuk> bor0 there's also https://github.com/laverdet/node-fibers
+20:09 < CptnTerribleCode> cause the self-proclaimed noob should really be using fibers
+20:09 < tjholowaychuk> bor0 but creating modules using that would fragment the community so best to only use it for your app
+20:10 <@mbalho> if someone doesnt know about callbacks why would anyone recommend they learn anything else first? (legitimate question)
+20:10 < CptnTerribleCode> mbalho: +1
+20:10 < substack> fibers just make it so that most people can't use what you've built unless they also use fibers
+20:10 < substack> like the gpl
+20:10 < CptnTerribleCode> in ancient sparta you'd get kicked into a bottomless pit for that
+20:11 < SoulRaven> is a good practice if i load modules, in a try catch statment?
+20:11 < CptnTerribleCode> no
+20:11 <@mbalho> SoulRaven: its the only way to do it but its kind of an anti pattern
+20:11 < substack> SoulRaven: what would you expect that to do?
+20:11 < ashnur> is there a public log for this channel, I was disconnected for 3 minutes
+20:11 < ashnur> ?
+20:12 < SoulRaven> substack, @mbalho the ideea is that i want to know when a module is loaded, and in the future procesing, to not call the methods inside that module
+20:13 < SoulRaven> i am traying to make something similar with a round rubin, or circula load balancer for multiple services of geocoding
+20:13 < harrydog> how do i set a cookie in express?
+20:13 < tjholowaychuk> harrydog http://expressjs.com/api.html#res.cookie
+20:13 < ashnur> substack: sry for asking again, maybe you responded me earlier and I haven't seen it because I was disconnected...
+20:13 < substack> SoulRaven: store callbacks in a fifo queue for that
+20:13 < chovy> harrydog: you need a cookiestore first
+20:13 < CptnTerribleCode> ashnur: http://cl.ly/text/0A1e2R0m3K1s
+20:13 < chovy> like redis
+20:13 <@mbalho> substack: no, fifo QUEUE!
+20:14 < SoulRaven> and i want to know what module is loaded, to have an ideea of how many steps will have the circular calling or how many nodes
+20:14 <@mbalho> substack: (read it out loud)
+20:14 < harrydog> how do i open a cookie store?
+20:14 < shripadk> mbalho: this is how its done: http://pastebin.com/gu1f34w5
+20:14 <@mbalho> i just ate a cookie
+20:14 < SoulRaven> substack: callback for what?
+20:14 < ashnur> thanks CptnTerribleCode 
+20:14 < ashnur> :) what a nick 
+20:16 < SoulRaven> http://bin.cakephp.org/view/1904340971
+20:17 < Cheery> my post didn't seem to appear on mailing list
+20:17 < substack> SoulRaven: why would you want to keep running if one of your requires failed
+20:17 < ashnur> substack: actually, my problem is much more modest. I am pretty sure I have conceptional issues mostly. I have a static server which I don't want to change, so I don't want to conditionnaly send different data through that. I would like to be able to send back through dnode the session cookie name and check if the session is still alive, that's all.
+20:18 < SoulRaven> substack: i want to make the app runing as much is posibile, because will be in a production envirement, that demands to have 100% uptime
+20:18 < ashnur> and I am lagging again. what a nice evening this is :(
+20:18 < shripadk> ashnur: you have two apps
+20:19 < shripadk> and you want to communicate via dnode
+20:19 < substack> SoulRaven: try/catch will only catch errors on the same tick
+20:19 < shripadk> and pass session cookies
+20:19 < shripadk> from one to another
+20:19 < shripadk> right?
+20:19 < SoulRaven> substack: is for a AVL device server
+20:19 < substack> I don't know what that is
+20:19 < nathan7> Hey substack-man
+20:19 < SoulRaven> GPS/GPRS tracking devices
+20:20 < ashnur> shripadk: no
+20:20 < substack> SoulRaven: try/catch doesn't work the way you seem to think it works
+20:20 < substack> also
+20:20 < shripadk> ashnur: i still don't get your question then
+20:20 < substack> if one of the requires fails early none of the rest of the requires in the block will fire
+20:20 < Cheery> COOL
+20:20 < Cheery> v8::Local<v8::Value> Encode(const void *buf, size_t len, enum encoding encoding = BINARY);
+20:20 < SoulRaven> substack: i have see also that
+20:21 < substack> and you'll be left with a ton of undefined lexicals that you'll try to call methods on elsewhere
+20:21 < substack> SoulRaven: basically you should never do what you're doing with try/catch there
+20:21 < CptnTerribleCode> that's why i just wrap every line in a try/catch
+20:21 < SoulRaven> substack: so my new aproch, is to resolve first the module, and is is not resolved then abord to load that module
+20:21 < CptnTerribleCode> better safe than sorry :/
+20:21 < substack> SoulRaven: check out http://nodejs.org/docs/latest/api/domain.html and write tests
+20:21 < substack> and wrap your program in another program to restart it when it crashes
+20:22 < substack> SoulRaven: also 100% uptime is impossible
+20:22 < shripadk> CptnTerribleCode: lol
+20:22 < SoulRaven> i know, but you indestand the ideea
+20:22 < substack> what if a cosmic ray scrambles some ram in l2 and crashes your program?
+20:23 < SoulRaven> @undestand
+20:23 < CptnTerribleCode> substack: you mean you don't have a module for that?
+20:23 < CptnTerribleCode> npm install cosmic-ray-protection
+20:23 < abhinavsingh> Hi guys, is there a way by which npm can respect custom INCLUDE_PATH environment variable while compiling a C module?
+20:23 < ashnur> shripadk: step by step. I had an index.html. I set up a static server. then I set up passport for auth. then I added dnode. everything works fine untill this point. now I would like to write code with dnode or similar which then reads the session cookie, sends it back to the server through websockets or whatever I am using and checks if this cookie is still connected to a live session, or it's expired or
+20:23 < ashnur> logged out or whatever might happen. But this last part isn't the issue, I can't find a way how to get to passport's sessions. 
+20:23 < harrydog> so i added res.cookie("foo", "bar");, but when i accessed the page, it ididn't set the cookie
+20:24 < substack> just make your systems crash tolerant and everything is much easier
+20:24 < ashnur> shripadk: I know how to read connect's sessions for example, I just set up connect-redis and it was straightforward from there
+20:24 < shripadk> ashnur: ah okay now makes sense
+20:24 < substack> ashnur: so you missed why it's so hard to do that
+20:24 < substack> I'll repaste
+20:24 < abhinavsingh> I am trying to install GeoIP node.js binding and I have geo ip c library installed in a custom path... as a result I get following error
+20:25 < abhinavsingh> ../src/node_geoip.h:7:10: fatal error: 'GeoIP.h' file not found
+20:25 < abhinavsingh> #include <GeoIP.h>
+20:25 < substack> ashnur: it sounds like you're more having a problem with how all websocket fallback libs hide http from you because node's core http library s poorly designed to handle upgrades
+20:25 < substack> so the websocket libs all hack at the http server instance to insert their listeners in the right order
+20:26 < substack> instead of passing (req,res) to these libraries
+20:26 < substack> but node core fans out the events between upgrade and request listeners
+20:26 < substack> and the event signatures are completely different
+20:27 < substack> otherwise you could do whichever kinds of checks you wanted really easily before any websocket connection
+20:27 < ashnur> well, I am not familiar at all with this :(
+20:27 < shripadk> substack: i think he just wants to know as to how to get the session info from passport
+20:28 < ashnur> yup. I was aware that I don't have the same signatures
+20:28 < ashnur> no req, res 
+20:29 < ashnur> first I thought that if I read the connect's sessions from redis that will help
+20:29 < ashnur> but it didn't
+20:29 < shripadk> does passport use connect-redis?
+20:29 < shripadk> if it doesn't then its pointless
+20:30 < substack> why would an auth library be hard-bound to a particular db adaptor?
+20:30 < substack> this is why we should be writing composable interfaces
+20:30 < ashnur> no, it's not hard bound, but it needs the session middleware from connect 
+20:30 < ashnur> if you want sessions
+20:30 < substack> ug that's terrible
+20:30 < ashnur> well. 
+20:31 < substack> tight implicit coupling
+20:31 < ashnur> yeah. I am now sure that my whole concept was wrong
+20:31 < shripadk> it shouldn't… and definitely passport doesn't rely on any particular db adaptor
+20:31 < substack> libraries try to solve too many problems
+20:31 < ashnur> I will delete passport and implement browserid separately
+20:32 < shripadk> if passport uses connect sessions
+20:32 < shripadk> a
+20:32 < shripadk> and i see that it does
+20:32 < ashnur> then I will store my sessions how I want, and will have no problem with this
+20:32 < shripadk> https://github.com/jaredhanson/passport/blob/master/lib/passport/strategies/session.js#L40
+20:32 < shripadk> then you can use connect-redis
+20:32 < shripadk> but you would have to include connect-redis yourself
+20:32 < ashnur> i included connect-redis
+20:32 < shripadk> and ensure connect is using redis as session store
+20:32 < shripadk> if you did all that
+20:33 < shripadk> then you can find the session keys in redis
+20:33 < ashnur> it is, as it's writing into
+20:33 < substack> everything about all of that is so wrong
+20:33 < ashnur> I found the keys based on the cookies
+20:33 < ashnur> but there is no data different when I am logged in or not
+20:33 < shripadk> then what is the issue? just use cookie info to fetch the redis session key
+20:34 < shripadk> substack: like?
+20:34 < ashnur> and I believe substack that it's wrong :D
+20:35 < shripadk> how are you getting the cookie information?
+20:36 < substack> shripadk: depending on implicit dependencies to modify parameters in upstream middlewares that must be loaded in the correct order
+20:36 < shripadk> substack: very true.
+20:37 < substack> and that there is such a thing as "connect-redis"
+20:37 < ashnur> shripadk: I did do that, but the data in redis is the same for any session, there is no info in plus for logged in users
+20:37 < ashnur> :)
+20:38 < shripadk> ashnur: are you sure you are fetching the cookie information only on connect?
+20:38 < CptnTerribleCode> substack is just on a high horse cause he's too 1337 for leaky abstractions... what y'all are talking about is totally fine
+20:38 < ashnur> :)))
+20:38 < shripadk> CptnTerribleCode: he's correct nevertheless :)
+20:39 < ashnur> shripadk: I have no idea what am I doing, I can show you the code maybe :P
+20:39 < ashnur> :D
+20:39 < shripadk> ashnur: okay make a gist
+20:39 < shripadk> :)
+20:41 < shripadk> i think all websocket fallback module implementors need to attach cookie information with the client object as part of the core module itself.. is that so hard?
+20:42 < substack> shripadk: if you passed the (req,res) explicitly to them you wouldn't need to have that
+20:42 < shripadk> how can you do that?
+20:42 < substack> they would just need to make the socket id available
+20:42 < abhinavsingh> guys any idea on the problem I am facing?
+20:43 < abhinavsingh> I tried the following, thought it might help, but doesn't
+20:43 < shripadk> web socket protocol for instance just has HTTP header data only at the time of Upgrade
+20:43 < abhinavsingh> CPPFLAGS="-I/Users/abhinavsingh/Builds/include" LDFLAGS="-L/Users/abhinavsingh/Builds/lib" npm install
+20:43 < abhinavsingh> tried exporting INCLUDE_PATH variable, but npm doesn't seems to pick that 
+20:43 < shripadk> so it makes sense to just store the cookie information at the time of Upgrade
+20:44 < ashnur> shripadk: https://gist.github.com/3966140 https://gist.github.com/3966146
+20:45 < substack> shripadk: var id = webSocketThing(req, res)
+20:45 < substack> how it should be
+20:46 < shripadk> substack: why not just: client.cookie ?
+20:46 < shripadk> ashnur: looking at it
+20:46 < substack> or var c = webSocketThing(); c.on('connect', function (id) { }); req.pipe(c).pipe(res);
+20:46 < substack> shripadk: because you're only thinking about your own hyper-narrow use case
+20:47 < substack> there are other headers besides cookie
+20:47 < harrydog> newbie question alert, when you do a "remember" login scenario, do you store the username/password in a cookie on the client?
+20:47 < shripadk> yes you can include those headers as well
+20:47 < substack> and the request itself has meaningful data
+20:48 < substack> but
+20:48 < substack> you don't need to attach that onto anything
+20:48 < ashnur> harrydog: no way
+20:48 < substack> because you pass the parameters explicitly
+20:48 < substack> there is no need for websocket libs to give a fuck about having the right attributes
+20:48 < ashnur> harrydog: you set a cookie with a unique id
+20:48 < substack> because they will definitely fuck that up
+20:48 < shripadk> but then you would need to store req, res somewhere
+20:48 < substack> shripadk: false
+20:48 < substack> it's in scope
+20:49 < shripadk> you don't get a req, res for every websocket message
+20:49 < shripadk> doesn't that result in a race condition?
+20:49 < substack> shripadk: you're thinking about it wrong
+20:49 < harrydog> where does the unique id come from, i generate it on the server?
+20:49 < randimiller> I am wanting to embed a terminal window into a local webpage. Does node.js have some functionality that would help with this?
+20:50 < substack> instead of websocket libs hacking their way into an http server like a virus and hijacking all the events we should instead pass the (req,res) to them explicitly
+20:50 < substack> then all this shit goes away
+20:50 < ashnur> harrydog: yes, it's just some unique id which you use when you store the session or whatever you want to get back for that specific user when he/she gets back
+20:50 < shripadk> oh okay i get you now
+20:50 < substack> but node makes this hard right now because of the 'upgrade' event that needs to die
+20:50 < shripadk> you mean instead of server.on("upgrade")
+20:50 < shripadk> just pass the req, res
+20:51 < shripadk> and let the lib check the header
+20:51 < chovy> how do i tell which module is installed w/ npm?
+20:51 < shripadk> is that what you are trying to say?
+20:51 < ashnur> chovy: npm list
+20:51 < harrydog> so, on the server, next time they log on, do like this (client has cookie unique id, check if unique id matches database record of user, if so log on)?
+20:51 < substack> shripadk: io = require('socket.io').listen(app)
+20:51 < substack> needs to die in a fire
+20:52 < substack> it's just virally infecting `app`
+20:52 < substack> with all kinds of fragile magic
+20:52 < ashnur> harrydog: yes
+20:52 < harrydog> awesome, thanks
+20:53 < substack> shripadk: nobody even ever uses 'upgrade' except for websocket authors
+20:53 < substack> and they all do it completely stupidly
+20:53 < shripadk> substack: true. even i wondered why there is an upgrade event in the first place
+20:53 < substack> exactly
+20:53 < substack> it's just full duplex http
+20:53 < shripadk> okay now i understood your issue :)
+20:53 < ashnur> i don't get the name either
+20:53 < ashnur> what's upgrading there?
+20:54 < ashnur> what about my issue? :)
+20:54 < chovy> it says expres 3.0.0
+20:54 < chovy> is that the latest?
+20:54 < ashnur> yes
+20:55 < harrydog> kinda weird, on safari, it doesn't show a cookie set in the resource inspector, but on chrome it does
+20:55 < tjholowaychuk> substack yeah i agree with you there
+20:56 < tjholowaychuk> it looks odd .listen(app)
+20:56 < tjholowaychuk> not sure what guillermo has planned for the new stuff
+20:56 < shripadk> ashnur: what do you get in L25 in https://gist.github.com/3966140 ??
+20:57 < ashnur> s:Okys53e4A3zkZN2vki+mgVYH.UCqP7p0Zjprs80tQ9BuUYqoZTsbSGfr+PKCm5prnTDU sess:Okys53e4A3zkZN2vki+mgVYH
+20:57 < shripadk> is it always the same session id?
+20:57 < shripadk> for different pages?
+20:57 < ashnur> there are no different pages
+20:58 < ashnur> but it's the cookie I have in the browser
+20:58 < substack> tjholowaychuk: I really hope the new stuff has an explicit means of supplying (req,res)
+20:58 < shripadk> what is the reply from redis?
+20:58 < substack> I don't mind if there's a convenient way that injects itself into a server so long as I can avoid it
+20:58 < shripadk> ashnur: what reply do you get from redis?
+20:59 < ashnur> shripadk: well, I have just checked agains null, and it wasn't null. I used redis-cli to see the data in redis
+20:59 < shripadk> its not null you mean?
+20:59 < tjholowaychuk> substack yeah i imagine the old way might be left for BC regardless but i agree
+21:00 < substack> node does make it hard to just pass req,res though
+21:00 < shripadk> if its not null then what is the issue? :P your authenticating just fine… i just don't like the way its done though
+21:00 < substack> on account of fanning out the requests between events
+21:00 < substack> for no good reason whatsoever
+21:00 < shripadk> why is there an upgrade event in the first place?
+21:01 < substack> shripadk: because some c parser was written that way
+21:01 < shripadk> and it survived in the node core for 9 versions
+21:01 < ashnur> shripadk: not null, but you know that you have a session without login :)
+21:01 < shripadk> ashnur: okay how do you logout?
+21:02 < shripadk> why don't you erase the session while logging out?
+21:02 < ashnur> http://passportjs.org/guide/log-out.html
+21:04 < shripadk> okay thats weird
+21:04 < ashnur> :)))
+21:04 < shripadk> why is there no callback for req.logOut??
+21:04 < ashnur> not sure
+21:05 < shripadk> so from what i can tell… the logout doesn't work for you. right?
+21:05 < ashnur> https://developer.mozilla.org/en-US/docs/DOM/navigator.id.logout
+21:05 < ashnur> shripadk: nah, I have not tried logout. :D 
+21:05 < ashnur> shripadk: leave it, it's not worth
+21:06 < ashnur> thanks for the help, and thanks for you and substack for the discussion, I've learned a lot
+21:06 < shripadk> from what i can tell, there is nothing wrong with the code you have
+21:06 < shripadk> but i would not do it the way you have done it
+21:07 < shripadk> primarily because you are checking with redis for every message
+21:07 < ashnur> how would you do it?
+21:07 < ashnur> well, isn't redis for things like this? :D
+21:08 < shripadk> yeah but i don't think its worth a RTT for every message :)
+21:08 < ashnur> hmm
+21:08 < ashnur> I am in trouble now
+21:09 < shripadk> i would hack into the web socket lib and make sure the cookie is attached to the client object on connection
+21:09 < shripadk> (parsing out from the HTTP header)
+21:09 < jugglinmike> If I'm using cluster with RedisStore, io.sockets.clients().length ought to be the same across all processes, right
+21:09 < jugglinmike> ?
+21:09 < ashnur> or maybe not. this is still streams, so if I do the auth at the start
+21:09 < ashnur> I don't have to auth again untill reconnect
+21:10 < shripadk> ashnur: yes. but watch out for race conditions.
+21:10 < ashnur> I am not sure if could do that websocket hack
+21:10 < shripadk> ideally i would love to have it behave the way substack wants it to
+21:11 < ashnur> me too
+21:11 < ashnur> =)
+21:11 < mrchrisadams> hi guys, I'm having a really hard time working out how to use mocha, should and node redis together to write extremely simple coder to wrap a few calls to node-redis's  fetching functions in a User object. What is the obvious thing that I'm doing wrong here in this gist, to not get an object returned how I'd expect?
+21:11 < mrchrisadams> https://gist.github.com/3966250
+21:11 < shripadk> you can try this:
+21:11 < shripadk> http://mattmueller.me/blog/quick-tip-node-js-socket-io-authentication
+21:12 < shripadk> jugglinmike: may not be
+21:12 < shripadk> jugglinmike: from what i can see, it only lists for the current process
+21:12 < shripadk> ashnur: sorry for the wrong link
+21:12 < shripadk> hold on
+21:13 < tjholowaychuk> mrchrisadams (err, chris)
+21:13 < tjholowaychuk> chris is probably null
+21:13 < tjholowaychuk> assert(chris)
+21:13 < tjholowaychuk> https://github.com/visionmedia/better-assert
+21:13 < tjholowaychuk> should sucks for null/undefined
+21:14 < jugglinmike> shripadk: yeah, I'm trying to read through the source, too
+21:14 < mrchrisadams> tjholowaychuk: thanks, that looks like a step in the right direction :)
+21:14 < jugglinmike> the four processes don't agree on how many clients are connected, and they mostly ignore disconnection events
+21:14 < shripadk> http://www.danielbaulig.de/socket-ioexpress/
+21:14 < shripadk> ashnur: http://www.danielbaulig.de/socket-ioexpress/
+21:15 < jugglinmike> as far as io.sockets.clients().length is concerned, at least
+21:16 < shripadk> jugglinmike: ignore disconnection events? thats bad
+21:17 < jugglinmike> yeah... it seems to keep growing
+21:18 < shripadk> jugglinmike: what port are you running the server on?
+21:18 < jugglinmike> 8000
+21:18 < ashnur> shripadk: yeah, and dnode is not socket.io based
+21:18 < shripadk> netstat -anl | grep 8000 | awk '/^tcp/ {t[$NF]++}END{for(state in t){print state, t[state]} }'
+21:19 < shripadk> ashnur: dnode is not socket.io based? i thought it was… been away from Node for a long time. so must have missed updates :)
+21:20 < shripadk> oh cool so dnode uses socks now
+21:20 < shripadk> *sockjs
+21:20 < substack> false
+21:20 < substack> dnode doesn't use anything
+21:21 < shripadk> oh!! was it not a wrapper on top of socket.io before?
+21:21 < substack> it was but that was a terrible idea for a purely algorithmic transformation library
+21:22 < shripadk> okay sorry i have been away from node scene for months… so i missed all the new stuff :)
+21:24 < ashnur> sry then, i said stupid thing again
+21:25 < mrchrisadams> tjholowaychuk: it looks like the returned 'chris' object in that spec was indeed null/undefined. is there a best practice with node for wrapping calls that are sync, like the redis hmgetall calls?
+21:25 < tjholowaychuk> not sure what you mean
+21:25 < tjholowaychuk> none of the redis commands are sync
+21:28 < mrchrisadams> tjholowaychuk: whoops - I meant to type 'async' there
+21:28 < tjholowaychuk> ah, depends what you're doing i guess but it usually ends up being the annoying
+21:28 < tjholowaychuk> if (err) return fn(err)
+21:28 < tjholowaychuk> dance
+21:28 < tjholowaychuk> over and over
+21:33 < mrchrisadams> tjholowaychuk: I'm not familiar with that dance yet - is there a url you might point me to get my head around the pattern?
+21:36 < tjholowaychuk> mrchrisadams basically just that you keep delegating the (err) arg that other apis give you
+21:36 < tjholowaychuk> instead of throwing or ignoring
+21:36 < tjholowaychuk> if (err) { fn(err) } else { my logic }
+21:49 < mrchrisadams> tjholowaychuk: I think I've been trying to naively map my experience in rails straight over to node - is there a good library you'd suggest I look at to see this pattern done well?
+21:55 < jugglinmike>  Should "io.sockets.clients()" only return clients for the current process? Or does Socket.io attempt to synchronize this with the information in its Store?
+21:55 < jugglinmike> All four cluster workers are reporting my single test connection. I'm thinking this is a bug in my implementation
+21:56 < jugglinmike> Especially given that when I disconnect, only one worker's "clients" array is updated
+22:06 < clever> jugglinmike: socket.io uses 2 http requests normaly
+22:07 < clever> jugglinmike: first a handshake req to get a sessionid, then (normaly) a websocket connection
+22:07 < clever> no idea how either one will interact with your clustering
+22:07 < jugglinmike> In this case I can guarantee it is a websocket connection
+22:08 < jugglinmike> the trouble is, it's getting duplicated across 4 processes
+22:08 < clever> but its also always doing a normal xhr before opening websockets
+22:08 < jugglinmike> right
+22:08 < clever> that could be duplicating things also
+22:08 < clever> and then only one handles the websocket
+22:09 < clever> it could also be whatever socket.io uses to store data between the handshake and connection
+22:09 < jugglinmike> Is it possible that socket.io is not actually cluster-compatible
+22:09 < clever> its posible, i havent tried using it with cluster yet
+22:09 < jugglinmike> I was pretty sure, but I'm starting to doubt it
+22:11 < Cheery> ls
+22:11 <@mbalho> jugglinmike: socket.io expects you to have sticky sessions when using in a load balanced environment
+22:11 < clever> . .. foo bar/
+22:11 < jugglinmike> ahhh
+22:11 < jugglinmike> !!
+22:12 < jugglinmike> thanks mbalho
+22:12 <@mbalho> jugglinmike: yea its a bummer
+22:12 <@mbalho> jugglinmike: <-maxogden
+22:12 <@mbalho> jugglinmike: im workin on a distributed session thing but its not done yet
+22:12 < Cheery> I tried to retrieve some binary data in my c++ addon, but I don't figure it out.
+22:12 < Cheery>     char *buffer_data = Buffer::Data(buffer_obj);
+22:12 < Cheery>     size_t buffer_length = Buffer::Length(buffer_obj);
+22:12 < jugglinmike> Max! I have your tweet on this favorited
+22:12 <@mbalho> jugglinmike: using https://github.com/dominictarr/scuttlebutt
+22:12 < Cheery>  these do not seem to work.
+22:12 < jugglinmike> https://twitter.com/maxogden/status/245259116275195904
+22:13 <@mbalho> haha yep
+22:13 < jugglinmike> I was happy to shelf that until I was worrying about mobile browsers
+22:13 <@mbalho> so the thing is
+22:14 <@mbalho> i really meant the non websocket transports
+22:14 <@mbalho> because theoretically websockets would only ever have 1 connection
+22:14 < Cheery> yay
+22:14 <@mbalho> but that isnt really true in reality
+22:14 < Cheery> maybe I figrued it out
+22:14 <@mbalho> so it is therefore true for all of socket.io that you need sticky sessions
+22:15 < jugglinmike> Is this why I'm seeing the socket in all four processes' "io.sockets.clients()", but only one process actually gets the connection event?
+22:15 <@mbalho> yea
+22:16 < jugglinmike> And also why I can make 10,000 websocket connection on a single core, but not when scaled with cluster...?
+22:16 < jugglinmike> Because I have been going nuts
+22:17 <@mbalho> you should ask guillermo for advice, he has more experience on this topic
+22:17 < clever> jugglinmike: so far, my only problem with 1k connections on a single core, has been the open file limit
+22:17 < jugglinmike> clever: ulimit -n
+22:17 < clever> ulimit easily pushed that up to twice what i need
+22:17 < clever> yep
+22:17 < jugglinmike> :P
+22:18 < clever> the hard limit is 4k
+22:18 < clever> i bumped soft to 2k
+22:18 < jugglinmike> mbalho: what's the best way to contact him? I've e-mailed him in the past, but no response
+22:19  * clever leaves for bed
+22:20 <@mbalho> jugglinmike: hang out in socket.io and say you work on rad things when you talk to him
+22:20 < jugglinmike> got it mbalho :)
+22:23 < jugglinmike> mbalho: Guillermo doesn't list his irc handle on his website--do you know it?
+22:26 < AirRicB> hey guys is there a command to update node on windows 7
+22:30 < shripadk> jugglinmike: socket.io should work with cluster
+22:30 < shripadk> it might not be a perfect round robin, but definitely connections should be spread across the various child processes
+22:31 < jugglinmike> shripadk: Is "io.sockets.clients()" supposed to list clients across processes?
+22:32 < shripadk> i don't know the new internals
+22:32 < shripadk> but if its reporting for all processes
+22:32 < shripadk> then its for sticky sessions + broadcasting
+22:33 < jugglinmike> That array is updated across all processes when a client connects
+22:33 < jugglinmike> but when a client disconnect, only one process removes it
+22:33 < shripadk> correct
+22:33 < shripadk> that behavior is okay
+22:34 < shripadk> oh the io.sockets.clients() is only an array?
+22:34 < shripadk> okay lemme check the source
+22:34 < jugglinmike> got it open here
+22:34 < jugglinmike> https://github.com/LearnBoost/socket.io/blob/ec07fa8308da815686fcc2bc041a5d32d71c29d5/lib/namespace.js#L50-61
+22:34 <@mbalho> jugglinmike: rauchg
+22:34 < jugglinmike> Thanks, max :)
+22:35 < shripadk> cool checking
+22:36 < EuroNerd> i've got a mongo-node question:   Can I open a number of collections upfront and assign to global vars and access them later, as need arises?
+22:37 < shripadk> okay
+22:37 < shripadk> jugglinmike: check this: https://github.com/LearnBoost/socket.io/blob/ec07fa8308da815686fcc2bc041a5d32d71c29d5/lib/namespace.js#L227
+22:37 < shripadk> jugglinmike: and this: https://github.com/LearnBoost/socket.io/blob/ec07fa8308da815686fcc2bc041a5d32d71c29d5/lib/namespace.js#L343
+22:38 < shripadk> so it should be removing the socket id from all processes on disconnect
+22:39 < shripadk> sorry it should be L341
+22:39 < shripadk> this.store.publish('leave', sessid, this.name);
+22:40 < shripadk> are you sure that when a client disconnects the socket id exists in other child processes?
+22:42 < jugglinmike> yes, but now I've got to check the way I'm initializing the socket.io server
+22:42 < shripadk> even if it is not removing the socket id
+22:43 < shripadk> at least your new connections should be distributed across the cluster
+22:43 < shripadk> (maybe not evenly)
+22:44 < jugglinmike> only one process actually removes the socket
+22:44 < shripadk> then its a bug
+22:45 < jugglinmike> I'll start dropping some console.log's into the socket.io source
+22:45 < jugglinmike> particularly the lines you've pointed out
+22:45 < shripadk> yes please do.. i'm not on my machine now else i would have done that
+22:50 < jugglinmike> shripadk: "handlePacket" is not being invoked
+22:50 < jugglinmike> but debug is telling me this:
+22:50 < jugglinmike>    info  - transport end (socket end)
+22:50 < jugglinmike>    debug - set close timeout for client 1782335144647615928
+22:50 < jugglinmike>    debug - cleared close timeout for client 1782335144647615928
+22:50 < jugglinmike>    debug - cleared heartbeat interval for client 1782335144647615928
+22:50 < jugglinmike>    debug - discarding transport
+22:51 < shripadk> this happens on client connect i presume?
+22:51 < shripadk> is this the json request?
+22:51 < shripadk> or is this on disconnect?
+22:52 < jugglinmike> this is on disconnect
+22:52 < jugglinmike> handlePacket  *is* invoked on connect, as expected
+22:52 < jugglinmike> still digging
+22:52 < shripadk> okay then looking at wrong file
+22:52 < shripadk> i think its transport.js
+22:55 < jugglinmike> only disconnect-related methods in transport.js are onForcedDisconnect, which is not invoked
+22:56 < jugglinmike> over in manager.js, onClientDisconnect is called with the appropriate id and reason="end"
+22:56 < shripadk> https://github.com/LearnBoost/socket.io/blob/master/lib/socket.js#L151
+22:56 < shripadk> onDisconnect
+22:57 < shripadk> in namespace.js L227 is the callback executed for all child processes
+22:57 < shripadk> ?
+22:58 < jugglinmike> sec
+22:59 < shripadk> because onClientDisconnect in manager.js calls handleDisconnect from namespace.js
+22:59 < jugglinmike> shripadk: socket.onDisconnect is invoked
+23:00 < jugglinmike> { reason: 'socket end', disconnected: false }
+23:00 < shripadk> i think the if block is short circuited… this.sockets[sid].readable maybe false/undefined for other child processes
+23:00 < shripadk> for all child processes or only 1?
+23:00 < jugglinmike> only one
+23:00 < shripadk> did you check the SocketNamespace.prototype.handleDisconnect part?
+23:01 < shripadk> like a console.log at L228 might help
+23:01 < shripadk> if its calling handleDisconnect for all child processes then the problem is with the if block being short circuited
+23:02 < jugglinmike> I can verify that this is being invoked: https://github.com/LearnBoost/socket.io/blob/ec07fa8308da815686fcc2bc041a5d32d71c29d5/lib/(manager.js#L555 )
+23:02 < jugglinmike> checking l228 in socketnamespace
+23:03 < shripadk> place the console.log before the if block
+23:05 < zezikaro> Hi does anyone know how to make zombie.js fire keyup events?
+23:05 < zezikaro> or should it do that by default?
+23:06 < jugglinmike> shripadk: That logs: { 'this.sockets[sid].readable': true, 'raiseOnDisconnect': true }
+23:06 < shripadk> only once?
+23:06 < jugglinmike> and this.sockets[sid] is set
+23:06 < jugglinmike> only once
+23:07 < shripadk> okay that means
+23:07 < shripadk> the disconnect message is not relayed to the other child processes
+23:07 < shripadk> transport.js L414
+23:07 < shripadk> should have an extra line
+23:08 < aaronn> Hello! I am trying to push for JavaScript in general as a development language in my company, but to be honest I don't really know why. It just feels right for me. Where can I find some convincing reasons? I mean they thing in terms of money so I should show them why it is better. Or am I wrong?
+23:09 < jugglinmike> One thing I should confirm is if I'm setting the redis storage correctly
+23:09 < jugglinmike> shripadk: https://gist.github.com/3966794 is that correct?
+23:10 < shripadk> https://github.com/LearnBoost/socket.io/blob/master/lib/transport.js#L456
+23:10 < shripadk> checking
+23:11 < jugglinmike> pasted a bit wrong--refresh for more context
+23:11 < jugglinmike> namely, "RedisStore" -> "socketIo.RedisStore"
+23:11 < jugglinmike> which is what I've been working with
+23:12 < shripadk> nothing wrong with the code.
+23:13 < shripadk> okay one last check :)
+23:13 < shripadk> in transport.js
+23:13 < shripadk> L465
+23:13 < timeturner> aaronn: go to nodejs.org and look at the site and look at the github repo for node. You'll find everything there.
+23:14 < shripadk> console.log("local: "+local)
+23:14 < shripadk> okay looks like thats the problem there
+23:14 < jugglinmike> Transport.end { reason: 'socket end', 'this.disconnected': false }
+23:14 < jugglinmike> okay, hang on
+23:14 < shripadk> it shouldn't matter if its local or not
+23:14 < shripadk> it has to publish the disconnect event
+23:14 < shripadk> nevertheless
+23:14 < shripadk> :)
+23:14 < shripadk> just remove the if else
+23:15 < aaronn> timeturner: Is there a file in the repo or you mean the nodejs's code in general?
+23:15 < shripadk> and merge the two lines L467, L469
+23:15 < timeturner> the wiki page
+23:15 < timeturner> it has reasons for using node, a list of all the companies that are using node, a huge list of node modules, etc.
+23:16 < EuroNerd> Which Redis module should I use for Connect session store? "redis" or "connect-redis" or, like someone here, both: https://gist.github.com/2416476   ?
+23:17 < timeturner> connect-redis uses node-redis which uses redis
+23:17 < timeturner> connect-redis should be used in conjunction with connect/express
+23:17 < popsch> I have the data (a csv file) on the server side but I need to pass it to the browser. How can I convert the string data into an expression that I can insert in the web page? (it should become: var data = '...' )
+23:18 < jugglinmike> shripadk: I'm getting the same behavior
+23:18 < jugglinmike> here's the modified code: https://gist.github.com/3966818
+23:21 < aaronn> timeturner: I will look into that. The main reasons I need are linked to the speed of development, maintenance or anything that makes bosses happy :)
+23:22 < jugglinmike> shripadk: not sure if you missed that.. I'm getting the same behavior with the modified code. Here's what I'm running: here's the modified code: https://gist.github.com/3966818
+23:22 < owen1> is it common to use a rake/grunt task for generating my rss.xml file?
+23:22 < jugglinmike> 3 of the 4 processes still list the socket
+23:22 < shripadk> jugglinmike: can you give me your source?
+23:22 < shripadk> i'm on my mac now
+23:22 < shripadk> will test it here
+23:23 < shripadk> also what node version are you on?
+23:25 < AntelopeSalad> how would i benchmark simulated io without it taking a ridiculous time to complete?
+23:25 < jugglinmike> shripadk: 0.8.12
+23:25 < jugglinmike> making gist...
+23:25 < tsingi> looking for the http server environment (not the shell env)  Can anyone tell me where to look?
+23:26 < shripadk> okay :)
+23:27 < jugglinmike> shripadk: https://gist.github.com/3966829
+23:28 < shripadk> jugglinmike: okay will test it and get back to you asap
+23:28 < yankov> do you guys know if  there is a browser analog of this? http://nodejs.org/api/events.html
+23:28 < jugglinmike> thanks! :)
+23:32 <@mbalho> yankov: you can use it in the browser
+23:32 <@mbalho> yankov: npm install browserify -g; browserify -r events > bundle.js
+23:32 <@mbalho> yankov: then load bundle.js in a browser and type require('events')
+23:32 < sha0coder> is possible to read the content of <input type=file  ?
+23:33 < yankov> mbalho: oh wow
+23:33 < sha0coder> the content of the selected file?
+23:33 < yankov> mbalho: thanks! does it work with every library?
+23:33 <@mbalho> yankov: most of them, some dont make sense for a browser though
+23:34 < yankov> mbalho: does it automatically browserify all the dependencies?
+23:35 <@mbalho> yankov: yep, go check out the browserify readme on github
+23:35 < yankov> mbalho: ok, thanks a lot
+23:35 < yankov> didn't know such thing exist
+23:50 < shripadk> jugglinmike: okay fixed :)
+23:50 < shripadk> this was a bug
+23:51 < shripadk> will make gists and send you the changes
+23:51 < jugglinmike> cool, cool
+23:51 < jugglinmike> You going to make a PR?
+23:52 < shripadk> whats a PR?
+23:52 < jugglinmike> Pull request
+23:53 < shripadk> oh nope not yet
+23:53 < shripadk> you review it first
+23:53 < shripadk> i'll make a pull request once you review it
+23:53 < shripadk> hold on
+23:54 < shripadk> okay here are the changes:
+23:54 < davebe> hello, in trying to see if client-side is functioning, the first line is 'prompt("test")' , and the server-side serves index.html succesfully but no prompt is given, what is the problem in this case?
+23:54 < shripadk> transport.js L456
+23:54 < shripadk> https://gist.github.com/3966914
+23:55 < shripadk> manager.js L281
+23:55 < shripadk> https://gist.github.com/3966915
+23:55 < shripadk> tell me if it works for you
+23:55 < shripadk> if it does then i'll make a pull request
+23:58 < jugglinmike> Fixed :D
+23:58 < shripadk> :D
+23:58 < shripadk> actually it had nothing to do with redis
+23:58 < shripadk> its just message passing
+23:58 < shripadk> i don't know what the redis store is actually mean't for in socket.io
+--- Log closed Sun Oct 28 00:00:12 2012
