@@ -1,0 +1,2590 @@
+--- Log opened Wed Dec 05 00:00:07 2012
+00:00 < tnorris> piscisaureus: hm. thanks. guess need to improve my c skills. have been able to compile w/o getting an error.
+00:02 <@piscisaureus> mscdex: I think the value is 2 not 1 btw :-)
+00:02 < tnorris> othiym23: what the... close must not be emitted. after a few runs of ab my connections counter increased to 400k.
+00:03 <@piscisaureus> enum addressAwarenessType {
+00:03 <@piscisaureus>     addrAwareDefault,
+00:03 <@piscisaureus>     addrAwareNoLarge,
+00:03 <@piscisaureus>     addrAwareLarge
+00:03 <@piscisaureus> };
+00:06 < othiym23> tnorris: oh right, you want to listen on 'finish'
+00:06 < othiym23> tnorris: don't ask me why, http is weird that way
+00:06 < othiym23> I bet isaacs knows
+00:06 < tnorris> othiym23: eh? bugger, that's not documented.
+00:07 < othiym23> tnorris: it's not, but I know that it is emitted, from reading the source and because it's at the core of some of my code
+00:07 < alchimis_> hi guys, any one here to help me with socket io issue
+00:07 < alchimis_> ?
+00:08 < mscdex> piscisaureus: i like how there is a separate "default" setting
+00:08 < alchimis_> I wanna emit after a post requist
+00:08 < alchimis_> my app crash after a post
+00:09 <@piscisaureus> mscdex: haha, yeah it's so lame
+00:09 < coolguy4> when npm says "Error: No compatible version found: source-map@'>=0.1.7- <0.2.0-'" where should I look to see what package it is failing on?
+00:10 < alchimis_> this is the error, TypeError: Cannot call method 'emit' of undefined
+00:11 < alchimis_> but i have defined io as var io = require('socket.io');
+00:12 < coolguy4> oic, 'source-map' is the package
+00:26 < mscdex> piscisaureus: argh, compiling with that works only a little better. i can `new Buffer(0x3fffffff)` once, but creating a second causes a runtime error
+00:27 <@piscisaureus> mscdex: well, theoretically it would not be possible to create more than 4 of them
+00:27 < mscdex> right
+00:27 < mscdex> but two should work at least
+00:27 <@piscisaureus> well
+00:27 <@piscisaureus> it depends on how fragmented the address space ends up being
+00:29 <@piscisaureus> mscdex: you can check what is going on by using vmmap (http://technet.microsoft.com/en-us/sysinternals/dd535533)
+00:33 <@piscisaureus> mscdex: actually, if fails for me even when I have 1gb of continuous free address space available.
+00:33 <@piscisaureus> mscdex: there is a (tentative) unix patch that mmap's buffers instead of mallocing them - that could work for windows too
+00:34 <@piscisaureus> mscdex: but it needs thorough benchmarking... I can't land that on a stable branch
+00:35 < mscdex> piscisaureus: i think it is working for me, using the information from vmmap
+00:36 <@piscisaureus> mscdex: well, it works once and then it fails
+00:36 <@piscisaureus> mscdex: instead of working never
+00:36 <@piscisaureus> but it could be better :-)
+00:36  * mscdex shakes a fist at fragmented address space
+00:40 < tnorris> piscisaureus: yeah! thanks for the tips. I was able to overwrite SetFatalErrorHandle so I can select different tasks to perform (e.g. write heapdump) when my app fatally crashes.
+00:40 <@piscisaureus> tnorris: haha, well, I just told you "yes you can". Good to hear that it worked tho
+00:42 <@piscisaureus> mscdex: I am heading home. If you want that patch landed, submit a PR
+00:42 <@piscisaureus> mscdex: also, really just use node-x64 :-)
+00:57 < garbagecollectio> what happened to everyone
+01:04 < JohnMcLear> virginity.
+01:14 -!- mode/#node.js [+o piscisaureus_] by ChanServ
+01:22 < garbagecollectio> hey
+01:22 < garbagecollectio> how can one do this:
+01:22 < garbagecollectio> Queue.prototype.queue = function (name, val, callback) {
+01:22 < garbagecollectio>   this.redis.rpush(name, val, callback);
+01:22 < garbagecollectio> };
+01:22 < garbagecollectio> how can u do this.redis
+01:23 <@Nexxy> garbagecollectio, this refers to whichever instance of the Queue object you're manipulating
+01:23 < othiym23> var queue = new Queue(redisClient); function Queue(client) { this.redis = client; }
+01:24 < garbagecollectio> https://github.com/apeace/lolqueue/blob/master/index.js
+01:24 <@Nexxy> garbagecollectio, https://github.com/apeace/lolqueue/blob/master/index.js#L1
+01:24 < garbagecollectio> yes but how can u do this.redis
+01:24 < garbagecollectio> Queue has no .redis method
+01:24 <@Nexxy> garbagecollectio, this refers to whichever instance of the Queue object you're manipulating
+01:25 < garbagecollectio> yes but t has no method .redis
+01:25 < othiym23> garbagecollectio: look at the code I put in the channel ^^
+01:25 < garbagecollectio> so this makes it work: queue.redis = require('redis').createClient();
+01:25 <@Nexxy> garbagecollectio, then it probably won't work
+01:25 < garbagecollectio> u can just add a method like that 
+01:26 < othiym23> garbagecollectio: that's what the README says to do
+01:26 <@Nexxy> or you could just use something like kue
+01:26 < othiym23> and you're not adding a method, you're adding a field to an object
+01:26 <@Nexxy> PEDANT
+01:26 < garbagecollectio> right how can u do that if its not an object literal
+01:27 < othiym23> Nexxy: this is known
+01:27 <@Nexxy> you're an ant, with feet
+01:27 < othiym23> garbagecollectio: you can do that with any object, that's what it means for JS to be dynamic
+01:28 < garbagecollectio> your saying i can do the following
+01:28 < garbagecollectio> >> function blah() { alert('test'); };   var x = new blah(); blah.newfield = "test";
+01:28 < purr> garbagecollectio: (string) 'test'; Console: 'test'
+01:29 <@Nexxy> no
+01:29 < garbagecollectio> function blah() { alert('test'); };  var x = new blah(); blah.newfield = "test"; alert(blah.newfield + 'something');
+01:29 <@Nexxy> alerts are unacceptable
+01:29 < garbagecollectio> >> function blah() { alert('test'); };  var x = new blah(); blah.newfield = "test"; alert(blah.newfield + 'something');
+01:29 < purr> garbagecollectio: undefined; Console: 'test', 'testsomething'
+01:30 < garbagecollectio> why is it undefined
+01:30 <@Nexxy> you're not returning anything
+01:30 < garbagecollectio> huh
+01:30 < garbagecollectio> >> function blah() { alert('test'); return false; };  var x = new blah(); blah.newfield = "test"; alert(blah.newfield + 'something');
+01:30 < purr> garbagecollectio: undefined; Console: 'test', 'testsomething'
+01:31 <@Nexxy> function lol() { return 'wat' }
+01:31 < garbagecollectio> >> function blah() { alert('test'); return 'wat'};  var x = new blah(); blah.newfield = "test"; alert(blah.newfield + 'something');
+01:31 < purr> garbagecollectio: undefined; Console: 'test', 'testsomething'
+01:31 < garbagecollectio> no
+01:31 < garbagecollectio> why does it say undefined
+01:31 < garbagecollectio> alert?
+01:31 <@Nexxy> I have no clue how purr works
+01:31 < othiym23> >> function Blah() {}; var x = new Blah(); blah.newfield "test": blah.newfield
+01:31 < purr> othiym23: SyntaxError: Unexpected string
+01:31 < othiym23> oops
+01:31 < othiym23> >> function Blah() {}; var x = new Blah(); blah.newfield = "test": blah.newfield
+01:31 < purr> othiym23: SyntaxError: Unexpected token :
+01:32 < othiym23> >> function Blah() {}; var x = new Blah(); blah.newfield = "test"; blah.newfield
+01:32 < purr> othiym23: ReferenceError: blah is not defined
+01:32 < othiym23> man I am DUM today
+01:32 < garbagecollectio> u were smart earlier
+01:32 < othiym23> >> function Blah() {}; var x = new Blah(); x.newfield = "test"; x.newfield
+01:32 < purr> othiym23: (string) 'test'
+01:32 < othiym23> (o_o)-b
+01:32 < othiym23>  so yeah, you can just add whatever to objects whenever you want
+01:33 < othiym23> however, don't use lolqueue
+01:33 < othiym23> the name includes a helpful tip as to why
+01:33 <@Nexxy> cuz lol
+01:35 < aboudreault> does anyone use jison here?
+01:37 < garbagecollectio> othiym23: whats wrong with lolqueue
+01:38 < othiym23> garbagecollectio: aside from it having essentially no value aside from saving you from having to look up how two Redis commands work? nothing
+01:41 < Fodi69> hello, how do I have to write my socket.io code to function also when the software run in multiple processes?
+01:42 < garbagecollectio> fuck
+01:43 < garbagecollectio> what about this one
+01:43 < garbagecollectio> https://github.com/apeace/killdrev
+01:44 < othiym23> Fodi69: you'll need to create a store of some kind to keep session data in
+01:44 < Fodi69> I'm using Redis for storing "normal" session data
+01:45 < othiym23> Fodi69: so you're set, pretty much
+01:47 < Fodi69> are there any examples for this?
+01:47 < point9repeating> Fodi69: https://github.com/LearnBoost/Socket.IO/wiki/Configuring-Socket.IO
+01:47 < garbagecollectio> what do u mean normal session data
+01:47 < Fodi69> garbagecollectio: I'm using it as an Express configuration
+01:48 < garbagecollectio> so your using body parser
+01:49 < garbagecollectio> or whatver
+01:49 < garbagecollectio> connect middleware
+01:51 < garbagecollectio> does throw New Error require process.on('uncaughtException');
+01:51 < garbagecollectio> ?
+01:51 < Fodi69> garbagecollectio: it will crash your application, if you don't catch the thrown error
+01:52 < garbagecollectio> so ur saying
+01:52 < Fodi69> but if that's not a problem, then it's not required
+01:52 < garbagecollectio> i need process.on('uncaughtException')
+01:52 < garbagecollectio> ur saying
+01:52 < garbagecollectio> that is the catch?
+01:52 < Fodi69> that is the last catch, that is possible
+01:53 < garbagecollectio>  console.log( 'Emitted %d events', total );
+01:53 < garbagecollectio> what is %
+01:53 < garbagecollectio> d
+01:53 < Fodi69> so if nothing catches it before, then the uncaughtException is called
+01:53 < garbagecollectio> the throw new error happens within a catch
+01:53 < LouisT> process.on('uncaughtException', function(err) { console.log(err); });
+01:53 < LouisT> what i do at times >.>
+01:53 < Fodi69> %d represents the number.
+01:53 < garbagecollectio> how do i handle specific error 
+01:53 < garbagecollectio> error events
+01:54 < warz> >_<
+01:54 < garbagecollectio> whois warz
+01:54 < Fodi69> garbagecollectio: `console.log( 'Emitted %d events', total );` is the same as `console.log( 'Emitted ' + total + ' events');`
+01:54 < Fodi69> garbagecollectio: but it's nicer.
+01:54 < garbagecollectio> %d?
+01:54 < garbagecollectio> weird
+01:55 < Fodi69> %d is replaced by the argument at the end.
+01:55 < garbagecollectio> are there other %?
+01:55 < Fodi69> %d can only handle numbers.
+01:55 < Fodi69> %s can handle any strings
+01:55 < Fodi69> so in your example, total can only be a number
+02:02 < jsilver> which is better for servers and why? Go or Node.Js
+02:02 < gkatsev> depends on your task
+02:03 < jsilver> chat servers
+02:03 < bnoordhuis> jsilver: define 'better'
+02:03 < jsilver> i have a node chatserver made and it's on par with my Ruby one which uses GServer, a little better is node
+02:03 < gkatsev> that too.
+02:03 < jsilver> CPU, Mem, Speed, number of concurrent connections. I have a node and I think it excels at these, atleast it beats Ruby
+02:03 < jsilver> my code is here: https://github.com/jsilverMDX/GlobalChat2
+02:04 < bnoordhuis> beating ruby is not much of a challenge :)
+02:04 < timeturner> is it bad that I write hundreds of lines of code and then debug. I find it faster than writing tests when I already what I want to code in my head and I just have to type it
+02:05 < JewZuckerberg> its me again
+02:05 < timeturner> okay maybe not hundreds. <= 100 lines
+02:05 < bnoordhuis> jsilver: blanket statement but go and node.js probably won't differ all that much in the things you mentioned
+02:05 < jsilver> it's not, but I needed the Node servers so that's why I wrote them. I have a private project "ServerDropper" which is a Rails server than monitors processes, used to be Ruby but then I switch em to Node
+02:05 < CoverSlide> you should always write the test first
+02:05 < jsilver> bnoordhuis: figured so
+02:05 < CoverSlide> as well as only program with a peer
+02:05 < jsilver> just hear a lot of "Go-talk"
+02:05 < JewZuckerberg> niggers are black because they dont use water, they dont wash
+02:05 < JewZuckerberg> anybody know jokes about holocaust or holoniggerism
+02:05 < gkatsev> ops!
+02:05 < CoverSlide> and only if your sticky note is in the "development" column
+02:05 < gkatsev> isaacs: ^^^
+02:05 < JewZuckerberg> how to repeat holocaust?
+02:05 < jsilver> lame
+02:05 < JewZuckerberg> ops!
+02:05 < jsilver> nobody is trolled
+02:06 < JewZuckerberg> i need fast
+02:06 < jsilver> u suck
+02:06 < othiym23> hey Nexxy we have an extrmely low-level troll bein dumb
+02:06 < timeturner> let's all just watch the show
+02:06 < jsilver> worst troll ive ever seen
+02:06 < JewZuckerberg> i eat children on breakfast
+02:06 < timeturner> and ignore
+02:06 < jsilver> timeturner: agreed, doing it
+02:06 < timeturner> this should be fun
+02:06 < jsilver> done it
+02:06 < JewZuckerberg> i raped small jewish children
+02:06 < JewZuckerberg> and ate them then
+02:06 < jsilver> and /clear is nice too
+02:06 < timeturner> yep
+02:07 < JewZuckerberg> if niggers would start using water
+02:07 -!- mode/#node.js [+o bnoordhuis] by ChanServ
+02:07 < JewZuckerberg> they would no longer be black
+02:07 -!- mode/#node.js [+b *!*JohnMurde@119.186.244.*] by bnoordhuis
+02:07 -!- JewZuckerberg was kicked from #Node.js by bnoordhuis [JewZuckerberg]
+02:07 <@bnoordhuis> moron
+02:07 < jsilver> well, thanks guys bbl
+02:08 < gkatsev> seriously, what's up with all the trolls recently?
+02:08 -!- mode/#node.js [-o bnoordhuis] by bnoordhuis
+02:08 < CoverSlide> vengeance for zul'jin!
+02:10 < othiym23> CoverSlide: your nerd humor required me to use the "google" function on my internet computer
+02:11 < CoverSlide> :D
+02:17 <@isaacs> gkatsev: ???
+02:17 <@isaacs> bnoordhuis: thanks
+02:17 <@isaacs> (for kicking, i mean)
+02:18 < roark> i came up with an idea
+02:18 < chovy> anyone want an invite to SCC?
+02:18 < bnoordhuis> np. banning people is my favorite pastime
+02:18 < roark> we go from lamps to lemons
+02:18 -!- mode/#node.js [+o bnoordhuis] by ChanServ
+02:18 <@isaacs> bnoordhuis: you should use the akick magic, though
+02:18 <@isaacs> bnoordhuis: 02:18 -ChanServ(ChanServ@services.)- AKICK on *!*@119.186.244.* was successfully added to the AKICK list for #node.js.
+02:18 < roark> linux apache mysql php -> linux enginx mongodb node
+02:19 <@bnoordhuis> isaacs: oh, i used /kickban this time
+02:19 < chovy> LEMN
+02:19 < chovy> nice
+02:19 < roark> LEMoN ?
+02:19 < chovy> MELN
+02:19 < roark> lol
+02:19  * isaacs mmm... mellons and lemmons...
+02:20 < chovy> the "e" is cheating though
+02:20 < roark> nah it isn't
+02:20 < roark> google LEMP
+02:20 < chovy> it's not enginx its nginx
+02:21 < roark> LEMP stack
+02:21 < chovy> i like MELN or LEMN better than LEMP
+02:21 < chovy> LEMP sounds stupid
+02:21 < roark> yeah, lemp is php instead of node
+02:21 < chovy> ahh
+02:21 < roark> but it exists, hence the E for nginx
+02:21 < chovy> i see
+02:21 < CoverSlide> lnmn?
+02:21 < chovy> LEMN then to keep consistent
+02:22 < roark> LEMN works
+02:22 < roark> but isn't M taken by MySQL, meaning we have to include an O
+02:22 < roark> for MOngo
+02:22 < MI6> joyent/node: isaacs streams2 * efde57e : fs: Default to higher water marks for fs streams (+48 more commits) - http://git.io/HMJghw
+02:22 < chovy> hmm
+02:22 < chovy> good point
+02:22 < chovy> LEON
+02:22 < roark> leaving us with LEMON
+02:22 < chovy> heh
+02:22 < CoverSlide> haproxy > nginx
+02:22 < chovy> what's hte L?
+02:22 < chovy> Linux?
+02:23 < CoverSlide> well except for static files
+02:23 < roark> yeah
+02:23 < roark> is express good enough for static?
+02:23 < roark> i've heard nginx is better
+02:23 < CoverSlide> but usually that's better served from a cdn
+02:23 < CoverSlide> it can do it
+02:23 < roark> right
+02:23 < chovy> how about NEON = *Nix, Engine x, mOngo, Node
+02:23 < CoverSlide> nginx would be better for the static
+02:24 < billy> n^3m
+02:24 < roark> hah
+02:24 < roark> nnnm
+02:25 < roark> look. all i'm saying is that LAMP is a real word, and so is LEMON
+02:25 < roark> so is neon
+02:25 < CoverSlide> maybe static assets could be offloaded to another server using varnish
+02:25 < CoverSlide> sounds good to me
+02:25 < roark> i'm thinking more of a future replacement of lamp servers
+02:26 < roark> as apposed to clusters
+02:26 < garbagecollectio> have u guys heard of cronyism i the workplace
+02:26 < garbagecollectio> i work at a large corporation
+02:26 < garbagecollectio> and they like put this guy in charge of everything
+02:27 < warz> there generally tends to be one of those
+02:28 < MI6> joyent/node: isaacs streams2-net * f9b202e : tests: Many streams2 test fixes  Mostly calling .resume() on various resp (+20 more commits) - http://git.io/n6trBQ
+02:29 <@Nexxy> garbagecollectio, I think that's just called; "the workplace"
+02:30 < syskk> in Mongoose, is there a way to get the raw array of document IDs after it has been populated?
+02:31 < niggler> is there a plan to introduce a utf16be buffer encoding?
+02:37 < AAA_awright> Linux/Nginx/Node.js/MongoDB
+02:37 < AAA_awright> hmm
+02:40 < AAA_awright> Well LAMP is overrated anyways since it includes Apache
+02:42 < chilts> so is the MySQL and PHP parts
+02:43 < chilts> Linux, Nginx, Perl, Postgres <- not sure what that accronym is ... but now Linux, Node.js, DynamoDB - another tough accronym
+02:43 < chilts> oh, and S3
+02:43 < chilts> and SQS et all
+02:43 < chilts> :)
+02:46 < garbagecollectio> why does node do streaming
+02:47 < garbagecollectio> like why does it "stream" with http requests and stuff
+02:48 <@mbalho> garbagecollectio: you really should read this http://nikhilm.github.com/uvbook/
+02:49 < garbagecollectio> woah thx
+02:49 < SomeoneWeird> https://github.com/substack/stream-handbook
+02:49 < Nom-> chilts: LAND!
+02:50 < timeturner> there should be !kick command
+02:50 < timeturner> to alert mods
+02:50 < Nom-> Linux And Node.js; DynamoDB
+02:50 < timeturner> or !troll
+02:53 < garbagecollectio> what are these .yml files
+02:54 < SomeoneWeird> yaml
+02:56 < garbagecollectio> yaml-config?
+02:56 < SomeoneWeird> ..?
+02:56 < garbagecollectio> whats yaml
+02:56 < SomeoneWeird> google
+02:57 < dnz-> GOOGLE
+02:57 < dnz-> IS
+02:57 < dnz-> YAML
+02:57 <@mbalho> yaml stands for Yeti Amateurs Mustache League
+02:57 <@mbalho> it was the name of the club where steve wozniak was invented
+02:57 <@mbalho> everyone knows this stuff
+03:00 < wo0kie> :o
+03:01 < kenperkins> bnoordhuis: that bug reproduces perfectly without request modules. You could have asked before closing it.
+03:01 <@bnoordhuis> kenperkins: what bug in particular? i'm on a closing spree tonight
+03:01 -!- mode/#node.js [-o bnoordhuis] by bnoordhuis
+03:01 < kenperkins> the http connection pool growing 
+03:02 < kenperkins> https://github.com/joyent/node/issues/4362
+03:02 < kenperkins> brb bathing daughter
+03:02 < TooTallNate> kenperkins: well post a standalone test case and we'll go from there
+03:02 < bnoordhuis> kenperkins: oh, that one. post a core libs only test case and we'll take it from there
+03:02 < bnoordhuis> what TooTallNate said :)
+03:08 < garbagecollectio> shit
+03:08 < garbagecollectio> someone give me some node tests
+03:08 < garbagecollectio> coding tests
+03:08  * astropirate slaps garbagecollectio 
+03:13 < styol> garbagecollectio: If you're haven' scoping problems, I feel bad for you son. I got 99 problems but...
+03:13 < styol> >>> 'this' !== 1
+03:13 < purr> styol: (boolean) true
+03:13 < garbagecollectio> styol: a cope ain't one
+03:14 < styol> garbagecollectio: you mean unit tests yah? Are you using a certain framework or can you refine your question?
+03:14 < garbagecollectio> no
+03:14 < garbagecollectio> i mean 
+03:14 < garbagecollectio> trivia
+03:15 < Leo_> Does anybody know a library that can allow me to work with raw packets in node? Possibily with a TCP layer and no TCP option.
+03:28 < polaris> Can anyone help me troubleshoot this error deploying to nodejitsu?
+03:28 < polaris> https://gist.github.com/4211916
+03:28 < garbagecollectio> yeha
+03:28 < polaris> thanks
+03:29 < timeturner> anyone ever thought of hosting on OVH?
+03:29 < garbagecollectio> how do i make an npm
+03:30 < garbagecollectio> wtf is a node hosting platform
+03:34 < MI6> joyent/node: Shigeki Ohtsu master * 1c8a526 : test: fix simple/test-debug-brk-file race condition  V8 debug agent needs - http://git.io/NrQ-jg
+03:34 < SomeoneWeird> garbagecollectio, do you know what google is?
+03:35 < garbagecollectio> yes
+03:35 < garbagecollectio> it's you
+03:35 < Youdaman> garbagecollectio: google npm cheatsheet
+03:35 < SomeoneWeird> k
+03:36 < Youdaman> garbagecollectio: a node hosting platform is any server/computer with node installed, but typically they mean that it's some kind of hosting/cloud service that has node installed
+03:36 < kenperkins> bnoordhuis: I should have known to use core libs. I even said to myself, "I'm sure request and async are fine here, just for convenience"
+03:36 < kenperkins> <sigh>
+03:36 < garbagecollectio> yeah but why the hell would anyone pay for that
+03:36 < bnoordhuis> kenperkins: oh well, next time :)
+03:36 < Youdaman> garbagecollectio: so you don't have to manage your own server and all the details involved with that
+03:36 < kenperkins> yep
+03:37 < garbagecollectio> lol
+03:37 < garbagecollectio> but they ar ejust cloud services that have node on it
+03:37 < garbagecollectio> then call themselves node jitsus
+03:37 < Youdaman> garbagecollectio: most have free accounts
+03:37 < Youdaman> garbagecollectio: not sure if trolling or...
+03:37 < garbagecollectio> you dont think thats dumb/
+03:37 < garbagecollectio> no im serious
+03:37 < garbagecollectio> cloud services with node on it?
+03:37 < Youdaman> garbagecollectio: easy money obviously, you should go do it
+03:37 < garbagecollectio> and then you advertise as a "node cloud provider"
+03:37 < garbagecollectio> yeah
+03:37 < warz> im pretty sure hes trolling. hes been at it for a few days.
+03:37 < garbagecollectio> for ralz
+03:38 < garbagecollectio> no i am not
+03:38 < Youdaman> :)
+03:38 < garbagecollectio> i dont get this example
+03:38 < garbagecollectio> https://github.com/substack/stream-handbook
+03:38 < garbagecollectio> second example with .pipe
+03:39 < Youdaman> garbagecollectio: what bit don't you get? here's the docs re pipe: http://nodejs.org/docs/latest/api/stream.html#stream_stream_pipe_destination_options
+03:40 < Youdaman> garbagecollectio: you know what pipe means on the command line right? program1 | program2 | program3 -- like that but in a node app
+03:40 < garbagecollectio> yeah
+03:41 < garbagecollectio> i dont get where its going or how it is pciking up the http request
+03:41 < Youdaman> garbagecollectio: magic.
+03:41 < garbagecollectio> a request comes in and it goes to http
+03:42 < Youdaman> via res
+03:42  * SomeoneWeird /ignores
+03:42 < acidjazz> hwo the fuck do i comment out multiple blocks in jade
+03:42 < acidjazz> s/blocks/lines
+03:42 < acidjazz> so retarded
+03:42 < SomeoneWeird> -> jade
+03:42 < SomeoneWeird> lol
+03:43 < Youdaman> acidjazz: https://github.com/visionmedia/jade#a6-5
+03:43 < acidjazz> yea ive read that entire page 20 times
+03:43 < acidjazz>  //, //-, /* <!-- all give me jade parse errors
+03:45 < Youdaman> acidjazz: that doesn't seem right. i just tested in a jade template i have and // works for me :(
+03:46 < Youdaman> pastebin your markup?
+03:46 < acidjazz> oh i see
+03:46 < acidjazz> the comment cant be at the begining of the line
+03:46 < garbagecollectio> Youdaman, via res but steam.pipe  is outside the 
+03:47 < garbagecollectio> call back
+03:47 < garbagecollectio> outside the function
+03:47 < garbagecollectio> how would it get acces to res
+03:48 < Youdaman> garbagecollectio: looking at the 2nd code block under this sub-heading -- https://github.com/substack/stream-handbook#why-you-should-use-streams -- i see that var stream is created within the callback for http.createServer ?
+03:49 < garbagecollectio> yes
+03:49 < Youdaman> acidjazz: hi5!
+03:49 < Youdaman> garbagecollectio: so it access res that way
+03:50 < Youdaman> garbagecollectio: do you have a specific problem you're trying to solve or do you just have a list of random issues?
+03:50 < garbagecollectio> yeah
+03:50 < garbagecollectio> how does the pipe get to 
+03:50 < garbagecollectio> i mean how can u handle res.end
+03:50 < garbagecollectio> when pipe is doing it
+03:50 < garbagecollectio> how can u configure it
+03:51 < Youdaman> stream is set up to call res.end on an error
+03:51 < faunaint> is there a chance node will ever support different encodings without lousy python dependencies?
+03:53 < garbagecollectio> i have an interview tomorrow
+03:53 < garbagecollectio> on node
+03:54 < Youdaman> garbagecollectio: good luck -- are you new to it?
+03:54 < garbagecollectio> no but i think not sophisticated at it, even though i use it in my company
+03:54 < garbagecollectio> to do compelx stuff
+03:54 < garbagecollectio> but its all express js
+03:54 < Youdaman> define "complex"
+03:54 < Youdaman> oh ok
+03:54 < garbagecollectio> i mean its complex web apps
+03:54 < garbagecollectio> so it snot actually complex
+03:55 < garbagecollectio> i think they are more hardcore
+03:55 < Youdaman> perhaps they're 1337?
+03:55 < garbagecollectio> no they aren't that good
+03:55 < garbagecollectio> just trendy
+03:55 < Youdaman> oh just 1336
+03:55 < Youdaman> hipster?
+03:55 < garbagecollectio> yea
+03:55 < warz> ill use visual basic to make a gui and sniff their ips
+03:55 < garbagecollectio> blah blah redis blah blah
+03:55 < Youdaman> sweet.
+03:55 < garbagecollectio> lol warz
+03:56 < Youdaman> garbagecollectio: needs moar flannel
+03:56 < garbagecollectio> i have a lot
+03:56 < Youdaman> ironic glasses also?
+03:56 < garbagecollectio> but im wondeirng if i should leave a fortune 50
+03:56 < garbagecollectio> company
+03:56 < garbagecollectio> f
+03:56 < garbagecollectio> for a hipster startup
+03:56 < garbagecollectio> yeah
+03:56 < garbagecollectio> totally
+03:56 < garbagecollectio> lots of that
+03:56 < garbagecollectio> "dog in the office"
+03:56 < Youdaman> yeah hipster startup for the win. sit in internet cafes. looking ironic. with stickers all over your mac.
+03:57 < faunaint> work environment is everything, imo. but not like this
+03:57 < faunaint> i read an interview with the people behind livingsocial once
+03:57 < Youdaman> garbagecollectio: i worked in a couple "dog in the office" places -- the dogs are great, their owners not always
+03:58 < garbagecollectio> faunaint: and?
+03:58 < garbagecollectio> yeah im kinda comfy
+03:58 < garbagecollectio> t
+03:58 < faunaint> and they had this strong idea about having a cultural filter on hirings so that everyone in the company could be buddies with everyone
+03:58 < garbagecollectio> he problem is that it would take me 10 years to advance
+03:58 < faunaint> they flew everyone to their office
+03:58 < garbagecollectio> righ
+03:58 < garbagecollectio> that makes sense tho
+03:58 < Youdaman> faunaint: sounds like a cult
+03:58 < garbagecollectio> thats the best work environment
+03:59 < Youdaman> -.-
+03:59 < garbagecollectio> i like my place but they wont give me dev projects cause i only have 1 year experience
+03:59 < faunaint> ppl spent a week there so current employees could get a sniff on them
+03:59 < garbagecollectio> i work on internal applications
+03:59 < faunaint> and everyone voted on new hirings
+04:00 < faunaint> I had the chance of working on a very small office once where we could have a similar experience
+04:00 < garbagecollectio> too bad living social is going down
+04:00 < Youdaman> faunaint: sounds... uncomfortable
+04:00 < garbagecollectio> how do writing streams and reading streams interact
+04:01 < Youdaman> garbagecollectio: they get drunk and go out to clubs together
+04:01 < garbagecollectio> please
+04:01 < garbagecollectio> this is no time for jokes
+04:01 < Youdaman> srs biz?
+04:01 < garbagecollectio> every node.js dev is a jokster
+04:01 < Youdaman> you are not!
+04:01 < faunaint> Youdaman, you're seeing it from the rejected applicant's POV
+04:01 < Youdaman> you're trying though. but your irony is showing
+04:02 < Youdaman> faunaint: yeah i'd say the rejects outnumber the actual staff
+04:02 < garbagecollectio> i am not rejectd
+04:02 < garbagecollectio> who got rejected?
+04:02 < faunaint> Youdaman, they do, but ppl in the world outnumber your friends circle too, right?
+04:02 < garbagecollectio> i thought it was supposed to be so easy to get a dev job
+04:03 < faunaint> it's easy garb
+04:03 < garbagecollectio> i thought u could go in one year from making 36k as a paralegal to 100k as a node.js developer
+04:03 < Youdaman> faunaint: and i like the diversity. i understand getting on with people at work, but it sounds a bit homogenous? some great ideas/progress comes out of differing views
+04:03 < faunaint> it's hard to get a job where you feel good
+04:04 < faunaint> Youdaman, I agree, and I tend to gravitate towards diverse people, but they all must have something in common I can't quite put into words
+04:04 < Oddman> Youdaman, yeah - if said people are willing to actually discuss and open to changing their minds
+04:04 < Youdaman> faunaint: i love my job -- i quit working in an office for a manager/boss and instead work from home as a freelance for clients. less interruptions, more free time, more control, less stress :)
+04:04 < Oddman> working with arrogance is a no-brainer, you don't.
+04:04 < Youdaman> Oddman: agreed
+04:05 < faunaint> Oddman, yeah, stuff like that
+04:05 < garbagecollectio> Youadam how did u quit?
+04:05 < Youdaman> Oddman: well, arrogance is fine, if... they can admit they're wrong when/if they are
+04:05 < Youdaman> garbagecollectio: which job?
+04:05 < Oddman> Youdaman, not really arrogance then is it ;)
+04:05 < Youdaman> :)
+04:06 < Youdaman> i'd say i'm arrogant at times, but mostly empathic. perhaps the term is "pride" moreso?
+04:07 < Youdaman> it's ok to think you're awesome, as long as you realise others are also awesome
+04:07 < faunaint> proud but still humble, something like that
+04:07 < garbagecollectio> how are streams and asynchronous io related?
+04:08 < Youdaman> garbagecollectio: picture a tap
+04:08 < garbagecollectio> yeah bt how is the asynchronous related to that
+04:09 < Youdaman> and then picture a glass collecting water from that stream, and then pouring that into a bucket, and then going back for more
+04:09 < Youdaman> maybe that's a bad analogy?
+04:09 < Oddman> faunaint, yeah something like that :)
+04:09 < Oddman> nothing wrong with confidence
+04:11 < faunaint> I miss working in an office
+04:11 < faunaint> I've been in the home-office for almost two years
+04:12 < Lorentz> can't work at home
+04:12 < Lorentz> just lose focus too quickly, I work best under pressure
+04:12 < Lorentz> might just be lack of discipline :S
+04:12 < faunaint> after some time just the fact that you're not changing you geographical location when switching off from work starts becoming annoying
+04:13 < garbagecollectio> yeah
+04:13 < garbagecollectio> office is awesome
+04:13 < Lorentz> that and my house is too small to comfortably feel that I have a room just for work
+04:13 < Benvie> anyone have experience with PyPy backend stuff
+04:13 < garbagecollectio> work from home sucks unless its for like a week
+04:13 < garbagecollectio> how much do u guys make?
+04:13 < Benvie> I make negative money but I enjoy it
+04:13 < garbagecollectio> shit
+04:14 < Lorentz> let's just say, not much after tax
+04:15 < Youdaman> faunaint: i go and visit my dad each day for a cup of tea, he lives about 15 mins drive away. i play basketball 3 nights a week. i organise monthly dinners with irl friends. getting out of the house definitely helps. also, going for walks around the neighbourhood
+04:15 < garbagecollectio> why dont u guys get real dev jobs
+04:15 < garbagecollectio> you certainly could
+04:15 < Benvie> I do what I want all the time and I'm waiting until I find how to get paid for it
+04:15 < faunaint> I make a good amount relative to where I live in Brazil, but not that much compared to the average in Sao Paulo for instance
+04:16 < faunaint> Youdaman, do you have like some sort of switch-off ritual?
+04:17 < faunaint> I feel I need to start doing something when I decide to stop for the day
+04:17 < faunaint> like take a walk, for instance
+04:17 < coolguy4> exit
+04:17 < coolguy4> whoops
+04:17 < Lorentz> I joined the local gym yesterday
+04:17 < garbagecollectio> you dont even make much in brazil?
+04:17 < garbagecollectio> shit im in the wrong profession
+04:17 < garbagecollectio> did u guys go to college?
+04:17 < Lorentz> so I shall be getting fit
+04:18 < Benvie> but I did stay at a holiday inn last night
+04:18 < Youdaman> faunaint: my switch-off is visiting my old man for tea usually, but i often still think about work problems i'm trying to solve. definitely go for a walk each day if you can or play some sports with others if possible
+04:19 < faunaint> garb, I did, twice, and dropped out of both, but really I'm better off than my college grad fellows money and career-wise
+04:19 < garbagecollectio> weird
+04:19 < Benvie> I pretty much just do follow my passion regardless of anything else so I've learned to go with it
+04:20 < garbagecollectio> i gotta get this job in nyc
+04:20 < garbagecollectio> i dont know shit about node
+04:20 < garbagecollectio> i sent them fake code samples
+04:21 < Benvie> I could get a job but what I really want to do is whatever I want, so that's more diffiult. Now to be fair, "whatever I want" tends to be useful, but it's still whatever I want
+04:21 < gkatsev> Benvie: how do you make money?
+04:22 < Benvie> I don't
+04:22 < gkatsev> oh
+04:22 < Benvie> I have no money
+04:22 < warz> garbagecollectio, you sent a job fake code samples, and you actually *want* to get the job?
+04:22 < garbagecollectio> hell yeah i want it
+04:22 < garbagecollectio> i sent them old code samples
+04:22 < faunaint> hahahhaha garb
+04:22 < gkatsev> Benvie: I thought you made a deal with the devil or something. He gives you money, you do whatever you want.
+04:22 < garbagecollectio> not fake
+04:22 < warz> why the hell would you want that job, though? do you realize how many bad things that says about the company if they hire you? lol.
+04:23 < warz> and then for you, youd just get in there and be useless
+04:23 < warz> itd be bad all around
+04:23 < warz> that sounds like a terrible idea
+04:23 < Benvie> for the short periods of time I've done work, I've been compensated well for it. But I'm basically very poor because I've prioritized doing whatever I want over everything else
+04:23 < Benvie> I think it's been the right decision because my productivity has been incredible
+04:24 < gkatsev> Benvie: thankfully i've managed to get a job that's mostly doing pretty cool stuff in an area that I'm interested in.
+04:24 < Youdaman> garbagecollectio: you might be better off selling insurance
+04:24 < garbagecollectio> i am extremely competent
+04:24 < garbagecollectio> it depends how much they care about coding from scratch
+04:24 < garbagecollectio> vs googling and shit
+04:24 < Benvie> my issue is that the "whatever I want" thing is semi-non-negotiable because it's not something I can choose
+04:24 < warz> then why half-ass a job application that you *really want*?
+04:25 < warz> that just seems backwards to me
+04:25 < faunaint> benvie, it's inspiration-driven I suppose?
+04:25 < Benvie> passion and inspiration, yeah
+04:25 < Benvie> I tend to work 48 hours at a time
+04:25 < gkatsev> Benvie: just get a job at mozilla :P
+04:25 < Benvie> I've been trying
+04:25 < gkatsev> heh
+04:25 < gkatsev> Benvie: gl
+04:25 < Benvie> I applied to a job working on dev tools
+04:26 < Benvie> that's what my passion essentially is
+04:26 < gkatsev> seriously, they really should hire you.
+04:26 < Benvie> all the stuff I make is related to dev tools
+04:26 < Benvie> well when I say trying
+04:26 < gkatsev> or maybe work for google.
+04:26 < Lorentz> I got bills to pay, can't just laze around :(
+04:26 < gkatsev> on like chrome dev tools
+04:26 < Benvie> i sent in an app a few days ago for a position that opened within the last week
+04:26 < gkatsev> especially since at google you get the 20% on top of that
+04:27 < garbagecollectio> warz: its representative of my skill
+04:27 < Benvie> fortunately I've finally produced some projects that are capable of getting me my ultimate desire
+04:27 < garbagecollectio> benvie what do u mean
+04:27 < Benvie> which is the credibility to do whatever I want and be paid for it
+04:27 < garbagecollectio> stuff u can show
+04:27 < warz> garbagecollectio and also entirely of your ethic too lol
+04:27 < faunaint> those 20% really piss me off (in a good way)
+04:27 < gkatsev> Benvie: GL!
+04:28 < faunaint> it's not that hard for other companies for afford 20% of employee 'free' time
+04:28 < faunaint> to afford*
+04:28 < Youdaman> garbagecollectio: i'm not sure if you're legit. you're either approaching things in a screwed up way like warz is suggesting, or you're just acting a fool here. if you're seriously concerned with wanting to learn more about node, instead of lurking here you should probably go read a few articles to do with whatever problems you're currently employed to work on, or things you find interesting 
+04:28 < Youdaman> and would like to work on. i'm trying to offer advice based on you being actually as naive as you sound. i wish you well, and feel free to ask node questions for sure
+04:28 < Benvie> I have some projects which have the merits to earn me leeways
+04:28 < bnoordhuis> faunaint: become a node.js core developer. my professional life is 100% 20% time
+04:28 < syskk> I have a REST question. let's say I want to update multiple documents (resources) at once, a list of posts for example. should I iterate the form and submit changes to /post/ID for every post or is there any way to do one single http request that will update all resources?
+04:28 < gkatsev> we have a 10-20% time at my work. Haven't taken advantage of it yet. Maybe at some point. Awesome stuff happening in january.
+04:28 < stefan41> question on execFile…from where does it get the $PATH it uses? it doesn't seem to be from the parent shell.
+04:28 < Benvie> Youdaman: yeah he's always like that. I thought it was the fool play for a long time but it's been so consistent for so long
+04:29 < garbagecollectio> alwyas like what?
+04:29 < garbagecollectio> asking questions?
+04:29 < Benvie> I think it may just be a weird quirk of the way you communicate
+04:29 < Benvie> either that or you're the most persistent and consistent troll I've met
+04:29 < Youdaman> syskk: probably depends on which db you're using and whether it allows that firstly, and secondly if someone has written an api/lib to help with that operation
+04:30  * gkatsev Benvie you should join #inimino. A bunch of people from ##javascript hang out there. We talk about cool shit and programming languages and JS and w/e
+04:30 < gkatsev> dammit
+04:30 < Benvie> lol
+04:30 < bnoordhuis> stefan41: PATH. if no PATH is set, it usually looks in /bin and /usr/bin (details are platform dependent)
+04:30 < hughfdjackson> :| 
+04:30 < hughfdjackson> it's /msg
+04:30 < gkatsev> that was supposed to be a /msg...
+04:30 < Benvie> well f you, I should have been invited long ago
+04:30 < hughfdjackson> you're the worst secret keeper
+04:30 < Benvie> now I don't even wanna
+04:30 < hughfdjackson> smh
+04:30 < hughfdjackson> :D
+04:30 < syskk> Youdaman: well, it's technically feasible for me.. I'm just wondering what is the typical way REST apis handle that
+04:30 < gkatsev> one time I accidentally typed my password into the channel
+04:30 < garbagecollectio> Benvie: describe more please
+04:31 < bnoordhuis> gkatsev: hunter2?
+04:31 < garbagecollectio> Benvie: u mean asking questions?
+04:31 < gkatsev> bnoordhuis: yes.
+04:31 < Youdaman> syskk: it sounds like it would be more efficient to try to do less http/rest transactions and send all the ids in one go, and then have the end that's receiving go through the list, but that's just my 2 cents
+04:32 < Youdaman> syskk: and again that depends on the api you're using and if that's possible, or whether you can roll your own stuff
+04:32 < syskk> Youdaman: how would you suggest structuring the URI? maybe a PUT on /posts ?
+04:33 < Youdaman> syskk: well i'm using couchdb so i'd probably do something like this: http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API#Modify_Multiple_Documents_With_a_Single_Request
+04:34 < Youdaman> syskk: i'm not sure, but maybe google "bulk update X" where X is the type of db you're using
+04:34 < Youdaman> syskk: perhaps someoene has asked a similar question on stackoverflow
+04:35 < Benvie> garbagecollectio: it's hard to describe
+04:36 < Benvie> it's like
+04:36 < Benvie> it reminds me of those SNL skits
+04:37 < Benvie> where the guy always sounds sarcastic and everyone just think's he's this sarcastic asshole, but in reality he just always sounds like that and is hopelessly desperate
+04:37 < Benvie> because he can't help it
+04:38 < Benvie> but at the end you're still not sure if he's just a big sarcastic asshole or not
+04:38 < garbagecollectio> sarcastic asshole wtf
+04:38 < garbagecollectio> hopelessly desperate, wtf
+04:38 < Benvie> well it's not sarcasm for you
+04:38 < garbagecollectio> this is absurd
+04:38 < garbagecollectio> i come in here and i get answers as hard as i can as fast as i can
+04:38 < Benvie> it's like you sound like you're asking leading questions all the time
+04:38 < Benvie> that you know the answer to
+04:39 < Benvie> and are waiting for someone to give the wrong answer so you can pounce on them
+04:39 < Benvie> but you never actually do
+04:39 < stefan41> bnoordhuis: is it says "chdir(): No such file or directory" what is that trying to tell me? do you have a gist of a execFile usage with a file not in /bin/?
+04:39 < bnoordhuis> stefan41: what os is that?
+04:40 < stefan41> mac
+04:40 < bnoordhuis> ah, poor you
+04:40 < bnoordhuis> on linux, you can run `strace -e execve node script.js` and it'll show you what exactly it's trying to execute
+04:40 < bnoordhuis> there's dtruss on os x but it's not nearly as nice as strace
+04:41 < bnoordhuis> still, you might want to give it a spin
+04:43 < garbagecollectio> im not asking to pounce on them at all
+04:43 < garbagecollectio> im asking questions about hwo stuff works
+04:48 < Youdaman> garbagecollectio: it's often quicker to google. for example, the pipe questions you were asking me, you could have googled pipes and node and streams and read a few tutorials. because any question you asked without doing that would just lead to 10 more questions otherwise. better to have 9 of those 10 already understood and coming to ask the one or two remaining things you don't get. you'll 
+04:48 < Youdaman> get more love that way, as well as self-satisfaction. that's not to say people don't want to help, but you have to show you're willing to help yourself also -- that makes people more likely to help you ;)
+04:49 < kenperkins> bnoordhuis: could req.end() not getting called result in more connections than are permitted in maxSockets?
+04:49 < garbagecollectio> youdaman: its not for me
+04:49 < garbagecollectio> dont understand when i google
+04:50 < Youdaman> garbagecollectio: that's because you're at the "i don't know what i don't know
+04:50 < Youdaman> stage
+04:50 < MI6> joyent/node: Ben Noordhuis master * c81dec7 : test: remove simple/test-child-process-fork2  The test assumes the parent - http://git.io/wtbQMw
+04:50 < garbagecollectio> thats true but how do you know that stage?
+04:50 < AAA_awright> kenperkins: if perstistent connections are being used I suspect not
+04:50 < Youdaman> garbagecollectio: reading
+04:50 < _numbers> if i want my node app to be multi-tjhreaded does that happen automatically, with async.js for example, or do i have to use a lib like node-threads-a-gogo
+04:50 < kenperkins> AAA_awright: Default agent, (keep-alive is set)
+04:50 < garbagecollectio> what is that stage
+04:50 < garbagecollectio> child process are threads
+04:51 < Youdaman> garbagecollectio: stage one: read. stage two: ask questions. i think you're skipping stage one.
+04:51 < othiym23> _numbers: node is (effectively) never multi-threaded, async just uses the event loop to provide concurrency
+04:51 < Youdaman> garbagecollectio: and people usually grow tired of helping people who skip stage one
+04:51 < faunaint> bnoordhuis, you said you work on node.js core... you have any idea if there is a remote chance node.js will ever do character encoding conversions at the core, without iconv's python dependency?
+04:51 < garbagecollectio> i read dude
+04:51 < garbagecollectio> i ask u for clarification
+04:51 < garbagecollectio> jesus
+04:51 < othiym23> _numbers: if you want to take full advantage of multiple cores in your system, use process-based concurrency through multiple node processes, using either child_process or cluster
+04:51 < Youdaman> i'm not jesus, but i'm close
+04:51 < garbagecollectio> othiym23: doesnt child process do threads?
+04:52 < garbagecollectio> you're stay at home jesus
+04:52 < othiym23> garbagecollectio: no, child process spawns separate processes
+04:52 < othiym23> threads execute in the same process space
+04:52 < _numbers> othiym23: oh i guess this lib makes it possible now https://github.com/xk/node-threads-a-gogo
+04:53 < Youdaman> garbagecollectio: thing is, i probably know less about streams than you do, but i just visited the docs, read a little, and it was obvious -- because substack wrote some really cool docs there that were pretty clear and concise. and yet you were asking questions that weren't really needed to be asked had you glanced at the docs a bit longer
+04:53 < bnoordhuis> kenperkins: not really
+04:53 < Youdaman> garbagecollectio: you're ask questions jesus
+04:53 < bnoordhuis> faunaint: not in the near future but perhaps someday
+04:54 < kenperkins> absent someone specifying connection close, how else could you end up with more http connections than maxSockets is set to?
+04:54 < bnoordhuis> faunaint: btw, what do you mean with iconv's python dep? you mean node-iconv?
+04:54 < bnoordhuis> kenperkins: depends. do you set (or unset) agent?
+04:54 < gildean> Youdaman: i think the actual term is "help vampire"
+04:54 < kenperkins> no
+04:54 < gildean> http://slash7.com/2006/12/22/vampires/
+04:54 < bnoordhuis> kenperkins: also, what's your definition of 'connection'? sockets in TIME_WAIT state don't count
+04:55 < kenperkins> ok, that's good to know
+04:55 < kenperkins> why don't those count?
+04:55 < bnoordhuis> because they're stale, they no longer refer to active connections
+04:55 < Youdaman> gildean: as in sucking victims brains dry with questions?
+04:55 < kenperkins> don't they still consume an open file descriptor?
+04:56 < Youdaman> gildean: "help zombie" in that case?
+04:56 < bnoordhuis> kenperkins: no. the kernel keeps the socket open a little longer to make sure the (address,port) tuple isn't reused
+04:56 < gildean> Youdaman: something like that, the link explains the concept in more depth
+04:56 < bnoordhuis> kenperkins: but they're dead and gone from user land's perspective
+04:56  * Youdaman reads (READS!)
+04:56 <@mbalho> what are you guys talking about IRC is for describing the same things over and over and over again every day in crazy detail
+04:56 < kenperkins> bnoordhuis: that really changes my perspective on a few things. Thanks. Can you point me or refer me to anything more authoritative than chat? (I'd like to share with some colleagues)
+04:57 <@mbalho> how else would we do it, that is the onlyw ay
+04:57 < bnoordhuis> kenperkins: you mean the kernel source or? wikipedia?
+04:57 < kenperkins> either realy :D
+04:58 < faunaint> bnoordhuis, i mean "npm install iconv" requires python
+04:59 < bnoordhuis> kenperkins: the kernel is easy, it's in net/ipv4/tcp.c
+04:59 < othiym23> _numbers: that's sort of a hand-hacked version of isolates, and you can use it, but it's far from a conventional Node strategy
+04:59 < kenperkins> thanks
+04:59 < bnoordhuis> kenperkins: finding useful on wikipedia proved to be something more of a challenge...
+04:59 < othiym23> there is a *lot* of Node code that's predicated on Node being single-threaded
+04:59 < Youdaman> gildean: thanks for that link :)
+04:59 < kenperkins> no prob, source is about as authoritative as you can be ;)
+04:59 < _numbers> is there any reason to use java anymore? seems like node kicks its butt
+04:59 < bnoordhuis> faunaint: oh right, that's because it's built with node-gyp and gyp is python
+04:59 < bnoordhuis> faunaint: that won't change in the near future
+05:00 < othiym23> _numbers: yeah, you have a big pile of XML and a large legacy stack to work with
+05:00 < othiym23> there is an awful lot of tooling out there for Java
+05:00 < Youdaman> garbagecollectio: you're a help vampire -- http://slash7.com/2006/12/22/vampires/ -- i'm not saying you're a bad person, but you're a help vampire. and i don't think you're even aware of it. apologies if you're just trolling.
+05:05  * mscdex shakes a fist at Java
+05:06 < Youdaman> mscdex: don't just shake it, wind it up and throw a punch
+05:06 < othiym23> aw
+05:07 < Youdaman> a punch full of love, of course
+05:07 < othiym23> I'm glad I don't write Java for a living anymore, but I'm also glad I have enough post-Java experience that I don't have to put up with people's prejudice against it in interviews anymore
+05:07 < bnoordhuis> i don't get the java hate. it's provided more job security over the years than node.js, python and ruby combined
+05:07 < Youdaman> othiym23: it has become accepted at least yeah
+05:08 < othiym23> it kinda sucks having people tell you to your face that all Java developers are terrible when your resume includes 13 years of pro Java dev experience
+05:09 < codingstream> the problem is Java's perception 
+05:09 < othiym23> that's why I like Dropwizard so much
+05:10 < othiym23> people like Coda Hale are out there showing how to do Java right
+05:10 < Youdaman> othiym23: PHP gets the same wrap. likewise C#. i think it's because they're popular, or are taught at uni etc, and so there is a bigger population of bad programmers just due to popularity. i love using PHP. there, i said it.
+05:10 < timeturner> I don't understand one thing
+05:10 < Youdaman> timeturner: you're lucky
+05:10 < timeturner> if you have to write Java for performance reasons or what not. why not just write in C
+05:10 < timeturner> forget about Java
+05:11 < timeturner> and go straight to C or C++
+05:11 < othiym23> for doing enterprisey things, there's a huge pile of useful code out there in Java
+05:11 < timeturner> basically cut the crap
+05:11 < misterhat> oh no
+05:11 < misterhat> what's going on here
+05:12 < othiym23> and at least once upon a time, Java hewed a nice middle path between C (where you have to manage memory and deal with pointer craziness) and C++ (where the STL and Boost are gigantic soul-sucking monstrosities for doing generic programming)
+05:12 < d4rklit3> hi
+05:12 < Youdaman> timeturner: maybe your company uses Java. maybe you don't know C or have the time to learn. maybe you like Java? but yeah for performance, like computer graphics, while there are libs out there, you're not going to see any AAA titles in java for example. all languages have their place. Java was supposed to take over the web, it didn't. it took over the enterprise. whatever an "enterprise" is
+05:13 < misterhat> yes
+05:13 < othiym23> Java used to be a really good language for software engineering, although the botched implementation of generics and annotations sort of compromised its status as just enough OO to get the job done for enterprise dev
+05:13 < misterhat> java failed @ taking over the web
+05:13 < Youdaman> ^
+05:13 < mscdex> just the amount of Java I had to write in college was enough to last me for a lifetime
+05:13 < misterhat> it's not really a terrible language
+05:13 < misterhat> but terrible for the web
+05:13 < d4rklit3> how goes it in node.js land
+05:13 < misterhat> terrible platform for the web alltogether
+05:13 < Youdaman> mscdex: they give you it to weed out the people who give up easily ;)
+05:13 < othiym23> misterhat: it was a huge improvement over mod_perl once upon a time
+05:13 < misterhat> sorta thrived in servers
+05:14 < othiym23> speaking as someone who was there
+05:14 < misterhat> but not as applets
+05:14 < misterhat> at all
+05:14 < codingstream> look at apache cassandra, compare that to the silly academic assignments you had to do in school
+05:14 < mscdex> Youdaman: i graduated and it still sucks :-)
+05:14 < Youdaman> rather than say language X is terrible i prefer to say language Y is better at A, B, C -- sounds less... rude? :)
+05:14 < othiym23> it's a shitty language for teaching programming, that's for sure
+05:14 < Youdaman> mscdex: we were the last year to do C++ at my uni -- the following year they starting teaching Java to first years
+05:14 < mscdex> for anything outside of academia
+05:14 < othiym23> although it beats the standard at my school when I was a student, which was Ada
+05:15 < codingstream> I think I might be crazy, but I'm using a mix of C, node, and haskell for my current project
+05:15 < mscdex> Youdaman: i'd rather have done c++ instead of Java for those courses that forced Java
+05:15 < Youdaman> i could see the advantage from the OO side of things -- if that's the paradigm you want -- but i didn't like that most examples had a stack of boilerplate UI code before doing the actual point of each lesson
+05:16 < Youdaman> i tutored Java in later years, and it raised more questions than C++ ever did
+05:16 < othiym23> Youdaman: I have never enjoyed doing graphics / UI programming in Java
+05:16 < othiym23> both the AWT and Swing are bad in different ways
+05:16 < d4rklit3> If I am routing withh express,   if i wanted to serve a folder  do i just do    app.get('/folder/' and sespond with .sendFile?
+05:16 < othiym23> d4rklit3: look at using the static middleware in connect
+05:16 < gildean> othiym23: i think those are the most hated parts of java, at least for what i've read
+05:16 < Youdaman> othiym23: yeah i've seen ports of C++ libs like ogre3d to java and wonder why but hey, it's because people like java
+05:17 < mscdex> graphics/UI in Java is just the tip of the iceberg in why it's so crappy
+05:17 < othiym23> gildean: yeah, when I started writing Java I had to do everything with the AWT (because this was back in 1995, when the future was Java in the browser) and it nearly broke me
+05:17 < mscdex> packages is another part that sucks
+05:18 < mscdex> com.asdf.foo.bar.baz.just.kill.me.now.plz
+05:18 < Youdaman> i think the only languages i'm fearful of are ones i've never tried i guess. back in the day i was a perl zealot. zealotry is never attractive.
+05:18 < gildean> i can't really say much about java, i only tried once and was like "fuck this is tideous, this could be done in less lines with even basic"
+05:18 < othiym23> mscdex: aw c'mon, it's a great integration toolkit now -- if you have a bunch of databases, a bunch of complicated business logic, and some reasonably competent OO developers, Java, like .NET, can be a super fast tool for putting services together
+05:18 < othiym23> yeah, that's why I like Node so much
+05:19 < d4rklit3> othiym23 will my routes override that ?
+05:19 < othiym23> do a lot with very few lines
+05:19 < d4rklit3> im tryin to enable pushstate
+05:19 < mscdex> .net is just as bad, but for other reasons
+05:19 < DTrejo__> thoughts? https://github.com/joyent/node/issues/4367
+05:19 < faunaint> java is not a language for simple hacks, it's a language for building monsters (in both a good and bad sense)
+05:19 < othiym23> d4rklit3: as long as your static dir doesn't collide with your route names, it shouldn't
+05:19 < d4rklit3> nice
+05:19 < DTrejo__> also, am I allowed to combine flags from http://nodejs.org/api/all.html#all_fs_open_path_flags_mode_callback? e.g. can I do fs.open(.., {flags: "rw"}
+05:20 < faunaint> more often in a bad sense
+05:20 < mscdex> DTrejo__: i don't think encoding is ever used anywhere
+05:20 < Youdaman> i like JS because it's on the client and now on the server, i like Python becuase it just feels clean (and maybe i should do more CoffeeScript?), i like C++ because it's oldschool and yet pro re desktop and console apps/games -- i liked perl because it was the glue of the web, but i think js is now coming into that space, and doing the one language on both the client and server is a win
+05:20 < DTrejo__> oh, you mean it is specified but never used by the fs code?
+05:21 < mscdex> DTrejo__: correct. i found that out when i was copying readstream and writestream for sftp
+05:21 < othiym23> DTrejo__: could I get EBCDIC into the list of supported encodings? ;)
+05:21 < misterhat> Javascript games are cooler
+05:21 < misterhat> :P
+05:21 < d4rklit3> thanks
+05:21 < misterhat> bananabread anyone?
+05:21 < astropirate> Did Github remove its PM feature?
+05:21 < Youdaman> misterhat: impactjs is awesome btw
+05:21 < misterhat> https://developer.mozilla.org/en-US/demos/detail/bananabread
+05:21 < misterhat> ^^^^
+05:21 < DTrejo__> othiym23: if you added that to Buffer.js, maybe!
+05:21 < misterhat> and also a very impressive looking game from opera devs: http://operasoftware.github.com/Emberwind/
+05:22 < misterhat> love it when people really showcase how great the language can perform
+05:22 < DTrejo__> mscdex: it seems like it uses the encoding default when you read/write; assuming you don't pass one in
+05:24 < othiym23> has anyone here screwed around with the node version of Smallest Federated Wiki?
+05:24 < DTrejo__> mscdex: e.g. the stringdecoder gets that decoding, and stuff like that. but i see your point that the _write and _read functions on writestream and readstream dont every use this.encoding
+05:25 < DTrejo__> so yea, interesting
+05:54 < DTrejo__> QUestion: if I pass in an FD to a child process, how does that child process find it and use it?
+05:54 < DTrejo__> (using the an options object like { stdio: [fd] } to child_process.exec)
+06:00 < kenperkins> do people tend to bias towards things like seq?
+06:00 < kenperkins> i find it harder to read than with callbacks
+06:01 < bnoordhuis> DTrejo__: is 'magic' an acceptable answer?
+06:02 <@mbalho> imo only case you need a flow control lib is when you need 'callback aggregation' e.g. when these 5 functions finish call my callback
+06:04 < DTrejo__> bnoordhuis: kinda?? I'm writin a test program to see if I can see how to find the fd number (e.g. 12), that the parent passes in. going to check in process.env, and also look in /proc/PID/fd for something other than 0 1 and 2
+06:04 < bnoordhuis> DTrejo__: what happens on unix is that the parent sends a copy of the fd to the child with sendmsg() magic
+06:04 < bnoordhuis> DTrejo__: on windows, there's even more voodoo involved
+06:06 < DTrejo__> bnoordhuis: btw, thank you for answering, I know you have many important software projects to be working on :) okay I am going to read about sendmsg to see how to get at it from my child program
+06:06 < bnoordhuis> DTrejo__: oh wait, i may have gotten ahead of things. child_process.exec() with stdio dup()s the file descriptors after fork()ing
+06:06 < bnoordhuis> frankly, i don't quite know how that's implemented on windows
+06:07 < bnoordhuis> probably a lot of DuplicateHandle() calls
+06:07 < bnoordhuis> anyway, all the relevant code is in deps/uv/src/{unix,win}/process.c
+06:09 < DTrejo__> thank you
+06:20 < Jimu> i want to watch a directory for new files - there's a module 'watch' but it's not great. ideas?
+06:25 < mscdex> npm stands for "Node Packaged Module" ?
+06:27 < Youdaman> anyone know what tech the new myspace is using? it just crashed.
+06:28 < Youdaman> and now it's back up
+06:29 < hemanth> is there a way to communicate with the browser from node? Ex:Open browser and navigate to ....
+06:30 < mscdex> hemanth: sure, use websockets/socket.io/whatever, and act on messages sent from the server?
+06:31 < hemanth> mscdex, so you suggest to have websocket runing in the browser ?
+06:32 < mscdex> hemanth: well or socket.io if you want to support browsers without websocks
+06:32 < mscdex> s/websocks/websockets/
+06:32 < hemanth> mscdex, any example, i have used socket.io before...
+06:47 < Sho_> Hi all!
+06:48 < Guest19780> ...
+06:50 < namastane> Anyone here?
+06:50 < namastane> ...
+06:50 < namastane> anyone that knows how to talk?
+06:51 < namastane> ...
+06:51 <@mbalho> protip: ask questions
+06:52 <@mbalho> (related to programming)
+06:54 < namastane> ...
+06:54 < namastane> well then
+06:54 < namastane> Hello raja
+06:55 < namastane> Well, I'm looking on creating an IRC client in Node
+06:55 < namastane> This popped up as something that might work well with what I'm doing.
+06:57 < namastane> It's just I don't know that much on javascript and would like to know how I can integrate this into my website
+06:58 < davidbanham> namastane: Does it have to be an IRC client or are you just looking for a chat client?
+06:58 < namastane> It needs to be IRC
+06:58 < Jimu> hemanth: you want to open a browser to a certain URL locally?
+06:58 < namastane> Have you heard of Pesterchum? Yeah, I'm working on something for that
+06:58 < davidbanham> namastane: Have you gotten a Hello World going with node yet?
+06:58 < hemanth> Jimu, no any given URL, it might be local or gobal 
+06:59 < namastane> Not yet actually... I need sufficient user privileges to download it to this computer
+06:59 < hemanth> heh heh
+06:59 < Jimu> hemanth: sounds like a simple process call, i think the child_process module?
+06:59 < hemanth> namastane, http://www.h3manth.com/content/irc-notification-bot-nodejs
+06:59 < namastane> Thank you.
+06:59 < davidbanham> namastane: Well, that's where I'd start. But once you've got an environment set up and you know what kinda goes where, I'd start looking at IRC interface libraries.
+07:00 < namastane> Ah, okay
+07:00 < namastane> I'm also looking into Ajax, so I'm going to see which works better
+07:00 < namastane> do you have any opinions on that?
+07:00 < hemanth> Jimu, what after that, i'm planning for something  like : navigate_to("h3manth.com"); click_by_name("about me") 
+07:01 < davidbanham> namastane: You'll use either Ajax or websockets to talk to a Nodejs server, which will then interface with the IRC server.
+07:01 < Jimu> hemanth: i think the major browsers accept a command line argument for the URL you want to open
+07:01 < namastane> Hm... I see...
+07:02 < namastane> Well, you see, I'm more proficient in PHP. That's what I meant I think.
+07:02 < hemanth> Jimu, yes, but after opening the browser, to intreact with the elements, node must be able to communicate with the browser, no?
+07:03 < namastane> Hey David.
+07:03 < davidbanham> namastane: Were you thinking you'd refresh the page and re-render it on the server periodically in order to update the chat if you were doing it in PHP?
+07:03 < Jimu> hemanth: yep, and that's pretty hard unless you're running an HTTP server on node
+07:03 < namastane> I've gotta go right now, but do you think we could stay in a bit of contact?
+07:03 < hemanth> Jimu, yes tricky. mscdex suggested sockets 
+07:03 < davidbanham> namastane: Feel free to drop me a DM whenever I'm here, but I'm pretty flat out at the minute I'm afraid.
+07:04 < namastane> I really don't know right now. I'm a bit of a novice at this ^^"
+07:04 < namastane> Okay, thanks david. I'll try to remember your nick
+07:04 < Jimu> hemanth: if you aim to control a browser from node... that's beyond sockets
+07:05 < davidbanham> namastane: No probs. Good luck.
+07:07 < hemanth> Jimu true, creating an headless thinge is not tough..but controlling entire browser is fun
+07:07 < RLa> hemanth, i worked recently on something like that
+07:08 < RLa> it's quite easy to control page inside iframe if it's on the same domain
+07:08 < RLa> page in iframe runs in the same js context as the main page
+07:14 < hemanth> RLa, wow! you mean to control the browser from node?
+07:14 < hemanth> Not like phantom or something similar, controlling the actuall browser RLa 
+07:16 < RLa> not that far, i just control the iframe from the main page, controlling from node would take websocket-node connection in the main page
+07:16 < RLa> hemanth, and then cross-domain issues with iframe, i have it always on the same domain as the main page, so iframe works very well for me
+07:17 < kenperkins> man
+07:17 < kenperkins> rewrites are fun but exhausting
+07:19 < kenperkins> does anyone use Seq, or other nested callback eliminating frameworks in their production code?
+07:20 < RLa> async is pretty fine
+07:21 < kenperkins> async doesn't really eliminate nested callbacks like Seq does it?
+07:21 < kenperkins> I guess it does, looking at the control flow stuff
+07:22 < kenperkins> seems more explicit though, than how seq does it
+07:22 < kenperkins> (i.e. easier to read)
+07:22 < RLa> 1-2 levels of nesting is fine, more is not so much
+07:22 < kenperkins> (with async, or in general?)
+07:25 < hemanth> RLa, nice
+07:25 < RLa> in general
+07:25 < DTrejo> bnoordhuis: please tell me how silly this is (goal is to allow a child process to inherit an fd, so that the fd can be manipulated with ioctl): parent opens a file, calls exec and passes fd in the `stdio` options hash. child runs `ls -al /proc/CHILD_FD/fd` yielding a mapping of fd:filename. The correct fd is chosen, then the child calls ioctl on that fd.
+07:25 < RLa> hemanth, it also runs in phantomjs :)
+07:26 < DTrejo> (i do agree that it is hacky)
+07:26 < hemanth> RLa, uber kool
+07:28 < DTrejo> bnoordhuis: or... I could adapt aredridel's little .node addon and add whatever I need (https://github.com/aredridel/node-ioctl/blob/master/ext/ioctl.cc)
+07:30 < DTrejo> or.... it seems like as long as you dont close any fds, then the child's FD has the name number as the parent's FD for that file, thus I could just set an environment variable equal to the number for the child, and then the child just reads it out and make ioctl calls on that
+07:31 < DTrejo> i suppose none of this is node specific, tho it feels like it since the parent process is node
+07:35 < gmg85> hi guys?
+07:35 < gmg85> between apache and nginx
+07:36 < gmg85> which would you choose to run infront of node.js?
+07:36 < DTrejo> nginx
+07:36 < DTrejo> faster
+07:39 < RLa> apache has evented mp module too but it's not doing what you think, so definitely nginx
+07:47 < gmg85> so where is nginx document root located?
+07:52 < gmg85> /usr/share/nginx/www
+07:52 < gmg85> but it does not display my html page :(
+07:53 < astropirate> gmg85, you might have more luck in #nginx
+08:38 < abrkn> what do people mostly use if not mongoose?
+08:39 < abrkn> (if one doesnt want orm)
+08:43 < DTrejo> bnoordhuis: I think I am going with introspection via the /proc/PID/fd directory. a wierd workaround but whatevs it works: https://gist.github.com/4df8e5c56cbcd3846942
+08:43 < DTrejo> thanks for your help btw
+08:44 < [AD]Turbo> hi there
+08:50 < abraxas> does anyone know if there's any way to get the PID of the master in a cluster, from the worker process? (without sending messages)
+09:03 < DTrejo> abraxas: could pass in the master's pid to all the workers when they start
+09:03 < DTrejo> read about the stdio option to fork
+09:03 < abraxas> DTrejo: right, I could stick it in the env
+09:03 < DTrejo> just supply the pid
+09:03 < DTrejo> er
+09:03 < DTrejo> nvm
+09:03 < DTrejo> yes the env
+09:03 < DTrejo> been thinking about fds too much lately
+09:03 < abraxas> But out of the box, no way to get a hold of it, I guess..
+09:03 < abraxas> :)
+09:04 < DTrejo> putting it in the env seems pretty sensical to me
+09:05 < abraxas> k
+09:14 < bnoordhuis> DTrejo: re parent pid, write a getppid() binding?
+09:15 < DTrejo> i solved my problem, but i guess abraxis should do that haha
+09:17 < DTrejo> the solution to the child finding the correct inherited FD was a bit inelegant. but whatevs 
+09:25 < abraxas> bnoordhuis: that would be very nice to have
+09:25 < abraxas> bnoordhuis: is that cross platform? (and then the follow up question: is there room for that in node?)
+09:27 < bnoordhuis> abraxas: i don't think you can do it reliably on windows
+09:27 < bnoordhuis> on unix, if the parent process exits, the child process is reparented to the init process
+09:27 < bnoordhuis> but nothing like that happens on windows
+09:28 < abraxas> it would only ever happen on initialization though, right?
+09:28 < bnoordhuis> so the pid is either invalid or it refers to some completely unrelated process
+09:28 < abraxas> similar to how process.pid is populated, i guess?
+09:28 < abraxas> right
+09:28 < abraxas> and you would need consistency?
+09:28 < bnoordhuis> yes
+09:29 < abraxas> unfortunate, but understandable
+10:01 < DTrejo> everything is complicated
+10:01 < DTrejo> lets give up on our profession
+10:01 < DTrejo> and take a break from twitter and the internet
+10:02 < DTrejo> and write programs on paper instead
+10:02 < DTrejo> and they will never be wrong
+10:09 < jamilbk> like capn crunch when he was in jail
+10:15 <@Nexxy> DTrejo, do you need a hug?
+10:15 < yawnt> Nexxy: do you need a ninjablock?
+10:15 < DTrejo> haha :) 
+10:15 < DTrejo> to nexy
+10:15 <@Nexxy> yawnt, I have some!
+10:16 < DTrejo> night everyone
+10:16 <@Nexxy> DTrejo, wait!
+10:16 < DTrejo> you're all node-it-alls
+10:16 <@Nexxy> DTrejo, are you going to hard hack?
+10:16 < DTrejo> if I was in the bay I'd definitely try to!
+10:16 < yawnt> Nexxy: last friday
+10:16 < DTrejo> im in RI at school
+10:16 < yawnt> i was at a coders meetup
+10:16 <@Nexxy> paff
+10:16 < yawnt> they were all talking about arduino
+10:16 < yawnt> i was doing some publicity for ninjablock
+10:16 < DTrejo> have fun!
+10:16 < yawnt> thank me.
+10:17 <@Nexxy> yawnt, thanks! <3
+10:17 < yawnt> now send me some for free
+10:17 <@Nexxy> preorders are soon!
+10:17 < yawnt> lol
+10:17 < yawnt> nice
+10:17 < yawnt> Nexxy: do you ship worldwide?
+10:17 <@Nexxy> you can make one for free ;o
+10:17 <@Nexxy> yes!
+10:17 < yawnt> then i'll prolly get one
+10:17 < yawnt> or two
+10:17 < yawnt> just to start a skyne
+10:17 < yawnt> *skynet
+10:17 <@Nexxy> preorders will get a good deal on shipping too :)
+10:18 <@Nexxy> yawnt, ninja blocks on AR drones
+10:18 <@Nexxy> I'm also getting in all the parts for a legit ravecopter
+10:18 <@Nexxy> I just have to figure out the mechanics on a tiny fog machine
+10:18 < yawnt> lol
+10:19 < yawnt> you just made my mind go wild.. i always have this childish dream of mine
+10:19 < yawnt> to disappear in a cloud
+10:19 < yawnt> like magicians
+10:19 <@Nexxy> yeah!
+10:19 < yawnt> "TINY FOG MACHINES" that's the solution
+10:19 < yawnt> i just need to make them faster
+10:19 <@Nexxy> fog machines are always the answer
+10:19 < yawnt> i cook meat with fog machines
+10:19 < yawnt> #truestory
+10:19 < SomeoneWeird> what's the question?
+10:20 < yawnt> to live or not to live
+10:20 < yawnt> THAT IS THY QUESTION
+10:20 < yawnt> whether tis nobler in the mind to suffer the sling and arrows of outrageous fortune
+10:20 < SomeoneWeird> and the answer is fog machines
+10:20 < yawnt> yes
+10:20 < deoxxa> "what shouldn't you buy for an asthmatic friend"
+10:20 < SomeoneWeird> seems legit
+10:20 < yawnt> :|
+10:20 < yawnt> hey deoxxa 
+10:20 < deoxxa> not sure i spelled that right
+10:20 < deoxxa> oh i did
+10:20 < deoxxa> fuck you, english
+10:20 < deoxxa> hello yawnt
+10:20 < deoxxa> HOW ARE YOU TODAY
+10:20 <@Nexxy> deoxxa, it's just glycol
+10:20 <@Nexxy> in most
+10:20 < deoxxa> are you a bad enough dude to murder the president
+10:21 < deoxxa> Nexxy: w/e imma fill mine with pollen
+10:21 <@Nexxy> deoxxa, you would
+10:22 < yawnt> deoxxa: i phoned apple support
+10:22 < deoxxa> take that, hayfever sufferers
+10:22 < deoxxa> yawnt: did they support you?
+10:22 < yawnt> they said they'll make my jappo keyboard arrive from china
+10:22 < yawnt> just need to order now \o/
+10:22 < deoxxa> oh lol
+10:22 < yawnt> deoxxa: they hung up my phone 9 times
+10:22 < yawnt> like
+10:22 < yawnt> "ALL OPERATORS ARE BUSY - TU TU TU"
+10:22 < yawnt> but the 10th time was the good one yeah
+10:22 <@Nexxy> lol, TU TU TU
+10:22 < sandfox> just swear down the line
+10:22 < yawnt> that's the noise a phone makes when you hang up
+10:23 < yawnt> =\
+10:23 <@Nexxy> do it again
+10:23 < yawnt> Nexxy: in italian "TU" means you
+10:23 < deoxxa> italian people have funny onomatopoeia
+10:23 < deoxxa> now i'm sure i spelled that one wrong
+10:23 < deoxxa> hooooly crap
+10:23 <@Nexxy> yawnt, what sound does a dog make?
+10:23 < yawnt> we have all kind of jokes .. like "lonely people picking up the phone and saying 'who's the cutest?'.. phone says YOU YOU YOU"
+10:24  * yawnt waits for everyone to laugh
+10:24 < deoxxa> italian people also have horrible jokes
+10:24 < yawnt> lol
+10:24 < yawnt> Nexxy: a dog is "BAU"
+10:24 < deoxxa> BAU BAU
+10:24 < deoxxa> bao
+10:24 < deoxxa> mmm
+10:24 < yawnt> pronounced "B-AH-OO"
+10:24 <@Nexxy> in japan, dogs go WAN WAN
+10:25 < gildean> a dog barsk like: "HAU!"
+10:25 < yawnt> in australia dogs are poisonous
+10:25 < gildean> *barks
+10:25 < deoxxa> now i want cha siu bao
+10:25 < yawnt> they bite you and you die
+10:25 <@Nexxy> yawnt, you're thinking of dingos
+10:25 < yawnt> Nexxy: no
+10:25 < yawnt> everything in australia is poisonous
+10:25 < gildean> Nexxy: i'm pretty sure everything in australia is poisonous
+10:25 < yawnt> ask deoxxa 
+10:26 < deoxxa> ah yeah
+10:26 < deoxxa> australian animals have a pretty strict rule
+10:26 < deoxxa> the cuter they are, the more they want to kill you
+10:26 < deoxxa> koalas will -fuck- you up
+10:26 <@Nexxy> australian tree frogs are saf
+10:26 <@Nexxy> safe
+10:26 < yawnt> koalas are the nicest killing machine ever
+10:27 < deoxxa> Nexxy: yeah but they're slimy so ew
+10:27 <@Nexxy> no way they're so cute
+10:27 < yawnt> deoxxa: so when are you flying to sushiland?
+10:27 < deoxxa> yawnt: like a week and a half or so
+10:27 < deoxxa> ~2 weeks
+10:27 < yawnt> i envy you
+10:27 < deoxxa> dunno, haven't booked yet
+10:27 < yawnt> ;_;//
+10:28 < deoxxa> tanoshimi ne~~
+10:28 < yawnt> let's see how much does a flight cost
+10:28 < yawnt> deoxxa: tokyo kyoto or what?
+10:28 < deoxxa> i'm looking at about $1500 return
+10:28 < deoxxa> i want to go to osaka, but there's a lot more tech stuff in tokyo so i'm thinking it might be a good choice to go there and try meet up with some people
+10:29 < yawnt> :3
+10:29 < yawnt> 1K back and forth
+10:29 < deoxxa> that's not bad
+10:29 < deoxxa> should go
+10:29 < yawnt> yeah
+10:29 < yawnt> and i live where
+10:29 < yawnt> ?
+10:29 < yawnt> in your couch?
+10:30 < deoxxa> ha, if it's allowed
+10:30 < deoxxa> not sure where i'm living yet
+10:30 < deoxxa> lol
+10:30 < yawnt> lol
+10:30 < yawnt> 24/24h coding
+10:30 < deoxxa> 24/24
+10:30 < deoxxa> wat
+10:30 < yawnt> wat
+10:30 <@Nexxy> lol
+10:30 < yawnt> |:
+10:30 <@Nexxy> TIME CUBE
+10:30 < deoxxa> oh 24 of 24
+10:30 < yawnt> i have the shining
+10:30 < yawnt> behold
+10:31 < yawnt> my power
+10:31 < deoxxa> i have the shitting, but my housemate has the showering
+10:31 < Gues_____> OMG THE POWER!
+10:31 <@konobi> kyoto++
+10:31 < deoxxa> so i also have the waiting
+10:31 < deoxxa> :<
+10:31 < yawnt> konobi: do you live in japan?
+10:31 <@konobi> nope, just spent some time out there
+10:31 < yawnt> lol deoxxa 
+10:31 < yawnt> WHO WANTS TO TRADE HOUSE
+10:31 < yawnt> japan for italy
+10:31 < Gues_____> soooo. mongodb. is that any good
+10:31 < deoxxa> no deal
+10:31 < yawnt> oh come on
+10:32 < yawnt> italy is cool
+10:32 < yawnt> you just got to live in nowhereland
+10:32 <@konobi> depends where in italy... milan is a hole
+10:32 < deoxxa> nodealland
+10:32 < yawnt> konobi: milan sucks
+10:32 < yawnt> so does rome
+10:32 < gildean> Gues_____: it's easy to use with node, in that regard it's good
+10:32 < yawnt> so does pretty much every big city
+10:32 <@konobi> rome wasn't too bad... florence was nice though
+10:33 < Gues_____> gildean i am just  a bit worried, if when i have all my data stored in documents, that at some point when i want to aggregate data of certain fields i'm fucked
+10:33 < Gues_____> i.e. sql seems more moldable
+10:33 < yawnt> http://missedhighfive.tumblr.com/
+10:33 < gildean> Gues_____: how's so?
+10:33 < gildean> Gues_____: you can modify the documents as much as you please
+10:33 < deoxxa> oh my god yawnt
+10:33 < deoxxa> oh my
+10:33 < deoxxa> hnnnnggggggg
+10:34 < yawnt> deoxxa: it's a jolly card
+10:34 < yawnt> increases productivy by 90%
+10:34 < yawnt> you should thank me
+10:34 < gildean> Gues_____: this was a pretty good post about mongodb: http://snmaynard.com/2012/10/17/things-i-wish-i-knew-about-mongodb-a-year-ago/
+10:35 < Gues_____> gildean yeah, i am aware of that. but let's say i have  a profile with badges. if i then later decide i want the badges aggregated or maybe in a seperate document i need to write a job to seperate them out
+10:35 < Gues_____> maybe i should just shut up and try to build something with it instead
+10:35 < gildean> Gues_____: a bit of advice: collections are cheap
+10:36 < gildean> it's easier to handle shallower documents than more deeply nested
+10:36 < deoxxa> KITTENS KITTENS KITTENS KITTENS KITTENS http://new.livestream.com/accounts/398160/events/1594566/player_pop_up KITTENS KITTENS KITTENS KITTENS KITTENS
+10:36 < Gues_____> gildean: also what if i want to bi the data in the end, i.e. do analystics etc on it. 
+10:37 < gildean> Gues_____: these questions would prolly work better in #mongodb instead
+10:38 < Gues_____> i know but then i get biased answers probably
+10:38 < deoxxa> Gues_____: mongo is cool for analytics if you have a) a small data set or b) a lot of servers
+10:38 < deoxxa> Gues_____: if you have a large data set and few servers, you're kind of boned
+10:38 < deoxxa> map/reduce is neat
+10:39 < deoxxa> (i use mongo at work a lot)
+10:39 < deoxxa> for analytics, however, we've really started using google bigquery a lot
+10:39 < Gues_____> deoxxa so u just dump ur data to bigquery?
+10:39 < Gues_____> how much data are we talking about?
+10:39 < deoxxa> it's like a 3gb csv file
+10:40 < deoxxa> about 20 fields, something like 20 million rows
+10:40 < deoxxa> for the bigquery stuff
+10:40 < Gues_____> so how do u do it then with mongo db
+10:40 < Gues_____> do u write a script to select stuff from the documents?
+10:41 < deoxxa> the mongodb data is about 60gb, but it's got a lot of data in it that we don't use for analytics
+10:41 < Gues_____> and output to csv?
+10:41 < deoxxa> yeah
+10:41 < deoxxa> exactly
+10:41 < deoxxa> just a script in node that periodically dumps the db
+10:41 < Gues_____> deoxxa thanks. i'll give it a try, somehow i feel like mongodb is going to hurt me in the end.
+10:41 < deoxxa> well it will, if you want it to behave like mysql or something
+10:41 < Gues_____> but i've never used it so i have no clue what i am talking about
+10:42 < Gues_____> i understand it as a view database, but not as the place where the real data lives or something
+10:42 < deoxxa> one thing that it's really good at is sharding, i've found
+10:43 < gildean> Gues_____: did you read the post a linked to?
+10:43 < gildean> it has some good advice imo
+10:43 < deoxxa> it's an absolute pain to get that working with mysql and probably pretty annoying with postgres as well (but i've never used postgres like that)
+10:43 < Gues_____> gildean i am reading it now
+10:43 < abrkn> im having some fucked up bug with monk (which builds on monkskin (which builds on mongodb-native)) where my program just exits
+10:43 < deoxxa> also tailable cursors are winnn
+10:43 < abrkn> ive added a listener to oncaughtException, nothing there
+10:43 < deoxxa> abrkn: it might be calling process.exit() somewhere?
+10:43 < deoxxa> lol
+10:44 < abrkn> deoxxa: exactly, but why the fuck would someone do that
+10:44 < abrkn> =)
+10:44 < abrkn> maybe i can override process.exit...
+10:44 < deoxxa> ask the perl people who do `$success || die'
+10:44 < deoxxa> :<
+10:44 < Gues_____> haha ok hipsters i am off thanks for advice!
+10:45 < abrkn> either you cant override process.exit or it's something else
+10:46 < RLa> deoxxa, is bigquery for online analytics?
+10:46 < RLa> i remember watching slides about it
+10:47 < RLa> i think it was for pretty general-purpose processing
+10:48 < RLa> hm, maybe that was some other thing
+10:53 < gandalf__> what does AMD stand for with regards to requirejs?
+10:54 < garbagecollectio> java is every enterprise
+10:55 < lethalduck> Async Module Definition
+10:55 < gandalf__> lethalduck, thanks
+10:55 < lethalduck> https://github.com/amdjs/amdjs-api/wiki/AMD
+11:26 < dileep> hello i got some error in ma code is "Cannot GET /"
+11:27 < dileep> node developer here
+11:27 < dileep> ???
+11:27 < Swadq> dileep: there's nothing to publish at the root
+11:27 < Swadq> I guess you're not handling requests for it
+11:28 < dileep> var express = require('express')  , app = express() , fs = require('fs');  // Routes  app.get('/form', function(req, res)   {   fs.readFile('./form.html', function(error, content)     { if (error)        { res.writeHead(500); res.end();      }     else     { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(content, 'utf-8');     }    })  }).listen(process.env.PORT);
+11:28 < deoxxa> dileep: 1) for the love of god use a pastebin
+11:28 < gildean> dileep: please don't paste such long lines of code in the channel
+11:28 < deoxxa> dileep: 2) you're not defining a handler for "/"
+11:28 < Swadq> ^
+11:29 < Swadq> If you go to localhost:port/form you'll get a page
+11:29 < deoxxa> dileep: 3) how many times are you going to ask this question - i've seen you ask and get answers to this like 3 times in the past week
+11:29 < dileep> deoxaa,not at all.now i m using express dats y i got the error
+11:30 < dileep> deooxaa,in ma code where i m goingg wrongg
+11:30 < gildean> dileep: add: app.get('/', function (req, res) { res.send(200, 'ok')};);
+11:30 < gildean> and then you'll see a page with "ok" when getting /
+11:34 < dileep> https://gist.github.com/4214896   please
+11:35 < gildean> dileep: i already answered, do as i say and go from there
+11:35 < Kakera> why would a socket close without ending first AND without had_error?
+11:36 < gildean> Kakera: a listening socket or a outward connecting socket?
+11:36 <@Nexxy> do as i say, what are you dileep's parent? lol
+11:36 < Kakera> the latter
+11:36 < gildean> Nexxy: sometimes you have to be strict with the kids
+11:36 <@Nexxy> lol
+11:36 <@Nexxy> I know what oyu mean
+11:36 < gildean> "use strict";
+11:37 < Swadq> dileep: https://gist.github.com/4214908
+11:37 < Kakera> gildean, any ideas?
+11:38 < gildean> Kakera: difficult to say, can we see the function is question?
+11:38 < gildean> *in
+11:38 < dileep> Swadq,tthanx bro foe helping me...coz i dnt got to where to put the res.send
+11:39 < Kakera> gildean, https://gist.github.com/4214916
+11:39 < Kakera> not sure if that helps
+11:39 < Swadq> Right
+11:39 < dbTrouble> hello
+11:39 < gildean> dileep: i gave you the whole route-function to use, you'd only needed to copy&paste
+11:40 < Kakera> the log only says "socket closed"
+11:40 < dileep> gildean,coz i wanna to learn ma mistake where i have to put the appropraiate code..nd sorry if u people got disturb by me..:)
+11:40 < deoxxa> dileep: here you go https://gist.github.com/4214910
+11:41 < Swadq> rofl
+11:41 < dbTrouble> I'm using require('mysql') for db connection but can't find any docs or examples for it, all i found was for different lib, can anyone give me link to docs for nodes mysql lib or tell me what events do i need to listen to in order to reconnect properly, Thank you!
+11:41 < sandfox> use the source :-p
+11:42 < radiodario> dbTrouble: npm search 'mysql'
+11:42 < gildean> Kakera: are you getting the events emitted otherwise?
+11:42 < radiodario> or search for mysql on the npm catalog
+11:43 < dileep> deoxaa,mind ur language,u have the knowlegde dat doesnt mean u making fun of others...
+11:43 < dbTrouble> nvm, just figured it out what's wrong...
+11:43 < dbTrouble> i'm also using this
+11:43 < dbTrouble> mysql-queues
+11:43 < Kakera> gildean, not sure what you mean
+11:43 < SomeoneWeird> lmao deoxxa 
+11:43 <@Nexxy> dbTrouble, now change your name to dbSuccess!
+11:43 < dbTrouble> and on reconnecting to db i don't set this: queues(mysqlClient, DEBUG) with new client
+11:44 < dbSuccess> :)
+11:44 <@Nexxy> \o/
+11:45 < Kakera> it's also hard to test, since it disconnects randomly and rarely
+11:45 < gildean> Kakera: hmm, i'm not sure but the socket-object that gets the data etc. events is actually passed on by the connect, which you're not passing along at all
+11:46 < gildean> Kakera: iirc when you do net.connect(port, host, function (socket) { socket.on('data', function (data) { console.log(data); }; });
+11:46 < Kakera> gildean, I'm listening for the events emitted by Connection elsewhere
+11:47 < gildean> Kakera: i mean i don't think the connection is what emits the events, but the object passed on by the connection
+11:47 < gildean> someone can correct me if i'm wrong about this
+11:48 < deoxxa> you're wrong about this
+11:48 < deoxxa> wait what
+11:48 < deoxxa> oh
+11:48 < Kakera> gildean, it's most likely not a problem with event listeners, because everything else works and I do get a 'socket ended' when the disconnection is expected
+11:49 < Kakera> I'm just wondering if there is a legit scenario where the socket would close without ending and without an error
+11:50 < Kakera> this had_error argument isn't well documented
+11:50 < gildean> deoxxa: had to check the docs, yeah i was incorrect about net.connect
+11:51 < deoxxa> dileep: i was actually waiting for you to type something, i thought you were about to say the thing to be corrected about
+11:51 < deoxxa> erm
+11:51 < deoxxa> gildean: ^^
+11:51 < deoxxa> gildean: instead i made myself look silly :<
+11:52 < gildean> deoxxa: i was thinking about net.createServer
+11:52 < dileep> deoxxa,only to be mind the languuage
+11:53 < deoxxa> dileep: has anyone really been far even as decided to use even go want to do look more like?
+11:54 < blakmatrix> deoxxa: nice
+11:54 < dileep> deoxxaa,m woking on that.and want tolearn by ma mistake.if  u dnt wanna to answr then dnt.not to be using such gists.
+11:56 < deoxxa> people is are practivity, involvements the company. world-classume resour full involvement that work environments times a set of source on our customers today's markedly.
+11:59 < garbagecollectio> how do i make my own data and on evemts
+12:00 < sandfox> eventEmitter
+12:00 < Kakera> alright, is there a way to figure out what's going on when it emits 'close'?
+12:01 < Kakera> I can't think of anything better than throw an exception, forcing it to crash and print a stack trace
+12:01 < Kakera> (it would crash anyway later)
+12:03 < garbagecollectio> can u do eventemitter on any object?
+12:05 < sandfox> yeah, as long as you inherit it / attach it to the prototype 
+12:07 < garbagecollectio> hoe?
+12:12 < sandfox> this isn't a bad guide :: http://wekeroad.com/2012/04/05/cleaning-up-deep-callback-nesting-with-nodes-eventemitter
+12:15 < garbagecollectio> what exactly is the event loop
+12:15 < garbagecollectio> like specifically
+12:16 < sandfox> read this :: http://blog.mixu.net/2011/02/01/understanding-the-node-js-event-loop/
+12:18 < garbagecollectio> If you do that in one request, other requests can be processed just fine while the database is running it’s sleep.
+12:18 < garbagecollectio> this is kind of misnomer
+12:18 < garbagecollectio> things outside the callbacks get executed first
+12:18 < garbagecollectio> and the call backs don't return until those are done
+12:19 < jsilver> what is wrong with:
+12:19 < jsilver> https://gist.github.com/6526d518c3c1da87b6d4
+12:19 < jsilver> dont say coffee
+12:20 < jsilver> https://gist.github.com/89c2080df68e74ad4952
+12:20 < sandfox> when you say wrong? what do you mean?
+12:20 < garbagecollectio> looks liek you are using coffee script jssilver
+12:20 < jsilver> https://gist.github.com/3ce83d3ee156fcaef86f
+12:20 < jsilver> doesn't work
+12:20 < jsilver> handles don't get cleaned
+12:20 < jsilver> ipad relies on this for exit
+12:20 < jsilver> garbagecollectio: yes
+12:21 < garbagecollectio> right so there is your mistake
+12:21 < jsilver> garbagecollectio: i am also the creator of js2cs, the first javascript to coffeescript compiler
+12:21 < jsilver> was that, also a mistake?
+12:21 < garbagecollectio> no that is great
+12:21 < jsilver> lol :)
+12:21 < garbagecollectio> but i dont get why coffee
+12:21 < jsilver> but i admit js2coffee, written later, is superior
+12:21 < garbagecollectio> why the hell do we need coffeescript
+12:21 < jsilver> shorter, easier to read, OOP, 
+12:22 < jsilver> much easier to port GChat_2_Server.rb to Coffee/Node
+12:22 < jsilver> than JS
+12:22 < jsilver> it's a line-for-line port
+12:22 < jsilver> 100%, just one broken feature. logsaving buffer replay's actually better
+12:23 < garbagecollectio> do ppl hire senior devs who are just smart but have 
+12:23 < garbagecollectio> u know they cna learn it and stuff
+12:23 < jsilver> yes, but it's most often better to come trained 
+12:24 < sandfox> jssilver: does 'remove_user_by_handle' never get called?
+12:24 < jsilver> sandfox: seems like, yes
+12:24 < garbagecollectio> in node.js
+12:24 < garbagecollectio> m
+12:24 < garbagecollectio> module.exports = somefunctionname
+12:25 < garbagecollectio> say functionanme is a blah.prototype
+12:25 < garbagecollectio> how do i then call that in the main app.js
+12:25 < michaelsokol> hey all!I'm having this annoying/weird npm issue. I've made a fresh install of node (v0.8.15) and npm (1.1.66)
+12:26 < michaelsokol> and each time i'm install something using npm install express (or something else), I get weird 'npm ERR! Error: ENOENT, lstat' errors
+12:27 < sandfox> jsilver: can you put some logging in the 'remove_user_by_handle' to see what it's actually doing, it's really hard to suggest whats wrong from that snippet alone
+12:28 < michaelsokol> the install takes forever (even for something like express), and eventually fails. Anybody has any clue on what is happening? :/
+12:28 < jsilver> sure can, bit tired tonight. you can test it with client_console.rb in master if u want :)
+12:28 < jsilver> gotta sleep n then get back to it really
+12:28 < jsilver> figured I'd might hear something like "Date().getTime - 30*1000" is wrong but guess not
+12:29 < sandfox> garbagecollectio:  when you do module.exports = myFunc,  myFunc will become whatever you make the require assign it to.  e.g  var rigby = require('./myLib');  rigby would be myFunc
+12:29 < garbagecollectio> so to get
+12:30 < garbagecollectio> myfunc.prototype = function() { return this; }; 
+12:30 < garbagecollectio> myfunc.prototype.blah = function() { return this; }
+12:30 < garbagecollectio> i would just go rigby();
+12:30 < sandfox> jsilver: what repo/master are you on about?
+12:30 < garbagecollectio> then rigby.blah?
+12:30 < jsilver> https://github.com/jsilverMDX/GlobalChat2
+12:30 < garbagecollectio> but i have to do rigby) first right?
+12:30 < jsilver> git@github.com:jsilverMDX/GlobalChat2.git
+12:31 < sandfox> garbagecollectio: just about yes I think
+12:31 < jsilver> watching "Law Abiding Citizen" right now :D
+12:31 < garbagecollectio> i have to do rigby() right in order to get access to the prototype members?
+12:31 < garbagecollectio> if i do rigby.blah()
+12:31 < sandfox> garbagecollectio: rigby become whatever you assigned module.exports to
+12:31 < garbagecollectio> it says cant find rigby.blah
+12:32 < garbagecollectio> i know
+12:32 < sandfox> garbagecollectio: you might need to throw a new in there somewhere
+12:33 < garbagecollectio> why
+12:33 < garbagecollectio> who uses new in node.js?
+12:33 < sandfox> i'm just guessing at what your code looks like
+12:33 < SomeoneWeird> you have to
+12:33 < Gabriel413> Everyone?
+12:34 < sandfox> new and the use of prototypes go hand in hand 
+12:35 < garbagecollectio> you dont have to
+12:35 < sandfox> of course not, but they do go well together
+12:40 < sandfox> jsilver: Do you have a real thing against new lines in your code :-p ?
+12:40 < garbagecollectio> so
+12:40 < garbagecollectio> events.EventEmitter.call(this);
+12:40 < garbagecollectio> i have to put that in my main constructor function?
+12:40 < jsilver> unnecessary ones, but i try to use them organizationally
+12:40 < garbagecollectio> if i want to enable events
+12:40 < garbagecollectio> ?
+12:40 < SomeoneWeird> you don't have to
+12:41 < SomeoneWeird> util.inherits(className, events.EventEmitter)
+12:41 < SomeoneWeird> is all you need
+12:41 < Youdaman> garbagecollectio: have you read Good Parts by Crockford?
+12:41 < garbagecollectio> yes
+12:41 < Youdaman> read it again.
+12:41 < garbagecollectio> why?
+12:41 < Youdaman> asking questions about new wtf.
+12:41 < garbagecollectio> lol
+12:41 < garbagecollectio> yeah 
+12:41 < garbagecollectio> he says not to use it
+12:41 < garbagecollectio> and he is wrong
+12:41 < Youdaman> stop being a vampire plz
+12:41 < garbagecollectio> it is handy
+12:41 < Youdaman> you're sucking the life-force out of this channel
+12:42 < Youdaman> and people want to help you
+12:42 < Youdaman> but you're bloody annoying
+12:42 < Youdaman> so go read some more books
+12:42 < garbagecollectio> how do i do that?
+12:42 < Youdaman> instead of typing inane/frustrating questions
+12:42 < jsilver> with your eyes
+12:42 < garbagecollectio> by saying i read it?
+12:42 < Youdaman> reading?
+12:42 < garbagecollectio> i annoy u by saying i read it and i disagree with crockford?
+12:43 < Youdaman> i'm one of the most helpful people on the planet, but you're testing my patience son. nobody cares that you disagree. nobody cares about "who uses new?". just do what you need to do to solve a problem. and if you don't actually have a problem to solve, go find one.
+12:43 < michaelsokol> If you plan on using an object a lot, then using prototype can be more efficient than using the closure-based object maker. The later creates new functions each time a new object is created.
+12:44 < garbagecollectio> yeah i am aware of that
+12:44 < garbagecollectio> not sure why you are freaking out
+12:44 < Youdaman> garbagecollectio: if you're smarter than crockford that's cool, go write a book on js. if you prefer foo = {} to using new, that's fine. next time you ask a question i'm going to ask you why you're asking -- as in what is the point, because from what i've experienced today you're asking questions with no direction and wasting time -- both your own and everyone else who tries to help you
+12:44 < SomeoneWeird> because you seem to be asking the most stupidest questions
+12:45 < jsilver> you're help vamping in a terrible way while telling me off for using coffee in my perfectly working chatserv program (i am using it right now to host a chat all day)
+12:45 < Youdaman> the only stupid question is the one you don't ask, but you're asking questions for the sake of asking it seems
+12:45 < jsilver> Youdaman, d'accord
+12:45 < garbagecollectio> no im not
+12:45 < garbagecollectio> asking how to use event emitters is a dumb question?
+12:45 < jsilver> aka "help vamping"
+12:45 < garbagecollectio> asking about the specifics of module.exports?
+12:45 < Youdaman> jsilver: sorry i don't follow
+12:46 < jsilver> oh, just "i agree"
+12:46 < Youdaman> garbagecollectio: several authors have taken the time to write really good explanations of these things. they're called articles.
+12:46 < Youdaman> some might call them docs
+12:46 < Youdaman> i don't like the "rtfm" attitude but you don't seem to be the kind that even know what the m stands for garbagecollectio
+12:46 < garbagecollectio> man,
+12:47 < Youdaman> no, you "man".
+12:47 < garbagecollectio> lol
+12:47 < Youdaman> LOLOL fuuuu
+12:47 < jsilver> rtfm's not an attitude, it's a religion and it has a purpose
+12:47 < garbagecollectio> why do you care about giving answeers?
+12:47 < Youdaman> because i'm helpful
+12:47 < Youdaman> and you're just a time-suck
+12:47 < garbagecollectio> dude your saying u dont want to help
+12:47 < garbagecollectio> then go do something else you psych
+12:47 < garbagecollectio> jesus
+12:47 < garbagecollectio> you dont wnat to discuss somsetihng go fucking do something else
+12:47 < garbagecollectio> im not wasting your time
+12:47 < garbagecollectio> your wasting ur own time
+12:47 < jsilver> you RTFM to get smarter. its only stressed as much as it is because it WORKs
+12:47 < jsilver> you're both wasting your times
+12:47 < Youdaman> i'm here to help those with actual questions where they've demonstrated they're stuck on something versus randomness
+12:47 < garbagecollectio> wrong
+12:48 < jsilver> just disconnect or /ignore eachother so you can hack better :)
+12:48 < garbagecollectio> youdaman, its not randomness
+12:48 < garbagecollectio> lol
+12:48 < garbagecollectio> u seem to think there has to be an actual problem
+12:48 < Youdaman> garbagecollectio: ok, what are you working on at the moment?
+12:48 < garbagecollectio> it cant just be about leanring
+12:48 < garbagecollectio> exactly
+12:48 < garbagecollectio> this is your hyper physical point of view
+12:48 < garbagecollectio> its like a mechanic
+12:49 < Youdaman> garbagecollectio: the problem is though, if it's purely about learning, then you're doing it wrong -- because you disagree with answers given, or you make blanket statements regarding certain features or code examples that are blatantly wrong
+12:50 < garbagecollectio> huh
+12:50 < garbagecollectio> the new keyword ive had extensive discussions about
+12:50 < Youdaman> and my fear is someone else who is learning will read your constant stream of questions on questions and think node js is confusing because you make it seem that way
+12:50 < garbagecollectio> your not educating me there
+12:50 < SomeoneWeird> *you're
+12:50 < Youdaman> it's not my job to educate you -- it's your own
+12:50 < garbagecollectio> node is confusing
+12:50 < Youdaman> it isn't
+12:50 < jsilver> no, it's not
+12:50 < garbagecollectio> lol
+12:50 < SomeoneWeird> no it's not
+12:50 < Youdaman> you just don't know enough
+12:50 < garbagecollectio> node is the most confusing programming yet
+12:50 < SomeoneWeird> You're just making it that way
+12:50 < jsilver> garbage
+12:50 < garbagecollectio> you dont know what iknow and what i dont
+12:50 < jsilver> you say what your name is
+12:50 < jsilver> garbage
+12:50 < SomeoneWeird> lmao
+12:51 < jsilver> lolol
+12:51 < Youdaman> garbagecolectio: you don't seem to know that there are more confusing languages and platforms out there
+12:51 < garbagecollectio> node is so confusing, most big companies cant even understand it or its benefits
+12:51 < SomeoneWeird> there are lots of companies using node
+12:51 < Youdaman> wtf
+12:51 < Youdaman> again with the blanket statements
+12:51 < SomeoneWeird> exactly
+12:51 < Youdaman> do you even work for a big company?
+12:51 < garbagecollectio> yes because i interact with these ppl youdaman
+12:51 < garbagecollectio> yeah i work for a fortune 50 company
+12:51 < garbagecollectio> that you have heard of
+12:51 < garbagecollectio> and i talk to thee people
+12:51 < jsilver> most big companies can't understand anything or it's benefits, why would you rate them on it
+12:51 < garbagecollectio> their direct consumer facing dev teams
+12:51 < SomeoneWeird> which would be..?
+12:51 < jsilver> Especially Tech 
+12:51 < Youdaman> woop de doo -- i feel bad for them then if you're representative of their talent
+12:51 < garbagecollectio> so while you sit at home youdaman
+12:52 < garbagecollectio> its funny, what you think matters youdaman doesnt matter at all
+12:52 < SomeoneWeird> garbagecollectio, what's your companies name?
+12:52 < garbagecollectio> not in terms of code design
+12:52 < garbagecollectio> programming
+12:52 < garbagecollectio> or advancing ones self
+12:52 < garbagecollectio> arent u the dood who has no friends and cant pay his rent?
+12:52 < SomeoneWeird> garbagecollectio, what's your companies name?
+12:52 < jsilver> garbagecollectio: if you spent as much time as you did on here trolling, as you did reading everything you could find on node, and maybe coffee, you'd learn it and wouldn't h ave any problems using it
+12:52 < Youdaman> i sit at home, running my own business, while you schlep each way to work each day on your commute and sit in a cubicle. i get to spend time with family and friends while you watch the clock. yeah, i'm pretty happy about working from home
+12:52 < SomeoneWeird> Youdaman++
+12:53 < sandfox> I detect a strong disturbance in the trollolol
+12:53 < jsilver> same
+12:53 < Youdaman> sandfox: i can't even begin to wonder if he's a troll or just defective
+12:53 < jsilver> "cant pay his rent" SCREAMS poser. anyone who is indepedent would not talk like this
+12:53 < jsilver> sorry dude, but no just no
+12:53 < SomeoneWeird> maybe he has something wrong with him
+12:53 < jsilver> yeah, he won't RTFM !
+12:53 < jsilver> :)
+12:54 < sandfox> it's like horse ebooks for the nodes channel
+12:54 < Youdaman> sandfox++
+12:55 < sandfox> jsilver: is there protocol spec for the globalchat2?
+12:55 < jsilver> yes
+12:55 < jsilver> https://github.com/jsilverMDX/GlobalChat2/wiki/GlobalChat2-Protocol
+12:55 < garbagecollectio> youdaman you were saying u were broke the other day
+12:55 < garbagecollectio> lonely
+12:55 < Youdaman> garbagecollectio: wtf? the other day? when? i only met you this morning in here
+12:56 < jsilver> LoL
+12:56 < garbagecollectio> idiot we spoke last night
+12:56 < sandfox> jsilver: star, I apparently can't work these things out
+12:56 < garbagecollectio> this is how fucking dumb u are
+12:56 < jsilver> ops!
+12:56 < garbagecollectio> we spoke all laas tnight
+12:56 < jsilver> sandfox: thx
+12:56 < jsilver> np
+12:56 < Youdaman> garbagecollectio: i think perhaps you've got a problem. i'm in a different timezone to you. for me it was my morning
+12:56 < jsilver> there's a few articles back there
+12:56 < garbagecollectio> youdaman no
+12:56 < SomeoneWeird> apparently he hallucinate's too
+12:57 < jsilver> https://github.com/jsilverMDX/GlobalChat2/wiki/_pages
+12:57 < Youdaman> garbagecollectio: and there's no need to resort to calling me dumb. i have offered you answers to questions you've asked. i at no stage said i was "lonely" or that i was "broke" -- i'm not sure where you're getting that from. you're kind of creeping me out now
+12:57 < garbagecollectio> you said that last night
+12:57 < garbagecollectio> we were talking about you not making any money
+12:57 < Youdaman> i said i was broke and lonely?
+12:57 < garbagecollectio> with a bunch of people
+12:57 < Youdaman> we were?
+12:57 < Youdaman> who?
+12:57 < Youdaman> what?
+12:58 < garbagecollectio> do you remember talking about that u work in your house with me?
+12:58 < Youdaman> a bunch of what
+12:58 < Youdaman> nope. i recall you making fun of me, so perhaps you've added extra narrative to the story in your head.
+12:59 < SomeoneWeird> lmao
+12:59 < SomeoneWeird> <SomeoneWeird> apparently he hallucinate's too
+12:59 < Youdaman> garbagecollectio: remember that thing you said about how you like to dress up like a polar bear and smother yourself in peanut butter? and then you told me your fantasy about donuts and monkeys? yeah, i liked that story.
+13:00 < jsilver> eww
+13:00 < garbagecollectio> huh
+13:00 < garbagecollectio> dude i have the logs
+13:00 < jsilver> wonder if he's a BRONY
+13:01 < garbagecollectio> i dont know why i get shit on for asking legit node.js qustions
+13:01 < jsilver> looks like someone's a BRONY
+13:01 < garbagecollectio> about the event loop
+13:01 < jsilver> it's hidden in the runtime
+13:01 < garbagecollectio> just strange
+13:01 < Youdaman> garbagecollectio: i do recall you saying you work for a fortune 50 company... i think that was your claim to fame. that you're a cog in a machine. a seemingly squeaky cog.
+13:01 < jsilver> don't worry about it
+13:01 < jsilver> just write you app
+13:01 < jsilver> copy my design
+13:01 < jsilver> coffee is easy to read
+13:01 < garbagecollectio> youdaman - exactly, u remember us talking about that because we were talking about you working at home and not making money and how you miss having an office
+13:01 < Youdaman> garbagecollectio: why do you call yourself garbagecollectio? is that like one N short of garbage collection? or is it like garbage collect IO?
+13:01 < garbagecollectio> lol
+13:02 < garbagecollectio> you're a zero dude
+13:02 < garbagecollectio> a fucking stay at home troll
+13:02 < Youdaman> garbagecollectio: i miss what? having an office? i quit working in offices because i HATE them. wtf.
+13:02 < garbagecollectio> getting scraps from the world
+13:02 < garbagecollectio> you've never coded anything fucking significant
+13:02 < Youdaman> garbagecollectio: orly?
+13:02 < garbagecollectio> yeah
+13:02 < garbagecollectio> you're a fucking nobody
+13:02 < jsilver> get out of here with that shit bro
+13:02 < Youdaman> tell me what i've coded thien
+13:02 < jsilver> nobody cares
+13:02 < sandfox> jsilver: https://github.com/jsilverMDX/GlobalChat2/blob/master/Node-GChatServ/server.coffee#L194
+13:02 < deoxxa> can i also be a nobody
+13:02 < garbagecollectio> no you tell me
+13:02 < jsilver> Youdaman: don't feed the trolls
+13:02 < Youdaman> deoxxa: join my on my apparent quest for anonymity
+13:02 < deoxxa> i want to be nobody, but i'm too significant
+13:02 < deoxxa> what do
+13:03 < jsilver> sandfox: DOH
+13:03 < Youdaman> ask more questions about node apparently
+13:03 < jsilver> sandfox: feels like the 30th! time coming from ruby
+13:03 < sandfox> jsilver: :-)
+13:03 < jsilver> sandfox: thanks !
+13:03 < jsilver> :)
+13:03 < sandfox> jsilver: np
+13:03 < SomeoneWeird> <garbagecollectio> you've never coded anything fucking significant < and you have?
+13:04 < gildean> deoxxa: sorry, no, we've come to expect more than that from you
+13:04 < Youdaman> jsilver: understood. i can't even read garbagecollectio's comments. they're too g for my level. need more xp.
+13:04 < deoxxa> gildean: gosh darn it
+13:04 < gildean> deoxxa: so no anonymity for you anymore
+13:04 < deoxxa> Youdaman: ey player stay up foo' REPRESENT
+13:04  * Youdaman comes correct (sounds wrong)
+13:04 < garbagecollectio> SomeoneWeird: yes when you work for a f50 company u by default do
+13:04 < jsilver> Youdaman: lol you know us lowdown lowlevel nobodies ;) it can be hard to read l33tsp34k
+13:05 < jsilver> patching
+13:05 < SomeoneWeird> hahahahahahahahahahah garbagecollectio 
+13:05 < Youdaman> jsilver: i feel so free now
+13:05 < SomeoneWeird> for the 5th time
+13:05 < SomeoneWeird> what company?
+13:05 < deoxxa> garbagecollectio
+13:05 < jsilver> Youdaman: good :) free to do whatcha gotta do. cuz that's your job ! :)
+13:05 < deoxxa> garbagecollectio: you realise most software at large companies is internal, and very close to insignificant, right?
+13:06 < sandfox> since when did being fortune 50 mean any software produced was significant
+13:06 < garbagecollectio> no this is public facing company
+13:06 < garbagecollectio> lol heard of amazon
+13:06 < garbagecollectio> google
+13:06 < deoxxa> all... companies... are public facing
+13:06 < garbagecollectio> ibm
+13:06 < SomeoneWeird> <SomeoneWeird> for the 5th time
+13:06 < SomeoneWeird> <SomeoneWeird> what company?
+13:06 < SomeoneWeird> <SomeoneWeird> for the 5th time
+13:06 < SomeoneWeird> <SomeoneWeird> what company?
+13:06 < SomeoneWeird> <SomeoneWeird> for the 5th time
+13:06 < SomeoneWeird> <SomeoneWeird> what company?
+13:06 < SomeoneWeird> <SomeoneWeird> for the 5th time
+13:06 < SomeoneWeird> <SomeoneWeird> what company?
+13:06 < garbagecollectio> apple
+13:06 < sandfox> orannge
+13:06 < SomeoneWeird> HAHAHAHAHAHAHAHAHAHAHAHAHA
+13:06 < sandfox> pear
+13:06 < garbagecollectio> deoxxa: garbagecollectio: you realise most software at large companies is internal, and very close to insignificant, right?
+13:06 < garbagecollectio> funny
+13:06 < garbagecollectio> SomeoneWeird: not telling
+13:06 < SomeoneWeird> faggot
+13:06 < deoxxa> i'd say 95% of software written at google or amazon is insignificant as far as the general public goes
+13:06 < gildean> SomeoneWeird: stop flooding please, doesn't help anything
+13:07 < SomeoneWeird> now you're just wasting everybodies time garbagecollectio 
+13:07 < SomeoneWeird> gildean, meh >.>
+13:07 < deoxxa> when's the last time you heard about amazon's state-of-the-art database maintenance scripts? or google's groundbreaking internal time reporting application?
+13:07 < deoxxa> that's what most developers work on in places like that
+13:07 < deoxxa> not AWS, not dynamo
+13:08 < deoxxa> now this software is definitely significant in terms of keeping the company running, but it's not something you can use for bragging rights ;)
+13:08 < garbagecollectio> the kindle fire?
+13:09 < garbagecollectio> ar you kidding?
+13:09 < garbagecollectio> the website?
+13:09 < garbagecollectio> yeah you cna
+13:09 < garbagecollectio> if u made kindle fire you could totally use that for bragging right
+13:09 < garbagecollectio> worked on it
+13:09 < garbagecollectio> or even an inventory admin system
+13:09 < deoxxa> wat
+13:09 < Youdaman> garbagecollectio: are you a libra?
+13:09 < sandfox> if we can't see it or feel it, you can't brag about it
+13:10 < SomeoneWeird> I'm going to leave before I lose more braincells
+13:10 < Youdaman> i'm a libra/libran/whatever
+13:10 < jsilver> sandfox: PONGer just worked in node :) hurrah!
+13:10 < deoxxa> i'm a librarian
+13:10 < garbagecollectio> Youdaman: shut up
+13:11 < garbagecollectio> internal apps can be engineering achievements
+13:11 < jsilver> garbagecollectio: so you mainly a coder or a troll
+13:11 < Youdaman> garbagecollectio: born on October 21 1986 perhaps?
+13:11 < sandfox> jsilver: whoooopp
+13:11 < jsilver> :D :D :D :D \o \o \o \o o/ o/ o/ o/
+13:12 < jsilver> and ofc, this implemented ponger seems nicer than the Ruby version ;)
+13:12 < jsilver> node wins
+13:12 < jsilver> great news. i'll update the main repo
+13:16 -!- garbagecollectio was kicked from #Node.js by Nexxy [garbagecollectio]
+13:16 -!- SomeoneWeird was kicked from #Node.js by Nexxy [SomeoneWeird]
+13:16 < deoxxa> me me me
+13:16 < zot> hello again ;)
+13:17 < Youdaman> garbagecollectio: perahps Nov 23 1984?
+13:17 < deoxxa> Youdaman: nah, that makes him older than 12
+13:17 < zot> i'm working on a c++ extension, and have a raw data buffer as a v8::Value, which is ultimately a string.  I want the raw bytes, as a const uint8_t *… but using String::AsciiValue appears to modify the contents.  Is there a proper way that I'm not finding?
+13:18 < Youdaman> garbagecollectio: it's just that when i click on your name i get "erere" and when i google that with js i get http://stackoverflow.com/questions/11937978/regex-with-javascript-to-retrieve-content-from-a-loop -- so i'm guessing one of those birthdays is yours
+13:19 < Youdaman> garbagecollectio: and that your alias is "lucky cool" but i could be wrong
+13:19 < guor_> zot, depending on your use case, you may want to use external strings
+13:19 < zot> what are external strings?  (i'm dropped into existing code, and trying to learn on the fly.  sorry for my ignorance :/ )
+13:20 < guor_> those are strings that have a backing store you as embedder provide, but is used by V8 as normal strings
+13:20 -!- Youdaman was kicked from #Node.js by Nexxy [Youdaman]
+13:20 < guor_> but maybe it's not what you want since javascript strings are assumed to be immutable.
+13:20 < zot> (ignorantly) it sounds like overkill — basically i've read some raw data from a pipe, and want to shove it to a C++ based decoded; small unique packets converted into js objects
+13:21 < zot> mainly i just can't figure out how to simply get the raw bytes.  i *thought* String::AsciiValue wouldn't modify the contents, but that doesn't appear to be the case; but this can't be a unique need :)
+13:21 < guor_> you could use String::Write
+13:22 < guor_> it would write stuff into a uint16_t buffer
+13:22 < garbagecollectio> what was the name of the utils function to regsiter event emitter in a class
+13:22 < guor_> what String::AsciiValue does is to use String::WriteAscii
+13:22 < zot> guor_: is it then doing a 2:1 expansion from bytes to shorts?  or just happens to use 16bit as a base buffer element?
+13:22 < zot> yeah, i'm reading that code as we chat :)
+13:23 < guor_> yes. it does, if you had an ascii string
+13:23 < guor_> if you had uc16 strings to begin with, nothing really changes
+13:23 < zot> i don't see where it gets mod'd, but when i dump the argument contents to a file, and compare them w/ gdb's x/49xb, there are 2 bytes that differ.
+13:23 < gildean> garbagecollectio: check the logs, link is in the /topic
+13:23 < pyrotechnick> good evening my asynchronous comrades
+13:24 < guor_> what are those two bytes?
+13:24 < garbagecollectio> thx
+13:24 < zot> the first one was nul (it's a protocol signal byte), converted to <space>; the other was 0x80.  so both not surprisingly mod'd :)
+13:25 < guor_> I think the background is that strings in v8 are stored as one-byte per char or two-byte per char, depending on what's necessary, but this is hidden from the embedder, so if you do WriteAscii, non-ascii get truncated to ascii
+13:26 < guor_> if you do Write, you get the common denominator, which is two-byte per char
+13:26 < zot> tricky.
+13:26 < zot> so, if I use Write, I at least get predictability, even if I have to convert it myself.
+13:26 < guor_> for WriteAscii, you could pass the option PRESERVE_ASCII_NULL
+13:26 < guor_> to preserve that signal byte
+13:27 < zot> that won't fix 0x80, i'm guessing.   [grepping source now]
+13:27 < guor_> yeah... lemme see if there is anything else you could do
+13:28 < zot> is that new in 0.8.15?  (i have 8.14 atm.)
+13:28 < guor_> uh. no idea. probably not :)
+13:28 < Youdaman> garbagecollectio: my apologies for linking to that page. feel free to ask me anything and i'll do my best to help!
+13:28 < guor_> I'm not really up-to-date on where node.js is wrt V8 versions
+13:28 < zot> wouldn't have thought so, but grep missed
+13:29 <@konobi> it's in the deps folder
+13:30 <@konobi> 3.13.7.1
+13:30 < zot> do I have to configure to get this downloaded?  grepping the whole tree doesn't show it.  
+13:30 < zot> in any case, if using ::Write gives me something consistent, I can deal w/ that.
+13:31 < zot> or will try :)
+13:31 <@konobi> https://github.com/joyent/node/tree/master/deps/v8
+13:32 < sandfox> jsilver - I'm busy making a mess in GChat node server
+13:32 < jsilver> sandfox: awesome !!! :)
+13:32 < sandfox> jsilver: you might hate me later for it :-p
+13:32 < garbagecollectio> does http.request always have to take the same config object
+13:32 < garbagecollectio> cause ive seen code where it takes a totally custom one
+13:32 < jsilver> ah, well it all depends but we'll see ! ;)
+13:33 < guor_> zot: if your string contains 0x80, the string is internally stored as two-byte-string to begin with
+13:33 < sandfox> jsilver: Is the layout currently one master server and then x number of other servers around it that come and go?
+13:33 < zot> guor_: ok.  so i need to just byte down and do the raw write thing regardless.  which i started :)
+13:33 < guor_> so String::Write would simply do a copy, so it's not like unnecessary work is done
+13:34 < Youdaman> garbagecollectio: http://nodejs.org/api/http.html#http_http_request_options_callback -- you can call it with as many different config/options as you like depending on what you need it for
+13:35 < jsilver> sandfox: pretty much. there's a good drawing of it because it's complex, but Nexus, is the Master List Server program, that runs on Heroku, then there is GChatServ which can run on any Nix platform reasonably and MacRuby, which pings the Nexus that it's up, but I also have ServerDropper, a private project which drops the GChatServs (currently only the node ones cuz its efficient) on a linode and controls them.
+13:35 < jsilver>  i want it to bluepill, but it doesnt yet
+13:35 < guor_> things may change in the future since there are efforts going on to support latin1
+13:35 < guor_> but that won't help you right now
+13:35 < sandfox> jsilver: bluepill?
+13:35 < zot> guor_: but i am assuming that a string of, e.g., 10 chars would need 20 bytes, and that every 2nd byte would be 0x0?  in which case i need to prune down to a normal uint8 array
+13:35 < jsilver> eh, it's the gem "god" but with memory leak fixed
+13:35 < jsilver> havent used it yet
+13:35 < garbagecollectio> var req = http.request(request_query, function(res)
+13:35 < guor_> yes
+13:36 < garbagecollectio> 	var query = {
+13:36 < garbagecollectio> signature: this.config.api_token,
+13:36 < garbagecollectio> format: this.config.format,
+13:36 < garbagecollectio> message: message,
+13:36 < garbagecollectio> };
+13:36 < sandfox> jsilver: gotcha , I'm not a ruby kid
+13:36 < garbagecollectio> those arent defined in the node api spec
+13:36 < jsilver> sandfox: no prob
+13:36 < garbagecollectio> so how can they be passed approprriately
+13:36 < guor_> unless your string had some weird non-ascii non-latin1 chars in it
+13:36 < jsilver> everything started in Ruby, nothing uses Rails except Nexus and ServerDropper, but the best most performant GChatServ yet is the Node one
+13:37 -!- mode/#node.js [+o Nexxy] by ChanServ
+13:37 < jsilver> GChat_2_Server.rb in Ruby1.9.3 is fine, but not well behaved in terms of memory and cpu usage
+13:37 < zot> guor_: it's a binary encoded AVRO object.  it could literally be anything.
+13:38 < zot> in fact, i want to have the API support both Buffer's and String's being passed in.  but that's later.
+13:38 < Youdaman> garbagecollectio: they might be ignored, or used by another part of the program you saw them in, or maybe they're not documented 
+13:38 < guor_> hm... how are you getting that object into V8 in the first place?
+13:38 < zot> i'd have to check the other side.
+13:39 < zot> it may be a Buffer at the moment, and being auto converted someplace?
+13:39 <@konobi> garbagecollectio: pastebin
+13:39 < sandfox> jsilver: i see
+13:39 < zot> guor_: in fact, it does appear to be a Buffer.
+13:39 < guor_> so like, you have an binary object outside of V8, pass it into V8, and retrieve it from V8 again... do you modify it?
+13:39 < zot> nope.  never want to modify it.  just decode it via AVRO library.
+13:40 < zot> so perhaps the smart thing for now is just to figure out how to do Buffer stuff from c++, and coerce the other way as needed.
+13:41 < alchimista> hi people,  I have a problem similiar to this, http://stackoverflow.com/questions/12566731/expressjs-socket-io-with-route-separation but i can't undertand the solution provided there
+13:41 < guor_> then just use an external string. you wrap the backing store of your binary object into an external resource
+13:41 < guor_> pass that to String::NewExternal so that you get a string in v8
+13:41 < alchimista> any one here wanna help me to understand that
+13:42 < zot> guor_: k.  thanks, i'll check out NewExternal :)
+13:42 < alchimista> i mean in my route, after inserting something to  db, i wanna emit it  to all browsers
+13:42 < guor_> when you need it, check that it's an external string, retrieve the resource (String::GetExternalAsciiStringResource), unwrap it, and you got your backing store back
+13:43 < zot> the Ascii part doesn't imply modification in any way?
+13:43 < guor_> inside V8 you will be able to read it as if it was a normal string
+13:43 < guor_> no. the ascii part implies that it's one-byte per char
+13:43 < garbagecollectio> see u dont have to use the new keyword
+13:44 < garbagecollectio> for requireining in things
+13:44 < garbagecollectio> u can bind this to the function
+13:44 < garbagecollectio> and it would do the same
+13:44 < alchimista> what i am not understanding form the solution provided in that post, how should i communicate from route with app js to let it know that there is a new entry so emit it to all browsers
+13:44 < guor_> the only thing i'm not sure about is that whether you would get any problems inside v8 since the assumption is that ascii strings have the range 0x00-0x7F
+13:44 < alchimista> any one reading my question?
+13:44 < alchimista> and wanna give me a hint or help me to do that
+13:45 < guor_> so you may want to wrap it into a non ascii external resource. but in that case you would read two bytes per character inside javascript
+13:45 < gildean> alchimista: you don't, you emit the event from the socket.io server-instance instead
+13:45 < gildean> alchimista: as it says in the explanation
+13:45 < zot> guor_: curious.  it feels weird that it's so unclear about how to do this… isn't this the normal place where people write C/C++ hooks? :)  or is there some doc that i haven't found talking about this...
+13:45 <@Nexxy> alchimista, you can do something like this:
+13:46 <@Nexxy> routes = require('./routes')(io)
+13:46 < guor_> maybe storing binary data as string is the wrong approach altogether
+13:46 < alchimista> Nexxy: where in my app.js or in my routes/index.js ?
+13:47 <@Nexxy> in app.js
+13:47 < zot> guor_: it's coming off a socket, via a Buffer, i think.  before doing this, I have to do my own protocol decoding, and then pass off the payload to the avro decoder.
+13:47 <@Nexxy> I'm not sure which socket you want to emit from
+13:47 <@Nexxy> but at least that way you will have reference to your io instance
+13:48 < zot> (confirmed — pipe -> Buffer -> hdr decode -> payload -> avro decode)
+13:48 < alchimista> so i'll have reference to io instance in routes/index
+13:48 < guor_> I see...
+13:48 < alchimista> ok i give a try 
+13:48 < guor_> but a buffer is basically a typed array, right?
+13:48 <@Nexxy> alchimista, yes, if your routes index has something like;
+13:48 < DimitrisGR> hello all, is there a ICMP implementation in nodejs?
+13:48 < zot> guor_: i think so.  but you know far more about node/v8 than i do ;)
+13:48 <@konobi> zot: so create a stream to do your decoding and pipe?
+13:49 < garbagecollectio> what does next(err)
+13:49 < garbagecollectio> do
+13:49 <@Nexxy> var routes = function(io) { //... routes, etc. }; module.exports = routes;
+13:49 < guor_> more about v8, not so much about node :)
+13:49 < garbagecollectio> isnt that the equivalent of throw err?
+13:49 < garbagecollectio> and thus the app crashes
+13:49 <@konobi> no
+13:49 < guor_> in any case, why don't you just create a result buffer, write into that, and don't use any strings
+13:49 < zot> konobi: you mean in C, i assume?  i've thought about it, but didn't think this would be so tricky.  and frankly, i prefer to keep as much as possible in the host language
+13:49 <@konobi> zot: no, just in JS
+13:50 < zot> konobi: ah; i'm told that it would be very slow in JS, because the AVRO codec is very bit manipulating
+13:50 < zot> plus i don't really want to implement AVRO coded myself, if i can avoid it :)
+13:50 <@konobi> you can still pipe to a program
+13:50 < gildean> DimitrisGR: i haven't seen one, tho i haven't looked either
+13:50 < gildean> DimitrisGR: if you come up with one that's easily leveraged to send pings etc. let me know
+13:50 < alchimista> Nexxy: this is my code  https://gist.github.com/c3096c4c4077423ac0d3
+13:51 <@konobi> zot: you can just do your protocol decoding in JS... then push the data via child_process
+13:51 < zot> konobi: i've done that already for this lib in another place, and dislike that model a lot.  surely there is a sane way to get an array of bytes.  perhaps i just need to figure out how to get at the core element of Buffer… but the V8 Value type doesn't show me an obvious way.
+13:52 <@konobi> it's the unix model
+13:52 < alchimista> in my routes i  have this https://gist.github.com/1b8d3c818a93d0a0d3bc
+13:52 < zot> i know.  i've done it lots of times; but directly accessing memory shouldn't be this difficult.
+13:52 < alchimista> Nexxy: can u now by seeing my code help me to do that
+13:53 < alchimista> because I didnt understand ur solution
+13:53 < guor_> zot: is it possible to just copy from buffer to buffer, until you have what you need?
+13:53 <@Nexxy> alchimista, oki sure
+13:54 <@Nexxy> alchimista, it looks like your gist from routes is incomplete
+13:54 < DimitrisGR> gildean: there some npm packages that implement icmp ping
+13:55 < alchimista> yeah i didnt post everything, but let me post again
+13:55 < zot> guor_: not sure what you mean… my problem is this.  I have a Handle<Value>, in an Arguments array;  if there is a C++ type for Buffer, I would gladly cast to to that, and grab the underlying data buffer.  but I've not found that, so strings felt like the way to go.  (normal c++ strings can be coerced into this non-modifying behavior, iirc.)
+13:55 < gildean> DimitrisGR: cool, i'll have a look
+13:56 <@konobi> zot: there's a node datatype for FastBuffer
+13:56 < alchimista> Nexxy: here you are https://gist.github.com/7b6767508e3e2419e188
+13:57 < zot> konobi: I'm assuming that to be the underlying c++ object when using a node Buffer?  If so, how to I cast it from the Arguments[x] instance?
+13:57 < Youdaman> garbagecollectio: is the next() in the context of plain vanilla node or express?
+13:57 < garbagecollectio> express
+13:57 < alchimista> Nexxy: in my view I have this https://gist.github.com/15488e7f49e2fbe1f7a6
+13:57 < Youdaman> garbagecollectio: http://stackoverflow.com/questions/10695629/node-js-express-next
+13:57 < alchimista> Nexxy: if u need something else tell me
+13:58 <@konobi> zot: not sure
+13:58 <@konobi> oh avro is an apache thing... not a video codec
+13:58 <@Nexxy> alchimista, just whatever is in ./routes/index
+14:00 < guor_> i'm not sure, but gut feeling tells me that it should be possible to get the backing store of the buffer
+14:00 < zot> i'm sure it's possible — just a question of whether it's exposed in the API, and how to get there.  i haven't found much in the wya of docs for this kind of thing :)
+14:01 < alchimista> https://gist.github.com/bf06df25637f91e33883  here your are Nexxy:
+14:02 < zot> oooooh, maybe just found it.  https://github.com/joyent/node/blob/master/src/node_buffer.h#L73 plus the next 2 funcs.
+14:03 < alchimista> Nexxy: what i want to be able to do is, after inserting a new pin, i have to push that pin to all browsers, thats all
+14:03 < garbagecollectio> Youdaman I don't get it
+14:04 < guor_> zot: yeah that may be it :)
+14:05 < Youdaman> garbagecollectio: "This appears to be a variable naming convention in Node.js control-flow code, where a reference to the next function to execute is given to a callback for it to kick-off when it's done."
+14:05 < garbagecollectio> but they use it on errors
+14:06 <@konobi> err may == undefined
+14:06 < Youdaman> garbagecollectio: yep, and could be used for other things, like (in that example) if they're not logged in, take them to the login/session page, otherwise forward them onto the _next_ page they were destined for
+14:07 < garbagecollectio> next(err)
+14:07 < garbagecollectio> doesnt seem to forward u to a apge
+14:07 < Youdaman> in that case, probably an error
+14:07 < Yellow> hello, wondering if anyone knows how to spawn an http.Server directly from a tcp socket.. i know it's strange
+14:07 <@konobi> the next() function may want to do something based on err
+14:09 < alchimista> Nexxy: any hint?
+14:09 < garbagecollectio> knobi but what happens
+14:09 <@konobi> garbagecollectio: whatever next() does
+14:09 <@konobi> ie: the next thing in the stack
+14:10 < sandfox> Yellow: as in when TCP get open attach HTTP server to it?
+14:11 < garbagecollectio> konobi but what does it do specifically
+14:11 < garbagecollectio> in error handling
+14:11 < Yellow> aye
+14:11 < Yellow> sandfox: aye
+14:12 < Youdaman> garbagecollectio: it's just passing the err to whatever function is actually next
+14:12 < sandfox> Yellow: never tried but as a guess you could proxy the data to a waiting HTTP server from the TCP, not sure of the mechanics in practice
+14:12 < sandfox> Yellow: sounds fun to try
+14:12 <@konobi> garbagecollectio: NOTHING
+14:13 <@konobi> it's up to you to handle the error IF there is an error
+14:13 < Yellow> sandfox: yeah i wanted to avoid that if possible
+14:13 < Yellow> sandfox: weee streams :)
+14:13 < sandfox> Yellow: start an HTTP server, then start a TCP server, when a TCP connection comes in, open a net.connection to the port you set the HTTP server on, and stream away
+14:14 < sandfox> Yellow: without hacking up some c/c++ extension, i don't see another (sane) way
+14:15 < zot> guor_: looks like a bingo!  none of my bytes (at a glance) appears to be wrong, and the string is the correct length :)
+14:15 < sandfox> Yellow: intact, my solution sounds pretty easy, my hack it up later
+14:15 < sandfox> Yellow: Dare I ask why you need this?
+14:17 < zot> guor_, konobi: thanks gents!
+14:17 < zot> (or ladies, for all i know.  either way, cheers :) )
+14:18 < guor_> congrats :)
+14:18 <@konobi> zot: i'm going for xenomorph
+14:18 < alchimista> gildean: u read my question previusely posted here, " hi people,  I have a problem similiar to this, http://stackoverflow.com/questions/12566731/expressjs-socket-io-with-route-separation but i can't undertand the solution provided there "
+14:18 < zot> konobi: i cannot translate that :/
+14:19 < alchimista> in my app.js
+14:19 < alchimista> https://gist.github.com/7b6767508e3e2419e188/15ed5bfe00d9e5cb6ab6a658114027c504e912c0
+14:19 < alchimista> https://gist.github.com/bf06df25637f91e33883 
+14:19 < alchimista> in my view I have this https://gist.github.com/15488e7f49e2fbe1f7a6
+14:19 <@konobi> male/female/xenomorph
+14:20 < alchimista>  
+14:20 < alchimista> my ./routes/index
+14:20 < alchimista> https://gist.github.com/bf06df25637f91e33883 
+14:20 < alchimista> any one here wanna help me in this regard
+14:20 < zot> ahhhhhhh.  best of both worlds?
+14:20 < alchimista> Nexxy: do u have a hint for me? 
+14:21 < Yellow> sandfox:  well.. im learning... :) and might i add that i hate the sockjs/socket.io ".install()" method to wrap webserver request handlers (is it for that? why can't we wrap the request handlers directly?). What i'm doing now is trying to accomplish an elegant way of separating http requests from the others, inside a tcp connection handler.
+14:21 <@Nexxy> alchimista, instead of using exports.<fn>
+14:22 <@Nexxy> alchimista, one sec
+14:22 < alchimista> ok, u can write an example on gist too
+14:22 < alchimista> thanx
+14:23 <@konobi> o.O
+14:23 < mads-> If I open a file, parse the input to JSON and modify it - how would I then safe it to file again? 
+14:23 < sandfox> Yellow: then ideally you'd want to separate out the nodes HTTP parser from it's underlying 'net', which afaik isn't do-able in user land code yet, (i stand by to be corrected)
+14:24 < garbagecollectio> how oftne do u guys use documentation while u code in node?
+14:24 < garbagecollectio> i mean it kind of requires you too write
+14:24 < garbagecollectio> right*
+14:24 < garbagecollectio> its not like client side javascript
+14:25 < Youdaman> garbagecollectio: as in write commented code? when i need to remember what something does and the variable or function names aren't obvious
+14:25 < garbagecollectio> no i mean look at docs
+14:25 < ThiefMaster> whenever it's necessary of course
+14:25 < ThiefMaster> looking up api docs all the time is not a bad thing
+14:25 < sandfox> Yellow: otherwise, yeah, I like your thinking, but for the meantime I suspect piping the TCP to HTTP is your only answer
+14:26 < Yellow> sandfox: yeah.. it's not in the docs and http.js is too big for me to wrangle around my head right now :) ill try to stream/proxy to the outter server like u suggested now
+14:26 <@Nexxy> alchimista, https://gist.github.com/986f4270bdda212f007e
+14:26 < Yellow> sandfox: thank you for your help, oss rocks :)
+14:27 <@Nexxy> use that along with requiring it like `var routes=require('./routes')(io)
+14:27 < sandfox> Yellow: anytime, I love problems
+14:27 < alchimista> thanx
+14:37 < Yellow> sandfox: I GOT IT. it's elegant: srv_tcp = net.createServer (socket)-> srv_http.emit 'connection', socket
+14:37 < Yellow> sandfox: duh! this works :D
+14:38 < sandfox> Yellow: nice, thats much simpler than piping streams in the way I was thinking of
+14:48 < tanepiper> daleharvey: sorry I DM'ed you that, but I didn't want to put it out public yet :)
+14:48 < tanepiper> but i thought it might meet your needs with your timer :)
+14:49 < daleharvey> tanepiper: no bother, I was just replying, thats awesome, I wasnt so much worried about accuracy but I realised testing it yesterday with my phone going to sleep iis pretty important :)
+14:49 < daleharvey> thanks
+14:52 < tanepiper> daleharvey: cool :) yea works nice, I have two of them running just now - one 1000ms and, one 10ms ticks for a smooth animation and they work pretty well (although some weirdness when the device sleeps or the window looses focus - they keep working accuratly, but basically have to 'catch up' to the current time so you see them speed up a lot to catch up, then go normal again)
+14:52 < tanepiper> it's funny when you leave it for an hour or so ;)
+14:53 < tanepiper> if you can think of a fix, yay :D
+14:54 < tanepiper> I was thinking webworkers, but then *android* 
+14:58 < alchimista> Nexxy: do i need to do some modification in my app.js
+14:58 < alchimista> i doesnt read the requests
+14:59 <@Nexxy> you should be loading the routes with `var routes = require('./routes')(io)
+15:04 < alchimista> Nexxy: TypeError: Cannot read property 'sockets' of undefined
+15:08 < matbee> konobi!
+15:08 < matbee> konobi, guess who won :)
+15:08 < matbee> konobi, http://startupweekend.org/2012/12/05/groupnotes-the-2012-global-startup-battle-champion/
+15:10 < jaha> is there good reason to be using "use strict" in node.js modules? if so, how should it be done, is it really best practice to use function scope or should I just ignore that warning since they are commonjs modules?
+15:11 < alchimista> Nexxy: it is still undefined
+15:11 < alchimista> Nexxy: thanx any way for your time
+15:17 <@konobi> matbee: woot!
+15:19 < matbee> We're headed to the googleplex soon, hopefully they give us a handful of devices haha
+15:21 <@konobi> nice one
+15:24 <@konobi> matbee: sounds like some fun/interesting times ahead
+15:27 <@konobi> there's 5 of you?
+15:32 < matbee> konobi, yeeep
+15:32 < matbee> konobi, 2 dev's, 3 biz guys
+15:32 <@konobi> kinda crazy for a 2 week old startup ^_^
+15:37 < matbee> konobi, http://venturebeat.com/
+15:37 < matbee> we're on the front page of VB :P
+15:37 < matbee> look for the canadian flag, haha
+15:39 < mscdex> node.js rules!
+15:40 -!- mode/#node.js [+o piscisaureus_] by ChanServ
+15:40 < gildean> mscdex: it sure does
+15:41 < matbee> mscdex, it totally helped us win the global startup battle :P
+15:41 <@konobi> matbee: so i can expect my first cheque shortly... =0P
+15:41 < mscdex> how many casualties?
+15:41 < matbee> 130
+15:41 < matbee> lol
+15:42 < hillct> isaacs: I ran into an oddity when installing yeoman via nom -g. What determines the path where sgmlinks for executables are created? In my case. the install created links in /usr/local/share/bin rather than in a location that's in my path. This is certainly easily corrected in a one-off basis but I'm just trying to understand why that location was selected.
+15:43 <@konobi> hillct: don't use sudo
+15:43 < hillct> Is it defined in the package, or derived from the install environment, or NPM
+15:43 <@konobi> install env
+15:43 < hillct> konobi: initially I didn't use sudo
+15:44 < hillct> konobi: if it's environment specific then it's my issue alone, and easy enough for me to fix. What ENV variable is being used to determine the target path?
+15:44 < asadpakistani1> Is there a way of creating date objects from 64-bit numbers and vice versa?
+15:45 < hillct> asadpakistani1: this is done as part of the mongo DB driver. but it's just encoded as a few bits of the 64bit string
+15:46 < hillct> asadpakistani1: arguably, there are any number of ways to do that encoding. Not sure what criteria you'd use to decide which is the 'correct' way
+15:49 < asadpakistani1> hillct: MongoDB only provides a timestamp class that can store a 64bit time stamp, but theres no way of getting a date object from it
+15:49 -!- mode/#node.js [+o piscisaureus__] by ChanServ
+15:50 <@konobi> no function to convert?
+15:50 < hillct> asadpakistani1:  new Date(timestampInteger)
+15:50 < asadpakistani1> Hillct: but wouldnt that die after 2038?
+15:51 < asadpakistani1> hillct: or 2^53 milli seconds to be precise
+15:51 < hillct> asadpakistani1: you'd think so. I think the Mongo docs address that issue but I forget what their solution was
+15:51 < asadpakistani1> hillct: ok thank you
+15:52 < hillct> you really think you're going to have a Y2K38 problem?
+15:52 < asadpakistani1> hillct: we are planning on making a lasting app...call me optimistic, I don't want a problem in the future :)
+15:52 <@konobi> it's easy enough
+15:53 <@konobi> have a 30 year mortgage?
+15:53 < asadpakistani1> konobi: whose gonna give me a mortgage in pakistan =0P
+15:54 < asadpakistani1> konobi: on the brightside no forclosure either
+15:54 < hillct> asadpakistani1, konobi on that subject, I always enjoy re-reading this http://www.washington.edu/imap/documentation/calendar.txt.html It never gets old
+15:55 <@konobi> lets just move to beats already
+15:56 < mscdex> lets move to swatch internet time!
+15:56 < mscdex> do they still sell watches that show beats?
+16:01 < hillct> konobi: so, do you know off the top of your head, the name of the environment variable nom uses to construct the bin link paths?
+16:01 <@konobi> hillct: PATH?
+16:02 <@konobi> npm ?
+16:02 < hillct> nom, yes
+16:02 < hillct> konobi: oh, do you mean I should just add the target location to my path, and call it fixed
+16:02 <@konobi> hillct: check the npm docs (config)
+16:03 < hillct> was doing that. didn't se it. looking again
+16:03 <@konobi> https://npmjs.org/doc/config.html
+16:15 < hillct> konobi: it seems the only npm config option that would impact the bin path i 'prefix' but that impacts all other install paths as well, which makes it unsuitable. I guess I'll be adding it to my path, in it's current location. Can't get a way from the feeling that this is a poor practice. Never been a fad of adding application-specific bin paths to my path… oh well
+16:20 < cpc> Hey guys
+16:21 < cpc> Im using Debian Squeeze and I cant get node to install at all. I just downloaded and compiled 0.8.15 if I do 'node --version' I get the following error "-bash: /usr/sbin/node: No such file or directory"
+16:24 <@konobi> hillct: check "global"
+16:25 < Thomas`-> Hey
+16:25 < Thomas`-> does anyone know the irc command to send a normal message
+16:26 < Thomas`-> MSG <nick> <message> is for private chats, but what is normal comamnd
+16:26 < hillct> konobi: I see global in the context of the built-in config and config file in /etc but no config option that impacts only the target binary link path
+16:26 < EyePulp> " normal" meaning… to the whole channel?
+16:26 < Thomas`-> yeah
+16:26 <@konobi> hillct: it also explains what happens
+16:27 < EyePulp> thomas - I don't think that's possible.  In fact, I'm just reading your thoughts and responding to them.
+16:28  * EyePulp wonders if this is IRC Punk'd 
+16:28 <@konobi> yeah, i hear that whole ESP thing is really taking off
+16:28 < hillct> konobi: I did read the docs. It explains that it uses 'prefix'/bin but then 'prefix' is used elsewhere to construct other paths
+16:28 < hillct> those other paths I specifically don't want to impact
+16:28 < Thomas`-> testing
+16:28 < Thomas`->  testing
+16:29 < EyePulp> testes
+16:29 < Thomas`-> Hm, think its supposed to be /privmsg #node.js : MEssage
+16:29 < hillct> konobi: It's fine. I just added /usr/local/share/npm/bin to my user path. It'll get the job done
+16:30 < Thomas`->  MEssage
+16:30 < Thomas`-> but doesnt work on my client
+16:31 <@konobi> Thomas`-: you're talking on the channel...
+16:31 < Thomas`-> Did "MEssage" come through?
+16:31 < Thomas`-> Its not shown it here
+16:32 <@konobi> Thomas`-: please go read your client documentation... mkay
+16:35 < supersym> whats the package again which lets you exclude files with _ underscore in say scss or styl files, some generators/frameworks use it
+16:35 < supersym> kinda forgot ><
+16:43 < cpc> anyone?
+17:01 < jaha> is there a good reason to use "use strict" in node.js modules?
+17:02 < lizk> hey a - anybody here from multiplay game servers? 
+17:06 < mscdex> jaha: never! >:-D
+17:07 < alexhancock> To stop JSLint shouting at you :P
+17:09 < jaha> mscdex: can you explain why? I dont mind JSlint yelling at me, and id like to enforce ec5, just dont know if there are special considerations for using it with node.js and if not using it in "function" scope is OK since they are commonjs modules?
+17:09 < medikoo> jaha: many,  just use it
+17:09 < medikoo> jaha: read about strict mode, a lot of resources online
+17:09 < aJohn> quick question: where can I find the port number the server sends response/reply to?
+17:10 < jaha> so V8 and node handle it pretty much the same way?
+17:10 < jaha> (as the browser)
+17:10 < gkatsev> node uses v8. Chrome also uses v8.
+17:10 < gkatsev> rather the opposite.
+17:10 < guor_> strict mode is a borked invention
+17:11 < guor_> the correct way would be to only allow ES5 features with strict mode, and do as if there were no ES5 without strict mode
+17:11 < guor_> instead, strict mode just adds one more dimension to the mess that is javascript
+17:12 < CoverSlide> true
+17:12 < mscdex> aJohn: req.connection.remotePort ?
+17:12 < CoverSlide> there is one nice gotcha that it checks and it's accidental global variable assignment
+17:12 < CoverSlide> probably the only reason that I use it
+17:12 < jaha> gkatsev: i suppose thats true ;)
+17:13 < aJohn> oh, great, tyvm
+17:13 < CoverSlide> reminds me of this blog post, and how easy it is to make that mistake:  http://blog.safeshepherd.com/23/how-one-missing-var-ruined-our-launch/
+17:25 < alexhancock> @CoverSlide, yeah that's interesting, and a good case for "use strict" in node
+17:36 < Fike_> can I emit multiple events at the same time with eventemitter?
+17:36 < Fike_> like this.emit(["hehe", "mhm"], arg1, arg2)
+17:41 < sandfox> Fike_: I don't know… can you?
+17:41 < sandfox> Fike_: i.e. have you tried it?
+17:41 < Fike_> I'm trying it, I need to clean up a lot of my code first
+17:41 < sandfox> Fike_: make a simple test case and gist it
+17:41 < Fike_> just thought I'd ask here while I'm on the channel
+17:43 < sandfox> Fike_: I'm not trying to troll, (and I actually don't know if you can but I bit of me suspects you can't) but this is in the category of 2 mins to hack up a POC
+17:43 < sandfox> Fike_: which I might do now anyway as I'm bored, Be the change you want to see :-p
+17:44 < Fike_> sandfox: no worries, I was just looking to see if anyone knew off the bat, but as I said I'm trying it out anyway :)
+17:44 < sandfox> Fike_: nope you can't do more than one event… 
+17:47 < Fike_> mm sandfox it wouldn't be too hard to write my own event emitter
+17:47 < Fike_> would it
+17:47 < Fike_> ?^
+17:48 < sandfox> Fike_: not massively, it might be worth looking at https://github.com/hij1nx/EventEmitter2 
+17:48 < Fike_> hmm
+17:48 < sandfox> Fike_: but then do you really need to, or can you get away with writing a wrapper around the existing one? 
+17:48 < Fike_> yeah, I could do that
+17:49 < sandfox> Fike_: also think about emitting multiple events, what about order of event firing etc..
+17:49 < Fike_> the events would fire in the order they're listed in the array
+17:49 < Fike_> but one after another
+17:50 < sandfox> Fike_: Are you just after syntactic sugar?
+17:50 < Fike_> mhm
+17:50  * Fike_ likes purty syntax
+17:51 < Fike_> it's fine though, isn't really a problem
+17:52 < sandfox> Fike_: it's just I can see a lot potential problems with it ( well only if your usage got really hardcore)
+17:56 < Fike_> hmm
+17:56 < Fike_> well, as soon as I'm finished this project I'm writing an IRCd
+17:56 < Fike_> in node.js
+17:56 < Fike_> :P
+17:58 < CoverSlide> there already is one
+18:02 < Fike_> CoverSlide
+18:02 < Fike_> I am aware.
+18:02 < Fike_> There's also an IRC library too.
+18:02 < Fike_> But I'm still writing one.
+18:02 < Fike_> hm, second.
+18:03 < CoverSlide> yeah i've tried it all of once, though
+18:03 < CoverSlide> and i don't know how well maintained
+18:03 < Fike_> !new
+18:03 < nodejs> undefined: You don't currently have a sandbox. Use !exec to execute code first!
+18:03 < Fike_> err, oops.
+18:03 < Fike_> sec
+18:04 < CoverSlide> !exec require('fs');var dirs = fs.readdirSync('/');console.log(dirs);
+18:04 < Fike_> lol
+18:04 < Fike_> that won't work
+18:04 < Fike_> but uh, I broke my parser.
+18:06 < Fike_> !new
+18:06 < nodejs> Fike_: You don't currently have a sandbox. Use !exec to execute code first!
+18:06 < Fike_> !exec 2 + 2
+18:06 < nodejs> Fike_: 4
+18:07 < CoverSlide> !exec require
+18:07 < nodejs> CoverSlide: 'ReferenceError: require is not defined'
+18:07 < Fike_> !exec var hello = function(arg) { return arg; }; hello("CoverSlide");
+18:07 < nodejs> Fike_: 'CoverSlide'
+18:07 < Fike_> !exec this
+18:07 < nodejs> Fike_: { console: {} }
+18:07 < Fike_> !exec this.console
+18:07 < nodejs> Fike_: {}
+18:08 < CoverSlide> !exec function b(n){return b(n+1)};b(0)
+18:08 < nodejs> CoverSlide: 'RangeError: Maximum call stack size exceeded'
+18:08 < Fike_> !exec while(True);
+18:08 < nodejs> Fike_: 'ReferenceError: True is not defined'
+18:08 < Fike_> err
+18:08 < Fike_> oops.
+18:08 < Fike_> !exec while(true);
+18:08 < nodejs> Fike_: TimeoutError
+18:08 < Fike_> :>
+18:08 < CoverSlide> !exec function b(n){try{return b(n+1)}catch(e){}};b(0)
+18:08 < nodejs> CoverSlide: null
+18:08 < CoverSlide> !exec function b(n){try{return b(n+1)}catch(e){console.log(e.stack)}};b(0)
+18:08 < nodejs> CoverSlide: null
+18:09 < CoverSlide> !exec new Error().stack
+18:09 < nodejs> CoverSlide: 'Error\n    at eval (eval at <anonymous> (eval at UserScript (evalmachine.<anonymous>:6:12)))\n    at eval (eval at UserScript (evalmachine.<anonymous>:6:12))\n    at run (evalmachine.<anonymous>:22:33)\n    at Socket.run (/Users/fionnkelleher/Documents/Projects/nodeirc/node_modules/sandbox/lib/shovel.js:60:5)\n    at Socket.EventEmitter.emit (events.js:85:17)\n    at Pipe.onread (net.js:416:51)'
+18:09 < Fike_> lol
+18:09 < CoverSlide> sweet
+18:10 < Fike_> Pilate: sup?
+18:10 < Pilate> !exec console.log("test\r\ntest")
+18:10 < nodejs> Pilate: null
+18:10 < Fike_> !exec this
+18:10 < nodejs> Fike_: { console: {} }
+18:10 < Pilate> !exec 1+"\x0d\x0atest"
+18:10 < nodejs> Pilate: '1\r\ntest'
+18:11 < Fike_> !new
+18:11 < nodejs> Fike_: New sandbox created.
+18:11 < Fike_> sec, need to implement a few things.
+18:12 < mscdex> oh teh noez! moar bots!
+18:13 < Fike_> hm
+18:13 < Fike_> !say hi
+18:13 < nodejs> hi
+18:13 -!- nodejs was kicked from #Node.js by konobi [nodejs]
+18:13 < Fike_> !say hidddksmlsknslkns
+18:13 <@mbalho> oh god someone is hacking the irc chat room again!
+18:13 < Fike_> lol
+18:13  * Fike_ hax mbalho 
+18:14 <@mbalho> someone get an op!
+18:14 < Fike_> wheres ryan dahl when you need him?
+18:14 < mscdex> he's MIA
+18:15 <@mbalho> nah he just doesnt work here anymore
+18:15 <@mbalho> but still lurks
+18:15 < mscdex> he's MIA after the Great Non-blocking War
+18:16 < superjoe> mscdex, what are you referring to?
+18:16 < superjoe> is there some big node.js debate over a specific issue?
+18:16 < brainproxy> I need to get "text on a curved path" working in IE 8, with results similar to how this renders in Chrome,FF,Safari: http://bl.ocks.org/2565344
+18:16 < mscdex> superjoe: fictitious, but it sounded exciting
+18:17 < brainproxy> any thoughts, been hunting around now for awhile, experimented already with r2d3 and d34raphael to no avail
+18:17 <@konobi> brainproxy: check modernizr
+18:17 < mscdex> it needs more node :D
+18:17 < ryanrolds_w> I miss ryah's tweets.
+18:18 < brainproxy> dahl left twitter altogether it seems
+18:18 < ryanrolds_w> Yeah, I said it.
+18:18 < ryanrolds_w> Yeah
+18:20 < CoverSlide> after he went on a rant about how all programming languages except 5 are bullshit
+18:20 < CoverSlide> got a lot of flak for that
+18:20 < ryanrolds_w> Ah. 
+18:20 < ryanrolds_w> I remember that, didn't connect that with the twitter exit.
+18:20 < CoverSlide> it happened like the next day
+18:21 <@mbalho> i touched ryan dahls hand once
+18:21 < ryanrolds_w> I only noticed yesterday, hadn't seen a soundcloud link in a while.
+18:21 < ryanrolds_w> Haha
+18:21 < ryanrolds_w> same
+18:21 < ryanrolds_w> We should be bros or something.
+18:21 <@mbalho> word
+18:21 < CoverSlide> where was max eating at the time?
+18:22 < hipsterslapfight> was it ryan saying all programming languages are shit or all religion is shit that led to him leaving twitter though
+18:22 < ryanrolds_w> I imagine him doing both.
+18:23 < hipsterslapfight> i know i unfollowed him for the second, i imagine he probably got a lot of flack over it
+18:24 < CoverSlide> I don't know
+18:26 < Fike_> so wait
+18:26 < Fike_> what happened with ryan?
+18:26 < misterhat> which ryan
+18:26 < Fike_> dahl
+18:26 < misterhat> o the all mighty ryan dahl
+18:29 < CoverSlide> ryan stepped down from node
+18:29 < Fike_> oh
+18:29 < Fike_> o_o
+18:29 < CoverSlide> Not sure if he's the BDFL
+18:29 < ryanrolds_w> He is still the BDFL?
+18:29 < ryanrolds_w> I thought he was.
+18:29 < misterhat> na
+18:29 < misterhat> he stepped down
+18:30 <@konobi> not entirely true
+18:31 < CoverSlide> https://groups.google.com/forum/?fromgroups=#!topic/nodejs/hfajgpvGTLY
+18:31 < gildean> konobi: do tell, i'm interested as well in hearing what happened to him
+18:31 < ryanrolds_w> Must have missed that news. I thought Isaac took over the day to day stuff and Ryan was still the BDFL. Completely understand wanting to work one something else after spending as much time on Node.js as he did.
+18:31 < CoverSlide> I guess isaacs is "gatekeeper"
+18:36 <@isaacs> ryah is still bdfl.  I never agreed to be benevolent, nor to stay on for life.
+18:37 <@isaacs> last i heard, he was living in brooklyn pursuing his dream of being a professional hipster.
+18:37 < Fike_> ^lol
+18:37 <@isaacs> writing goffeescript or something
+18:37 <@isaacs> which is like coffeescript, but compiles to go
+18:37 < garbagecollectio> who
+18:37 < garbagecollectio> \
+18:38 < exit2> Anyone here familiar with passport-twitter?
+18:38 < misterhat> didn't think he'd be into go
+18:38 < exit2> damn I want to move to Brooklyn and be a professional hipster
+18:38 < CoverSlide> it was on his list of "not bullshit languages"
+18:38 < gildean> haha, sounds like he totally achieved hipsterims at least when it comes to programming
+18:39 < CoverSlide> I think they were "JavaScript, C, C++, Rust, and Go"
+18:39 < exit2> in that order?
+18:39 < misterhat> well at least he listed javascript
+18:39 <@konobi> isaacs: btw, a node.js based app won the global startup battle thing
+18:39 < CoverSlide> plus he got some Rob Pike love on his last rant on G+
+18:39 < CoverSlide> if you remember that
+18:39 <@isaacs> konobi: global startup value thing?
+18:40 <@isaacs> konobi: er, battle?
+18:40 < gildean> global startup battle
+18:40 < gildean> or something like that
+18:40 <@konobi> http://globalstartupbattle.org/
+18:40 < Fike_> isaacs: you're nick is very familiar for some reason
+18:40 < Fike_> are you on any other networks?
+18:40 < exit2> that website is bad
+18:40 < gildean> http://venturebeat.com/2012/12/05/grounotes/
+18:40 <@isaacs> Fike_: i'm on all the networks.  sometimes i'm izs, or isaacs_ or isaacschlueter
+18:41 < Fike_> all?
+18:41 < Fike_> :o
+18:41 < CoverSlide> is this like famous rap battles in history?
+18:41 < Fike_> do you like, rape search IRC for new networks?
+18:41 < CoverSlide> err "Epic Rap Battles of History"
+18:41 < misterhat> isaacs: what web browser do you use
+18:42 < Fike_> ryan dahl uses lynx
+18:42 < misterhat> well yes obviously
+18:42 < misterhat> css is overrated 
+18:42 < gildean> isn't lynx too mainstream?
+18:42 < Fike_> o m g
+18:42 < Fike_> yeah
+18:42 < Fike_> he uses telnet
+18:42 <@isaacs> Fike_: ... rape search?
+18:42 < CoverSlide> Ryan Dahl does WebSockets and CSS4 animations in lynx.
+18:42 < Fike_> and read the source
+18:42 < gildean> it's like, preinstalled on rhel and all
+18:42 < Fike_> isaacs: rape searchIRC
+18:42 < CoverSlide> Ryan Dahl also counted to infinity. Twice.
+18:42 < Fike_> http://searchirc.com
+18:43 <@isaacs> Fike_: oh, irc networks.
+18:43 <@isaacs> Fike_: no, if i were to have sex with any search engines, it's always strictly consensual.
+18:43 <@konobi> i can vouch for that
+18:43 < misterhat> isaacs: w1?
+18:43 <@isaacs> misterhat: i use chrome
+18:43 < Fike_> isaacs: heh. pretty sure you aren't on mine though
+18:43 < misterhat> o
+18:44 < mscdex> using links to download nvidia drivers proves to be impossible
+18:44 <@isaacs> Fike_: yeah, irc networks other than freenode are silly.
+18:44 < misterhat> i use rizon and freenode
+18:44 < Fike_> for OSS projects, perhaps
+18:44 < Fike_> misterhat: same
+18:44 <@isaacs> irc is for arguing about programming
+18:44  * mscdex shakes a fist at sites that require JavaScript
+18:44 < Fike_> but
+18:44 < Fike_> I am in 54 channels while connected to 12 networks. I have 1 o:lines, 13 ops, 2 halfops, and 6 voices with power over 181 individual users.
+18:44 <@konobi> oftc isn't too much of a stretch
+18:44 < gildean> when i started ircing there was no freenode, iirc
+18:44 < exit2> Fike_: congrats :)
+18:44 < misterhat> :P
+18:44 < CoverSlide> Other than Freenode, IRC is just a place for warez
+18:44 < misterhat> i'm in 5 channels overall
+18:45 < Fike_> there are networks for everything
+18:45 <@isaacs> CoverSlide: in JS, it's not too hard to count to Infinity
+18:45 < misterhat> yeah there are
+18:45 < Fike_> Rizon is like, anime
+18:45 <@isaacs> CoverSlide: except that you start losing precision before you get there.
+18:45 < Fike_> Freenode, OSS
+18:45 < misterhat> no it isn't :P
+18:45 < CoverSlide> anime warez
+18:45 < Fike_> EFNet, zombies
+18:45 < CoverSlide> EFNet is for porn and warez
+18:45 < misterhat> i got to rizon for private server i'm working on
+18:45 < Fike_> misterhat: there's a lot of anime there though
+18:45 < misterhat> yeah there is
+18:45 < misterhat> rizon's trivia bot has like 12k animie questions
+18:45 < gildean> CoverSlide: nah, that was some of the networks way back, like dalnet etc. but ircnet is still one of the main networks, also in the 90's quakenet was cool
+18:46 < misterhat> wow
+18:46 < misterhat> anime*
+18:46 < misterhat> lol
+18:46 < gildean> if you played quakeworld an team fortress
+18:46 < Fike_> ircnet runs one service
+18:46 < Fike_> ALIS
+18:46 < Fike_> :P
+18:46 < misterhat> rizon's got some botting going on it too
+18:46 < misterhat> for other games
+18:46 < exit2> CoverSlide: 1.7976931348623157E+10308
+18:46 < Fike_> *cough*Jason
+18:47 < Daegalus> Rizon is pretty Anime heavy, I used to be part of some fansub groups doing encoding. All anime fansubbing goes on in Rizon. And if you go to #news on rizon. Its anime spam extravaganza from all the XDCC bots
+18:47 < misterhat> i think 4chan's channel is on rizon
+18:47 < tnorris> mother of... somehow I forced node to always run with the `--harmony` option, and I can't figure out how.
+18:47 < Fike_> misterhat: correct :)
+18:47 < misterhat> yupp
+18:47 < gildean> before rizon, most of the anime-related channels were on either dalnet or efnet
+18:47 < Daegalus> its probably because of /v/ and /a/ or whatver
+18:48 < Daegalus> i know most Manga channels are on irchighway, but my scanlation group is on rizon
+18:49 < exit2> are there any other properties you get from passport-twitter aside from id and username?
+18:51 < hipsterslapfight> speaking of anime channels does aniverse even exist anymore
+19:04 < Blkt> good evening everyone
+19:04 < mscdex> good afternoon
+19:05 < Blkt> :)
+19:08 < ashnur> what is the best/simplest/most straightforward way to make http requests from node? is there a lib which i should use, or some pattern i should apply?
+19:08 < mscdex> ashnur: depends on your needs
+19:11 < ashnur> mscdex: i receive a POST request from a wordpress and i will have to get some data after that from there. which then i want to save in filess. it's not something which is gonna happen to often, or more than once at a time
+19:11 < exit2> are there any other properties you get from passport-twitter aside from id and username?
+19:11 < granjef3> is anyone else having problems with google dns and accessing nodejs.org? 
+19:11 < chance> ashnur: that's like the worst description of what you're trying to accomplish, ever
+19:11 < chance> not trying to be an ass
+19:11 < chance> but that was pretty obscure
+19:12 < garbagecollectio> was my above comments correct
+19:12 < garbagecollectio> what else should i learn in node besides module.exports
+19:12 < garbagecollectio> event loops theory
+19:12 < garbagecollectio> emitting events
+19:12 < cellvia> anyone streamed results from redis as a node stream before
+19:12 < cellvia> i know mongodb can serve streams
+19:12 < cellvia> of results
+19:13 < cellvia> i would like to stream results of say ...   .keys  from redis  instead of buffer itall and then doing foreach
+19:15 < cellvia> oh think i found it    https://github.com/tblobaum/redis-stream
+19:15 < ashnur> chance: well. english is not my first language, and i have never done anything like this before 
+19:15 < ashnur> chance: so yeah. dunno what i should tell you in order that you could give me some directions on this
+19:16 < chance> ashnur: understood, I wasn't trying to be rude (sorry if I was). You need to give more information as to what exactly you're trying to do though
+19:16 < mscdex> ashnur: you can probably get by with the built-in http module for that it sounds like
+19:19 < ashnur> chance: there is an api plugin for WP which i want to use to export some data. this plugin responds to requests with json, so it's kinda nice. another wp plugin makes a POST request to a specified url (this would be my nodejs script, listening to it), and when this happens I need to make further request through the aforementioned api to get all the data needed. after i got everything, i have to save this out
+19:19 < ashnur> in a markdown file, and trigger further events in my script
+19:19 < ashnur> mscdex: yeah, it might be enough, i just wanted to ask first, to be sure
+19:21 < chance> ashnur: the service that you are making a request to responds to REST?
+19:23 < chance> theres the base package: http://nodejs.org/docs/latest/api/http.html#http_http_request_options_callback
+19:23 < chance> and i've used this before but can't remember if it was that much less of a hassle than the core: https://github.com/mikeal/request
+19:24 < ashnur> chance: no, not really, if I get it right
+19:24 < ashnur> i am not good with buzzwords like REST
+19:26 < chance> ashnur: it's just a type of web service that uses http requests as a means of operating against it
+19:26 < ashnur> but i might found other plugins which do the same, and are RESTful
+19:26 < chance> ashnur: where the verbs and the url pattern matter
+19:27 < chance> ashnur: i wouldn't bother, if you just need to make an http request to it than go with either approach above
+19:27 < ashnur> well. okay.
+19:28 < chance> the request project may make it a bit easier to deal with but learning node's core packages  has advantages as well
+19:28 < chance> anyone else use colloquy (osx irc app)?
+19:28 < bingomanatee> I do it is kind of tedious though
+19:29 < ashnur> i will try with the builtin http stuff, then if it's not enoght or i am having trouble with it, try something else 
+19:29 < ashnur> thanks for the help
+19:29 < bingomanatee> The kind of brains surgery it requires to hide enter/leave is amazing.
+19:31 < tnorris> can anyone help me understand how there are refs referenced in old issues, but they don't exist in my clone?
+19:31 < chance> ashnur: np man, let me know if you have any other questions :)
+19:36 < chance> wtf would colloquy break keyboard shortcut standards and not give a means to change them.. grr
+19:37 < mscdex> tnorris: they were victims of a bit bucket
+19:38 < tnorris> mscdex: ah, ok. yeah, like there are commits that show up under `joyent/node/` but only exist in someone else's repo.
+19:39 < mscdex> that can happen
+19:39 < mscdex> iirc
+19:39 < tnorris> bugger. makes it difficult when I want to test a commit on my box and I have to go track down where it actually exists.
+19:45 < tnorris> isaacs: i'm confused by your request on issue #0623
+19:53 < sosnon> is there a quirk with the replacer for JSON.stringify in node suddenly? it has worked in the past, now i keep getting a circular structure warning, though using a replacer
+19:54 < sosnon> JSON.stringify(this, "foo", 2); doesn't seem to work, for instance
+19:55 < sosnon> oh, it needs a function as replacer
+19:56 < sosnon> one more proof: reading the docs is helpful
+19:58 < TehShrike1> How do y'all usually parse POST info out of requests?  Do you just concatenate together the data events and parse apart the result, or do you have a favorite module that you use?
+19:58 <@mbalho> TehShrike1: really good question, depends on what the data is
+19:58 <@mbalho> TehShrike1: if you are uploading CSV you would want to use a streaming CSV parser like http://npmjs.org/csv
+19:59 <@mbalho> TehShrike1: if you concat them all and wait till the upload finishes then you run the risk of eating up your RAM
+19:59 < TehShrike1> mbalho: I'm looking at regular POST data from a form, in this case
+19:59 <@mbalho> TehShrike1: ahh so if its gonna be a small amount of data something like npmjs.org/concat-stream would do it
+19:59 <@mbalho> TehShrike1: just be careful to not buffer too much data in memory, one of the core ideas of node is that you process data as it arrives and you shouldnt always wait till its done
+20:00 < warz> or what about a module like formidable? https://github.com/felixge/node-formidable
+20:00 <@mbalho> warz: that is useful for multipart uploads since those are hard to parse
+20:01 < TehShrike|Work> mbalho: huh, concat-stream looks about perfect for this case, thanks
+20:01 <@mbalho> word. i wrote it #shamelessplug
+20:01 < TehShrike|Work> <3
+20:01 < TehShrike|Work> You don't go by maxogden on IRC? :-o
+20:01 < TehShrike|Work> Also, I'm a big fan of your beard
+20:02 <@mbalho> nope i used to but this way people arent biased when reading my opinions
+20:02 < warz> max bad ass linux haxor ogden?
+20:02 < CoverSlide> me too. just the beard. not you
+20:02 <@mbalho> warz: close
+20:02 < felixge_> mbalho: hi :)
+20:03 < TehShrike|Work> I beard too, though not quite as thoroughly as you
+20:03 < felixge_> mbalho: how is your arm for the drone coming along?
+20:03 <@mbalho> felixge_: yo yo awesome work with the firmware
+20:04 < CoverSlide> Forest Wizard is the tree master!
+20:04 <@mbalho> felixge_: i dont have a drone so i havent had time to test that disabling ttyO3 serial output hack yet
+20:04 <@mbalho> CoverSlide: heheh
+20:04 <@mbalho> github.com/forestwizard/isthe/tree/master
+20:04 <@mbalho> finally someone who understands my humor
+20:04 < felixge_> haha
+20:05 < felixge_> mbalho: made some good progress reading data from the navboard today as well
+20:05 < felixge_> unfortunately now shit is getting a lot harder, kalman filter, pid controllers, etc.
+20:05 <@mbalho> hah
+20:06 < felixge_> will probably take another week or two before I see a somewhat stable flight
+20:06 <@mbalho> there were some kids from stanford saying they had implemented kalman filters for the ar drone or something
+20:06 < felixge_> yeah, there are implementations for node.js and golang as well
+20:07 < felixge_> but I still need to go through it and understand it
+20:07 < felixge_> otherwise its a bit too much cargo culting :)
+20:07 <@mbalho> is cargo culting the opposite of NIH now haha
+20:08 < felixge_> :P
+20:09 < felixge_> well, the only reason I do this is because it's so much fun
+20:10 < felixge_> but yeah, a bit of NIH as well
+20:10 < felixge_> :D
+20:31 < iksik2> hello
+20:31 < iksik2> is it possible to find fragments of code that would never be executed?
+20:32 < xer0x> iksik2 Google's Closure compile might be able to do that for you
+20:32 <@mbalho> iksik2: there are "code coverage" or "test coverage" tools that do that
+20:35 < iksik2> xer0x: i have found some files (from express for example) that closure compiler didn't want to 'compile'
+20:36 < iksik2> throwing some 'errors' for example in response.js file 
+20:36 < iksik2> JSC_PARSE_ERROR: Parse error. missing name after . operator at line 18 character 17
+20:36 < iksik2> , send = connect.static.send
+20:36 < iksik2> :(
+20:37 < iksik2> mbalho: any examples of these tools? (code which i want to check does not use any kind of tests)
+20:37 < xer0x> iksik2: oh, bummer
+20:48 < f3d3> How do I set the PATH inside a Makefile to use a the bins inside the ./node_modules ?
+20:51 < TehShrike|Work> f3d3: you probably want to install those modules with the -g option
+20:51 < TooTallNate> f3d3: export PATH="./node_modules/.bin:$PATH"
+20:52 < f3d3> yes I tried that
+20:52 < f3d3> but doen't work
+20:52 < f3d3> I made a question here http://stackoverflow.com/questions/13731977/setting-path-on-makefile-node-js
+20:52 < TooTallNate> f3d3: do it outside the rule
+20:53 < TooTallNate> you're also missing "export"
+20:53 < f3d3> the problem is inside the makefile is not workking
+20:53 < f3d3> yes I added it after
+20:53 < bbcyb> newb here. where is a good place to store db connection information? have a base install of express and node-mysql package. Should i just require a db file in each route function and open/close per query?
+20:55 < _ritch> Anyone familiar with `domain.js:66 throw err` losing stack traces?
+20:55 < TooTallNate> f3d3: http://stackoverflow.com/a/13732215/376773
+20:55 < f3d3> TooTallNate: How can I do it outside the rule?
+20:58 < TehShrike|Work> f3d3: why don't you just install those modules globally?
+20:59 < f3d3> the thing is I'm developing an app for a guy, and I think would be better to have all the modules there
+20:59 < TehShrike|Work> where?
+21:02 < matbee> omg
+21:02 < matbee> Numb3rs tries to explain IRC... http://www.mechanicalgirl.com/post/luckily-i-speek-leet/
+21:02 < f3d3> TehShrike|Work: in the same folder as the app
+21:03 < TehShrike|Work> f3d3: why, if you want to access it from the path?
+21:03 < matbee> rofl watch that video
+21:03 < matbee> its so realistic
+21:03 < f3d3> I just wanted to add that relative path inside the Makefile
+21:05 < TehShrike|Work> matbee: is that the "ships in the night" video?
+21:06 < matbee> TehShrike, yeah
+21:07 < TehShrike|Work> Yup, pretty cringe-tastic
+21:07 < matbee> I didn't realize I was so transparent
+21:07 < matbee> criminals use irc...
+21:07 < matbee> wait..
+21:09 < matbee> that part's true, but, l33t!
+21:09 < matbee> also you could see what they were typing in real-time
+21:09 < matbee> pretty sure that's ICQ
+21:13 < Swadq> matbee: Looks like it's just a movie client
+21:13 < Swadq> Like, all the messages come in like that
+21:13 < Swadq> So they're just doing it for effect
+21:13 < Swadq> Seeing as though the rest of the protocol looks ok
+21:16 < drudge> +00 (00|_ 9u'/5
+21:21 < tnorris> here's a fun one, start a repl server within a repl server.
+21:21 < wink_> anyone familiar with node-clone?  im using it to clone a Buffer, and everything looks ok, but the clone is broken somehow.  the data is identical, but something is broken.  Somehow the buffer is almost a buffer, but something fundamental is missing: http://pastebin.com/Bq7BB306
+21:24 < tnorris> wink_: um, why don't you just `new Buffer(<buffer_to_clone>)`
+21:24 < CoverSlide> for a buffer, you need to run the constructor to allocate the memory
+21:25 < acidjazz> does a helper function exist in jade to do stuff like for i in 1-20 or for i in range(1, 20) ?
+21:27 < tellnes> acidjazz: - for (var i = 1; i <= 20; i++)
+21:27 < wink_> tnorris: i'd love to, but this isnt my library
+21:28 < CoverSlide> well the library is broken then
+21:29 < wink_> tnorris: i'd love to, but this isnt my library
+21:30 < wink_> this is happening in restify
+21:30 < tnorris> wink_: sorry, don't understand the limitations
+21:30 < CoverSlide> wink_: why do you need to clone options?
+21:31 < wink_> ok, so there is a node module called restify that internally instantiates the https server
+21:31 < wink_> i pass my server options into restify
+21:31 < CoverSlide> mhm
+21:31 < wink_> and it is cloning the object
+21:31 < wink_> im not sure why
+21:32 < wink_> but it breaks, and im trying to understand why its breaking
+21:32 < CoverSlide> odd
+21:32 < wink_> https://github.com/mcavage/node-restify/blob/master/lib/index.js#L52
+21:32 < wink_> if i take that clone out, everything works
+21:32 < TehShrike|Work> wink_: well, if a Buffer creates any variables in its constructor, only the functions that are created in that same scope will be able to access them
+21:32 < wink_> if i modify node-clone to properly copy a buffer, everything works
+21:33 < wink_> TehShrike: yeah, i figure there is some internal state in the buffer object that isn't making it across the naive copy
+21:33 < wink_> heres the clone process:
+21:33 < wink_> https://github.com/pvorb/node-clone/blob/master/clone.js#L45
+21:34 < rump> any opinions on most readable/maintainable way to do simple series?  https://gist.github.com/4219692
+21:34 < wink_> it's cloning everything well enough that all of the Buffer prototype methods work
+21:34 < wink_> but there must be something else missing
+21:35 < wink_> so im with you guys, i dont know why the clone is taking place to start with, but im not sure why its breaking either
+21:35 < rump> leaning toward last one, object literal
+21:35 < niggler> has anyone put together a lazy buffer wrapper that can take multiple buffers and present an interface as if its a single buffer (without actually copying)
+21:35 < wink_> niggler: yes, i jsut saw one somewhere
+21:40 < acidjazz> is it possible to concatenate a varible onto an ID in jade?
+21:41 < acidjazz> like git #bob_1.suzy .. i want to #bob_#{i}.suzy
+21:45 < gildean> acidjazz: yes, just do div(id="bob_#{id}")
+21:46 < gildean> or what ever the element might be
+21:52 < matbee> konobi, we made techcrunch! http://techcrunch.com/2012/12/05/startup-weekend-winner-groupnotes-finds-plenty-of-early-appetite-for-its-collaborative-education-product/
+21:53 < mindcruzer> isn't groupnotes from hamilton?
+21:54 < mindcruzer> it appears it is
+21:54 < mindcruzer> that's weird... i was at demo camp a few weeks ago and that was the first time i heard of it
+21:54 < mindcruzer> and here we are
+21:58 < matbee> mindcruzer, no it's from toronto
+21:58 < matbee> mindcruzer, a couple people in my group are from hamilton, they keep bringing that shit up, haha
+21:58 < bwinton> Mmm, toronto…
+21:59 < mindcruzer> ok well at democamp at Mac a few weeks ago they didn't say anything about toronto lol
+22:00 < mindcruzer> congrats on getting techcrunched
+22:01 < acidjazz> gildean: thanks
+22:02 < acidjazz> btw i contributed to jade
+22:02 < acidjazz> https://github.com/visionmedia/jade/issues/651
+22:02 < matbee> mindcruzer, yeah we won SW Toronto. SW Hamilton is a joke, haha.
+22:03 < mindcruzer> matbee: Hamilton in general is sort of a joke
+22:03 < matbee> so our node servers are getting a little more traffic than normal, which is awesome
+22:04 < matbee> we nuke the notes on our site every 10 minutes just to be sure
+22:06 -!- mode/#node.js [+o piscisaureus_] by ChanServ
+22:10 < sugendran> hey guys, anyone know how to get a dump of all JS objects in the current app?
+22:10 < sugendran> trying to track down a leak
+22:11 < TehShrike|Work> sugendran: iterate over properties of the window object?
+22:12 < TehShrike|Work> Oh wait, you're not in the browser, duh >_<
+22:12 < TehShrike|Work> And yeah, I saw a module for doing that in node not too long ago I'm pretty sure...
+22:12 < sosnon> if i use 'npm explore' to navigate to the source of a package, then change a file manually, will this run the new code? is this (somewhat) reliable?
+22:12 < sugendran> there are things like node-inspector but that just gives me console access.. couldn't work out how to dump the current state
+22:13 < TehShrike|Work> There's https://github.com/kesla/node-leaky
+22:13 < tellnes> TehShrike|Work: global ~= window
+22:14 < TehShrike|Work> sugendran: I would also recommend "use strict"
+22:16 < fearphage> do you use n or nvm? or there other recommendations for node version management?
+22:16 < CoverSlide> nave, give
+22:17 < CoverSlide> i prefer both over n or nvm
+22:17 < fearphage> is it better for some reason?
+22:17 < fearphage> never heard of give
+22:17 < chilts> fearphage: n, nvm and nave - I use nvm and love it
+22:17 < CoverSlide> give if you want to keep up to date with master or a branch
+22:17 < CoverSlide> nave I like the subshell route
+22:18 < CoverSlide> but give you have to compile node, nave uses binaries
+22:19 < niggler> wink_ you find it?
+22:20 < fearphage> thanks
+22:23 < thealphanerd> if anyone is in the bay area I am showing an installation tonight at Stanford
+22:23 < thealphanerd> https://ccrma.stanford.edu/events/physical-interaction-design-presentations
+22:26 <@mbalho> thealphanerd: whoa sweet, is your thing powered by node?
+22:26 < thealphanerd> not this time
+22:27 < thealphanerd> http://vimeo.com/54842728
+22:29 < CoverSlide> then gtfo
+22:33 <@mbalho> CoverSlide: hey no trolling
+22:35 < niggler> technically speaking if it's not node then its OT
+22:35  * niggler niggles
+22:38 < thealphanerd> CoverSlide: can I stay if I show my tits?
+22:38 < CoverSlide> sounds good to me!
+22:38 < thealphanerd> I warn you… they are juicy kneck-beard titties
+22:38 < misterhat> hi niggler
+22:38 < misterhat> no mistertwig isn't here
+22:38 < CoverSlide> the best kind!
+22:38 < niggler> im expecting "/me tips self to niggler"
+22:40  * niggler tips misterhat to niggler
+22:40  * misterhat tips niggler to self
+22:40 < niggler> ooh the hat tipping the person!
+22:40 < misterhat> yes
+22:41 < CoverSlide> in soviet russia ...
+22:42 < othiym23> does anyone know why http requests get a "finish" event instead of a "close" event when the connection is done?
+22:43 < gildean> othiym23: you mean the "end" event
+22:43 < gildean> did you check the docs
+22:43 < Azra-el> hello.. anybody using mongoose here by any chance? :)
+22:43 < jtm> How can I handle a situation where a variable becomes undefined suddenly and causes my nodejs app to crash?
+22:44 < CoverSlide> othiym23: what about keep-alive connections?
+22:44 < CoverSlide> othiym23: you want to know when the request ends, not when the socket is closed
+22:45 < jtm> I am using socket.io and if I disconnect the client, I notice sometimes it sends an emit while being disconnected, so client.handshake.address.address become undefined. In fact client.handshake.address even becomes undefined.
+22:45 < jtm> And this causes a crash
+22:46 < CoverSlide> in your code or in socket.io?
+22:46 < othiym23> gildean: yes, sorry, 'end' instead of 'close'
+22:46 < CoverSlide> because that would appear to be a bug
+22:46 < othiym23> CoverSlide: I figured it had something to do with keep-alive
+22:46 < othiym23> next question, why isn't 'finish' a documented event?
+22:47 < othiym23> I need to use that event to time how long a request takes to process, and using undocumented events makes me nervous
+22:47 < bingomanatee> thealphanerd -  might make it
+22:47 < thealphanerd> bingomanatee: cool!
+22:47 < thealphanerd> my irl name is Myles
+22:47 < thealphanerd> my installation is the black box
+22:48 < kenperkins> anyone here that knows the globalAgent very well?
+22:48 < kenperkins> trying to understand some peculiarities of the connectionpool
+22:49 < CoverSlide> kenperkins: what's the question?
+22:51 < kenperkins> CoverSlide: I'm trying to understand the docs that state, "If no pending HTTP requests are waiting on a socket to become free the socket is closed."
+22:52 < Keisial> hello 
+22:52 < Keisial> is there a way to make npm not to change its uid to 'nobody'?
+22:52 < kenperkins> That seems like, if you don't have work that is already enqueued when the last call finishes, the connection is disposed immediatley
+22:52 < kenperkins> wouldn't you want some delay so you can amortize the cost of creating connections?
+22:52 < Keisial> I'm having problems with the package files owned by nobody:root
+22:53 < Keisial> (and no, I'm not building as root, it's a fakeroot)
+22:53 < kenperkins> for example, if I do a series of calls in quick succession http->tcp->http->tcp and so on, it creates n new HTTP connections, because the next connection wasn't already enqueued when the last one finished
+22:53 < kenperkins> seems very contrary to my undersatnding of a connection pool
+22:53 < kenperkins> (and the benefit of http keep-alive)
+22:55 < kenperkins> othiym23: it seems my dialog has closely aligned with yours, unintentionally
+22:56 < CoverSlide> hmm
+22:56 < CoverSlide> perhaps
+22:56 < kenperkins> let me show you two examples CoverSlide 
+22:57 < CoverSlide> well perhaps it's so you don't keep the event loop open after you're done requesting
+22:57 < CoverSlide> maybe the solution would be to have a flag to keep those connections open
+22:57  * CoverSlide shrugs
+22:58 < kenperkins> i've just been super confused why limited concurrency scripts would result in thousands of http connections in TIME_WAIT
+22:59 < kenperkins> and it's because bewteen connections node is doing lots of work, thus resulting in truly less than concurrent connections
+22:59 < kenperkins> which as I'm sure you know, lots of time_wait connections can run into file descriptor problems
+22:59 < CoverSlide> kenperkins: maybe try this: http://nodejs.org/api/http.html#http_request_setsocketkeepalive_enable_initialdelay
+22:59 < Keisial> because TCP leaves the connections in TIME_WAIT after closing
+22:59 < kenperkins> not to mention the HTTP overhead
+22:59 < kenperkins> CoverSlide: looking
+23:00 < Keisial> since it can't know if the other end received the "it's closed" message
+23:00 < CoverSlide> i duno
+23:00 < Keisial> all tcp programs do that
+23:00 < Keisial> (or rather, the underlying tcp stack)
+23:00 < Keisial> the problem is that there are many connections created
+23:00 < Keisial> so you see them lingering
+23:00 < kenperkins> Keisial: but what node does, is immediately close the HTTP connection when there are no enqueued connections, even when using keep-alive
+23:01 < Keisial> kenperkins, but after closing the connection, the socket has to be in TIME_WAIT for a while
+23:01 < othiym23> kenperkins: I've been watching your bug on Node with interest, because it does intersect with some stuff I've been dealing with lately
+23:01 < kenperkins> the point is the connection shouldn't be closed in a connection pool, should it?
+23:01 < kenperkins> othiym23: I'm still trying to refine it
+23:01 < Keisial> I'm just explaining the tcp concept, if you asked node to keep the connection open, it should have done so
+23:02 < kenperkins> node's default agent behavior does include HTTP conneciton: keep-alive
+23:02 < kenperkins> I'm not questioning how TCP works, rather, does node's default agent over aggressively close conncetions
+23:04 < kenperkins> I've got the perfect repro I think
+23:08 < kenperkins> CoverSlide, othiym23: https://gist.github.com/4220343
+23:13 < wolfeidau> Does anyone know of a node library which can convert ANSI escape sequences into HTML color output?
+23:15 <@isaacs> tnorris: oh, that
+23:15 <@isaacs> tnorris: i think the idea was to move lib/buffer.js to lib/_buffer.js
+23:15 < tnorris> isaacs: ah, sort of what you're doing with the new streams2 files?
+23:16 < tnorris> (e.g. lib/_stream_duplex.js)
+23:18 < skiddy> omg rails must be dying or something. they got so hostile when i went in there to ask about a gem that would aggregate my view templates into javascript
+23:18 < skiddy> like what kind of idiot would do that, right?
+23:18 < skiddy> single page applications? what a stupid idea! ho ho
+23:19 < skiddy> does not bode well
+23:23 < EyePulp> so I'm trying to write some mocha tests using should.js  -- just learning the basics -- but my test is getting ignored
+23:23 < skiddy> EyePulp: need more info
+23:23 < EyePulp> yeah, getting a paste set up =)
+23:24 < EyePulp> skiddy: http://dpaste.com/841842/
+23:25 < EyePulp> I think I'm not understanding how one can use should.js as part of the mocha style
+23:25 < EyePulp> when I run the test, I get no errors, but I also get told "0 tests complete (0 ms)"
+23:28 < stagas> EyePulp: I think you need it() to define a test
+23:30 < EyePulp> stagas: that was it - thanks for the tip!
+23:31 < skiddy> damn beat me to it :)
+23:31 < EyePulp> heh
+23:55 -!- mode/#node.js [+o piscisaureus_] by ChanServ
+--- Log closed Thu Dec 06 00:00:13 2012
