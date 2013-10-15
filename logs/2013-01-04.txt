@@ -1,0 +1,1735 @@
+--- Log opened Fri Jan 04 00:00:15 2013
+--- Day changed Fri Jan 04 2013
+00:00 < othiym23> cellvia: because this is defined on the ReadableStream, it knows when it has data to push to the pipe
+00:00 < othiym23> so it calls write directly, rather than calling read() on itself
+00:00 < othiym23> I know it doesn't look it, but it's simpler than the old implementation
+00:01 < cellvia> i didnt actually ever dig into the old one
+00:01 < cellvia> i was always manually donig process next ticks and creating wrapper through pipes and stuff to deal with the problem
+00:01 < cellvia> so thats taken care of inside readable stream logic now
+00:02 < cellvia> very cool it listens to its own readable event
+00:03 < cellvia> so i dont even ahve to call read() then since i'll be pipe
+00:03 < cellvia> pipe() ing everything
+00:03 < cellvia> and i jus listen for readable
+00:03 < cellvia> instead of data
+00:03 < cellvia> in all of my through pipes
+00:04 < cellvia> i guess transform pipes
+00:06 < cellvia> ill wait til the http stuff worked out to bother replacing, since thats a main thing im using it for
+00:06 < cellvia> but overall this looks cool
+00:07 < cellvia> i can lose some of these annoying stream librarie
+00:07 < cellvia> now
+00:08 < cellvia> transform stream type will be a major improvement for what im doing
+00:10 < scott_switzer> I added my question to stack exchange here in case anyone wants to help :)
+00:10 < scott_switzer> http://stackoverflow.com/questions/14149270/passing-reference-to-db-into-routes-is-not-working-for-my-node-express-project
+00:10 < othiym23> Raynos: nice find
+00:10 < othiym23> I like that both spellings are included
+00:11 < Raynos> othiym23: the gangster?
+00:11 < othiym23> Raynos: y
+00:15 < cellvia> scott_switzer dunno if this is the issue but i'd avoid using the same var names when you are nesting callbacks, ive had confusing errors and oversights from that before
+00:16 < cellvia> db.open(function(err, db) {
+00:17 < tnorris> TooTallNate: for the life of me, I can't figure out how to set `-O3` as default in binding.gyp. any ideas?
+00:18 < cellvia> are you sure db.open even returns itself
+00:18 < scott_switzer> cellvia: thanks - i actually tried changing names - to no avail.  (changed the 'db' outside the function to 'database') - still broken.
+00:18 < cellvia> i would just do db.open(function(err) {
+00:18 < scott_switzer> yes it returns an object
+00:18 < cellvia> oh ok
+00:19 < TooTallNate> tnorris: something like this I think https://github.com/joyent/node/blob/master/common.gypi#L59
+00:19 < scott_switzer> and I checked that when I create the post object, that the DB is defined there.  Upon startup, everything looks perfect.  It is when I try to call one of the routes when the db is not defined
+00:19 < TooTallNate> tnorris: you might need to put it into a "configurations": "Release" block to override node's common.gypi one right there
+00:21 < tnorris> TooTallNate: and I should see it in build/basics.target.mk, right?
+00:21 < cellvia> scott_switzer did you try calling the original db
+00:21 < cellvia> instead of the returned object
+00:21 < cellvia> a la db.open(function(err) {
+00:22 < scott_switzer> just tried it - no luck
+00:22 < cellvia> still undefined?
+00:23 < TooTallNate> tnorris: what OS?
+00:23 < cellvia> scott_switzer the post object is still properly maintained?
+00:23 < scott_switzer> yes - still undefined
+00:23 < cellvia> just the db is missing
+00:24 < tnorris> [rant]gist new tab/space support freaking sucks[/rant]
+00:24 < tnorris> TooTallNate: Here's my file: https://gist.github.com/4448797
+00:24 < tnorris> -Test shows up, but -O3 doesn't
+00:24 < cellvia> scott_switzer inside the constructor, is the db arriving properly?
+00:24 < TooTallNate> tnorris: what OS?
+00:24 < scott_switzer> cellvia:  yes
+00:24 < tnorris> TooTallNate: ubuntu 12.10 x64
+00:25 < TooTallNate> oh ok
+00:25 < TooTallNate> well then that's a little strange, haha
+00:25 < TooTallNate> you could try putting it into a common.gypi file instaead
+00:25 < scott_switzer> cellvia:  constructor:[object Object]
+00:25 < scott_switzer> post:[object Object]
+00:25 < scott_switzer> Express server listening on port 3000
+00:26 < scott_switzer> checking for the object in the constructor, and also after instantiating the post object (post.db)
+00:26 < cellvia> i dunno i'd use util. inherits in all of your methods
+00:26 < cellvia> and analyze the db object
+00:26 < cellvia> eveywhere
+00:27 < cellvia> see where the broken link is
+00:27 < scott_switzer> i will look at this 
+00:27 < scott_switzer> thx
+00:27 < cellvia> yep
+00:27 < tnorris> TooTallNate: I created a common.gypi in place of the binding.gyp and ran `node-gyp clean; node-gyp configure`. it failed. something else I'm supposed to do?
+00:28 < TooTallNate> tnorris: well you also need a binding.gyp file ;)
+00:28 < tnorris> heh, ok
+00:28 < TooTallNate> but the common.gypi file can define some common props
+00:28 < TooTallNate> like that one
+00:28 < TooTallNate> "cflags"
+00:32 < tnorris> TooTallNate: ok, i've updated it to look like so: https://gist.github.com/4448797
+00:32 < tnorris> but now none of the cflags appear.
+00:32 < PeerLesS> #war
+00:32 < TooTallNate> tnorris: what version of node-gyp?
+00:33 < tnorris> TooTallNate: v0.6.3
+00:33 < TooTallNate> tnorris: ok ya, you need to update that for the common.gypi stuff
+00:36 < tnorris> TooTallNate: ok. it was installed w/ my node v0.8.16 build/install. so I should just build/install node-gyp itself?
+00:36 < TooTallNate> tnorris: are you just running `npm install`?
+00:36 < TooTallNate> to invoke node-gyp that is
+00:37 < TooTallNate> tnorris: you can do `npm install -g node-gyp` to get an up-to-date copy in your $PATH
+00:37 < tnorris> TooTallNate: nope. in the module I'm writing I use `node-gyp clear; node-gyp configure; node-gyp build`
+00:37 < tnorris> ah, that's nice.
+00:37 < TooTallNate> tnorris: oh ok, so that's still npm's internal copy of node-gyp
+00:38 < TooTallNate> tnorris: so take a look at https://github.com/TooTallNate/node-gyp/wiki/Updating-npm's-bundled-node-gyp
+00:46 < tnorris> TooTallNate: strange. the command on the wiki gave the following error: "prefer global node-gyp@0.6.3 should be installed with -g"
+00:46 < TooTallNate> error?
+00:46 < tnorris> but `sudo npm install -g node-gyp` worked for me
+00:46 < TooTallNate> that should just be a warning
+00:46 < TooTallNate>  /cc isaacs 
+00:46 < tnorris> oops. sorry. it's a warning.
+00:46 < TooTallNate> oh ok
+00:46 < tnorris> but why did it say @0.6.3?
+00:47 < TooTallNate> hmm ya that's strange
+00:47 < TooTallNate> you did the @latest part?
+00:47 < TooTallNate> isaacs: does @latest respect the package.json-specified version?
+00:47 < tnorris> `sudo npm explore npm -g -- npm install node-gyp@latest`
+00:48 < tnorris> ^ what I ran
+00:48 < TooTallNate> ya, i guess @lastest doesn't do what I was hoping
+00:49 < TooTallNate> tnorris: so instead of @lastest, do @`npm info node-gyp version`
+00:49 < CoverSlide> is @lastest laster than @latest?
+00:50 < mistertwig> hello friends
+00:51 < javagoogles> that node-dev package says to install growlnotify . i have growl 2 installed on my machine, but i can't find the right download to install the lib on http://growl.info/downloads#generaldownloads
+00:52 < CoverSlide> maybe you need
+00:52 < CoverSlide> GrowlNotify 2.0 
+00:52 < CoverSlide> For use with Growl 2.0 
+00:52  * CoverSlide shrugs
+00:52 < CoverSlide> it's perplexing
+00:52 < tnorris> TooTallNate: ugh. not sure what's going on but `npm info node-gyp` -> "ERR! Error: unauthorized Name or password is incorrect.: node-gyp"
+00:52 < javagoogles> CoverSlide: there's no mention of 2.0 here http://growl.info/extras.php#growlnotify
+00:52 < TooTallNate> tnorris: maybe just type @0.8.2 instead
+00:53 < TooTallNate> i'm not sure what username or password has to do with anything
+00:54 < tnorris> TooTallNate: here's the full thing: https://gist.github.com/4448953
+00:54 < tnorris> no matter what I type I get the same usr/pass error.
+00:55 < TooTallNate> tnorris: forget "info", just do the install aprt
+00:55 < TooTallNate> part
+00:55 < tnorris> TooTallNate: it's happening with any package I'm trying to check/install.
+00:55 < tnorris> just tried to install one of my own packages and it happened.
+00:57 < tnorris> TooTallNate: ok. for some reason my .npmrc was jacked up. just reset it and added myself again. working better now.
+00:58 < TooTallNate> haha weird
+00:58 < CoverSlide> javagoogles: here's a suggestion: try one. if it doesn't work, try the other
+00:58 < javagoogles> CoverSlide: sorry i'm on crack it was there the whole time
+00:59 < javagoogles> man that's awesome
+01:00 < christo_m> Does anyone here play LoL and able to get this to connect ? https://github.com/nagash/node-lol-client
+01:01 < xer0x> christo_m: neat a lol client!
+01:02 < xer0x> christo_m: weird that you have to set the Lol client version to match the current build..  that's gonna trip folks up
+01:02 < christo_m> xer0x: ya, the guys at lolking arent giving up their trade secrets for how their getting summoner stats
+01:02 < christo_m> xer0x: i did that already , set to 1.73.12_12_18_17_01
+01:03 < xer0x> christo_m: there's a iPhone client that logs into chat too. I wonder what library they use
+01:03 < christo_m> xer0x: i already have a bot able to chat on the pvp.net networks.. send/recv all that
+01:03 < christo_m> xer0x: its just built with the XMPP protocol, 
+01:04 < xer0x> christo_m: ah
+01:04 < christo_m> but man, that adobe air client.. using rtmp .. had to wireshark for that, and then realized theres some existing work out there
+01:04 < christo_m> but it doesnt look like i can get this one to connect, something abouta missing login token
+01:05 < xer0x> bummer
+01:05 < xer0x> wiresharkin' it sounds like the way to go
+01:05 < tnorris> TooTallNate: sorry, one more question. know why i'm getting the following error: https://gist.github.com/4449051
+01:05 < christo_m> xer0x: https://code.google.com/p/lolrtmpsclient/source/browse/trunk/#trunk%2Fcom%2Fgvaneyck%2Frtmp , i found this java one also but.. it looks like too much to leverage, not sure how id integrate it with my current RoR setup.. unless i bust out jruby but i digress. Just wondering if someone here is well versed enough with node.js to check out that project
+01:06 < christo_m> im just kinda learning on the go here
+01:06 < TooTallNate> tnorris: should be fine ~ ignore it
+01:08 < niggler> TooTallNate any way to expedite a bug fix getting committed to the master?
+01:09 < TooTallNate> niggler: which bug?
+01:09 < TooTallNate>  / patch
+01:09 < tnorris> niggler: if you're talking about updating your npm package, I usually throw on a quick fix number, e.g. "0.1.3-2"
+01:09 < niggler> https://github.com/joyent/node/pull/4513
+01:10 < christo_m> xer0x: ?? you give up on me
+01:10 < christo_m> i guess i gotta do it live
+01:11 < TooTallNate> niggler: have you signed the CLA?
+01:11 < niggler> yeah its that google thing right?
+01:12 < niggler> lol the item that stood out the most was "powered by google docs"
+01:12 < TooTallNate> ya that thing
+01:12 < niggler> one confusion, though, is that i though e-signatures had to be a person typing their name
+01:12 < niggler> and not just "I AGREE"
+01:13 < xer0x> christo_m: yep
+01:13 < christo_m> xer0x: i need more friends that know things
+01:14 < christo_m> well, just more friends. but still, this is more intense than camping
+01:14 < xer0x> ha
+01:15 < xer0x> christo_m: you tried using Curl to login to LoL yet?
+01:15 < christo_m> xer0x: of course not, that would make sens
+01:15 < TooTallNate> niggler: google knows your name
+01:15 < christo_m> sense* XD, one moment
+01:16 < xer0x> christo_m: ./lib/login-queue.coffee is sending what looks like an HTTPS request to /login-queue/rest/...etc
+01:16 < christo_m> xer0x: thats what i was looking at
+01:16 < christo_m> xer0x: that path is relative though, it isnt something LoL-side
+01:16 < niggler> my question TooTallNate focused on what constitued an e-signature
+01:16 < christo_m> actually sorry
+01:16 < christo_m> you're right, 
+01:16 < tnorris> TooTallNate: have to jam, but filed node-gyp#178. Still can't change `-O` cflags for Release even after upgrade.
+01:16 < xer0x> christo_m: it's LoL side ;)
+01:17 < tnorris> funny thing is that they are being added to Debug.
+01:17 < xer0x> christo_m: that's their API
+01:17 < christo_m> xer0x: ya but over port 443, dont think i can use curl
+01:17 < christo_m> lq.na1.lol.riotgames.com/login-queue/rest/queue/authenticate
+01:17 < xer0x> Since it's using HTTPS it is going to hide from wireshark
+01:18 < xer0x> you can totally use curl with HTTPS
+01:20 < christo_m> xer0x: hmm.. i dont see an option in the manual
+01:20 < christo_m> it keeps defaulting to 80
+01:20 < xer0x> curl -vk https://lol.api/whatever
+01:21 < xer0x> christo_m: anyways, that Node client doesn't look finished. It doesn't look like it sends the user/pass to the API
+01:22 < xer0x> christo_m: er.. it does at the .end
+01:24 < christo_m> xer0x: curl didnt show anything interesting there.
+01:24 < MI6> joyent/node: Nirk Niggler master * 0459a23 : REPL: fix floating point number parsing  In JS, the expression ".1" is a  - http://git.io/jLbVQQ
+01:24 < TooTallNate> niggler: ^
+01:25 < christo_m> xer0x: a call is made to connect at the end, which looks like it sets up all the RTMP stuff
+01:25 < niggler> ++ TooTallNate sorry about that -- i use the repl a lot to test stuff, so those minor niggles are irritating
+01:25 < TooTallNate> niggles
+01:25 < TooTallNate> lol
+01:25 < christo_m> i turned the debugging option on and stepped through it
+01:26 < christo_m> RTMP login fails. not very illuminating
+01:26 < jrajav> Is your surname actually niggler?
+01:28 < niggler> an exercise in legal trolling
+01:30 < niggler> gotta love the USA
+01:31 < niggler> it's not my original given name, if that's what you are asking
+01:31 < jcrew> fwiw i laughed when i first read it
+01:32 < niggler> its actually a really strange story
+01:37 < chovy> let's hear it
+01:39 < niggler> not even 15 minutes after the name was created, i was already called out for having a fake name
+01:39 < jcrew> i thought you were typing the epic
+01:40 < niggler> it started as an exploration of the financial industry
+01:40 < niggler> so my main business is proprietary trading
+01:40 < niggler> ( TooTallNate its my business hence there's no concern about employer claim to code )
+01:41 < niggler> and i found myself in a really strange position where I had a position in a stock
+01:41 < niggler> and there was a buyout offer the next day, so that position doubled
+01:42 < niggler> now the only reason i was there was because i have a process which calculates which stocks are best for market making (cronjob runs at 4 am)
+01:42 < niggler> so this having happened, i was interested in what was going on with the company etc.  and at the time, 90% of the articles on google finance and google news came from a website called seeking alpha
+01:42 < jcrew> this sounds like something i did when i was in the marine corps
+01:43 < niggler> a startup that's trying to get into the financial news industry
+01:43 < niggler> anyway, so i started this to figure out what's going on
+01:43 < niggler> i wrote something and had them do their magic
+01:43 < niggler> then it showed up on google finance!
+01:44 < niggler> but it gets worse
+01:44 < niggler> im trying to find the screenshot one sec
+01:45 < niggler> here we go: http://cl.ly/image/2T0w2v0I2q0Q
+01:45 < niggler> the original tweet address https://twitter.com/adamfeuerstein/status/224851208190439424
+01:46 < niggler> and this happened literally 15 minutes after i put this all together
+01:47 < niggler> so then i had to go through a verification process, and naturally i solved it by adopting the name
+01:47 < mdedetrich> hey peeps
+01:48 < niggler> in retrospect i probably shouldn't have, but i learned a ton about legal persons, names, etc
+01:48 < niggler> so here i am :)
+01:48 < niggler> hey mdedetrich
+01:48 < jcrew> had to go through verification on seekingalpha?
+01:48 < jcrew> i'm reading your article
+01:49 < niggler> well it started there
+01:49 < niggler> oh the article was censored after the fact
+01:49 < niggler> which makes the story even more strange
+01:49 < jcrew> i wrote something in 2005 to look for large splits i could exploit
+01:49 < niggler> im looking for different things
+01:49 < niggler> its rebate capture
+01:50 < niggler> so the exchanges pay out a rebate to liquidity providers
+01:50 < niggler> (that concept was developed during decimalization, but the rebates were set too high)
+01:51 < niggler> that rebate usually exceeds the costs of the trade (and is supposed to compensate for risk)
+01:51 < niggler> so you see some very large funds that run a big martingale -- if you have enough capital, you can just sit on positions and wait for them to move in your favor)
+01:52 < niggler> the dumb martingale pays out .1 cent per share after costs for small-price stocks (sub-20 dollars)
+01:52 < jcrew> so are you just investing in the liquidity providers?
+01:53 < jcrew> it's like superman 3
+01:54 < niggler> what happened over the past 8-10 years is really funny -- the exchanges decided to promote this model because they knew they could charge exorbitant colocation fees, but now since volumes are dropping the exchanges are getting slaughtered
+01:54 < niggler> NYSE was recently bought out by ICE and, if you read the press releases, the purchase was mostly symbolic
+01:54 < jcrew> they didn't change any of the trading rules?
+01:55 < niggler> its a much larger discussion, but nyse was slow to the rebate game
+01:55 < niggler> the idea is that you can either cater to those who provide liquidity or to those who take liquidity (these are the 'real traders' that CNBC talks about)
+01:56 < niggler> for various reasons, over the past 3 years, even though the S&P doubled people aren't participating as much
+01:56 < niggler> based on what I've seen, I think that the industry is basically squeezing pennies from pension funds, retirement funds, and wealth management.
+01:57 < niggler> and the first two categories are seeing a major crunch, the former thanks to regulatory changes and the PBGC and the latter thanks to the economy (people using their retirement savings to last until social security starts paying)
+01:57 < jcrew> stuff like enron and madoff didn't really help people's view of that stuff
+01:57 < othiym23> welp, that was a fun foray into #haskell
+01:58 < othiym23> note to self: mentioning llvm.js in #haskell not a super good idea
+01:58 < niggler> then you have stuff like the flash crash in 2010
+01:58 < niggler> the markets themselves have become more fragile
+01:59 < niggler> $50K, for example, is enough to cause a half-percent swing in some stocks like AA (alcoa, a dow component)
+02:00 < niggler> i gotta say, though, i've been losing interest in programming over the past few years but node and js really piqued my interests
+02:00 < owen1> is it possible to deploy to multiple hosts using https://github.com/visionmedia/deploy
+02:00 < owen1> ?
+02:01 < jcrew> i haven't really been a developer for like 10 years, node is fun though
+02:02 < niggler> TooTallNate what are your thoughts on having node Buffer support length-prefixed strings?
+02:07 < draginx> does anyone in here know how to check for float numbers in jasmine/frisby?
+02:15 < TooTallNate> niggler: user-land
+02:16 < TooTallNate> niggler: and in fact, look up "netstrings"
+02:16 < othiym23> draginx: number % 1 !== 0
+02:18 < samholmes> I'm not sure whether these dump.rdb files are coming from mac or from redis
+02:18 < niggler> samholmes redis
+02:19 < samholmes> I see
+02:19 < niggler> that's saving to disk
+02:19 < samholmes> So it just dumps the file in the working dir were the redis-server command was invoked?
+02:20 < niggler> there may be a configuration option for that
+02:21 < niggler> its the 'dir' option samholmes in redis.conf
+02:22 < samholmes> Where is the default redis.conf located?
+02:26 < draginx> othiym23: thanks now im trying to figure out how to properly make an extension to the matchers
+02:33 < astropirate> test
+02:38 < jcrew> /test
+02:39 < draginx> Is there a way to send an image with frisbyjs/jasmine?
+02:50 < niggler> OT: anyone familiar with content MathML?
+03:02 < owen1> is it possible to deploy to multiple hosts using https://github.com/visionmedia/deploy?
+03:43 < christo_m> xer0x: im completely lost 
+03:44 < xer0x> christo_m: how's LoL going?
+03:44 < christo_m> xer0x: i emailed the guy who developed the client, i mean, the last commit was like 7 months ago so maybe something changed in the authentication process
+03:44 < christo_m> not well
+03:44 < xer0x> christo_m: ya, they've probably added something extra
+03:44 < xer0x> christo_m: have you looked at adobe's site for RTMP authentication documentation?
+03:45 < christo_m> xer0x: it looks like all there is is the RFC standards for the protocol
+03:45 < christo_m> i dont know if i have to get that low level, but may be
+03:45 < christo_m> xer0x: http://www.adobe.com/devnet/rtmp.html
+03:47 < xer0x> I don't think they're using RTMP
+03:47 < christo_m> xer0x: https://code.google.com/p/lolrtmpsclient/source/browse/#svn%2Ftrunk%2Fcom%2Fgvaneyck%2Frtmp  Got this to work though
+03:48 < christo_m> xer0x: it loosk like the Adobe Air client does exactly that, rtmp , actionscript , etc 
+03:49 < xer0x> christo_m: yep
+03:49 < xer0x> christo_m: whoa, that java client has a lot going on
+03:50 < christo_m> xer0x: right? i dont want to parse all that ish!
+03:50 < christo_m> That guy went the extra mile and wrote a package in there to spectate any player, based on handle alone
+04:04 < christo_m> xer0x: even the node-amf libs claim to be unstable due to how horrid adobes specs are.
+04:05 < christo_m> they obviously did this on purpose to troll us all
+04:06 < xer0x> true that.
+04:11 < joe-node0> I'm looking for a JavaScript programmer for a really cool web application, in fact I'll even pay you $20!
+04:11 < joe-node0> this is a joke btw
+04:11 < mmalecki> let's not spoil programmers, would we?
+04:12 < mmalecki> $ 20 is waaaay too much
+04:12 < sente> heh, reminds me of
+04:12 < sente> https://twitter.com/JesseWaites/status/278281842648563714
+04:12 < joe-node0> this guy comes into the YUI room a month ago and tries to petition people to "Write a datatable module" for him
+04:12 < sente> "I need a Rails guy for a super super interesting project- a few hours tops. Anti-corporate espionage type of thing."
+04:12 < joe-node0> "it'll only take you 25 mins!" 
+04:13 < joe-node0> then he says... "Cmon I'll pay you like $25 bucks!"
+04:13 < sente> my response was incredulous with sarcasm
+04:13 < sente> but he thought i was serious
+04:13 < joe-node0> no he was
+04:13 < joe-node0> that's what made it hilarious
+04:13 < joe-node0> I told him it would take a good YUI programmer at least 3 weeks, and that he should just give up now.
+04:13 < mmalecki> people are hilarious sometimes
+04:14 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+04:14 < niggler> epic adverse selection
+04:15 < AlchemyFalcon> "I'm looking for a technical co founder for my social local mobile crowd sourced music app…"
+04:15 < AlchemyFalcon> haha
+04:15 < AlchemyFalcon> ^college
+04:15 < mmalecki> buzzword limit reached
+04:16  * mscdex shakes a fist at IMAP
+04:16 < joe-node0> if only robots could program
+04:16 < Sembiance> AlchemyFalcon: rofl, that almost hit ALL the buzz words ;)
+04:16 < mmalecki> mscdex: yeah, it's terrible
+04:16 < AlchemyFalcon> haha :)
+04:16 < niggler> what are the other 2012 buzzwords that AlchemyFalcon missed Sembiance?
+04:16 < mscdex> mmalecki: you're being too polite
+04:16 < sashman> looool at joe-node0
+04:17 < joe-node0> we need more robots dammit!
+04:17 < mmalecki> why can't we get an actual protocol for email
+04:17 < niggler> mscdex are you dealing with courier-imap?
+04:17 < niggler> or just the protocol
+04:17 < mscdex> niggler: imap the protocol :-\
+04:17 < sente> if you guys ever need twitter [ro]bots, let me know
+04:17 < niggler> because i daresay that the software is worse than the protocol
+04:17 < sente> somehow i end up making a new one every other day it seems
+04:17 < mmalecki> mscdex: I implemented it in python tornado a while back
+04:17 < mscdex> imap is so bad in so many ways
+04:18 < mmalecki> that was the worst week of my life
+04:18 < niggler> parsing XLS is far worse
+04:18 < mscdex> it wouldn't be so bad if fetch responses weren't such a pain
+04:19 < mmalecki> I'd pay for IMAP -> REST
+04:19  * joe-node0 off to get sugar for final work-burst of the day
+04:19 < mscdex> heh
+04:19 < mscdex> niggler: i've parsed binary office document metadata before :-)
+04:20 < mmalecki> who wants to make one for $ 25?
+04:20 < niggler> nooo not the metadata mscdex
+04:20 < niggler> *very basic* http://niggler.github.com/js-xls/
+04:20 < niggler> and by very basic i mean it was used to parse stuff that were generated from the output of a machine that generated xls
+04:21 < niggler> i kinda wish the machine generated csv
+04:21 < mmalecki> I'd write one if I could come up with some business model behind it
+04:21 < mscdex> yeah, i had started to do that but i never got to parsing the streams
+04:21 < mmalecki> otherwise it's not worth the money spent on valium
+04:21 < niggler> mmalecki you can write it and pay yourself 25 bucks
+04:22 < mmalecki> niggler: how do I tax myself paying myself?
+04:22 < niggler> its less than 600 bucks -> disappears into the void
+04:22 < mscdex> niggler: fwiw here's what little i had: https://github.com/mscdex/documation
+04:23 < mscdex> after awhile i thought it's not worth it with binary dying off and xml docs being the "future" ...
+04:23 < mscdex> :S
+04:23 < niggler> i tried excel web app and excel 2013
+04:23 < niggler> both represent major steps back
+04:23 < niggler> its as if they took cues from apple
+04:24 < niggler> *apple 'numbers'
+04:24 < niggler> mscdex you didnt try hard enough: https://github.com/Niggler/js-xls/blob/master/xlsconsts.js
+04:25 < mscdex> niggler: i know, as i said i just got to parsing the metadata ;-)
+04:25 < mscdex> the OLE crap
+04:25 < niggler> anyone have a framework for distributed math with JS?
+04:26 < niggler> ive been playing with a simple monte carlo simulation framework but it seems like something someone has done already
+04:29 < styol> Node standard is two space indentation, correct?
+04:29 < mbalho> yep
+04:29 < styol> gracias
+04:32 < styol> damn, the terminology for that is escaping me.. was it "standards" or something else? "coding standards"?
+04:33 < niggler> style
+04:33 < mbalho> styol: http://nodeguide.com/style.html
+04:33 < styol> ah sweet, thanks niggler and mbalho
+04:34 < mbalho> styol: actually i think this is more up to date https://github.com/felixge/node-style-guide
+04:36 < styol>  oh whoa, I thought multiple variable declarations per var statement was standard.. perhaps have just seen it pretty often and assumed
+04:37 < SomeoneWeird> pretty sure it is
+04:37 < SomeoneWeird> oh, heh
+04:37 < SomeoneWeird> most people do it anyway
+04:38 < styol> yeah dats what me thought me has seen commonly
+04:38 < mbalho> styol: style guides are always a bike shed. i like a new var on each line because it makes it easier to copy paste lines around
+04:38 < styol> mbalho: yeah i understand. I still do that but it is usually within the same list haha
+04:39 < styol> multi-line ternary operators makes me sad face… that was like on of the main reasons i decided to start using ternary operators was to keep simple checks on a single line heh
+04:40  * styol cheers for acquired OCD
+04:40 < niggler> i used to like ternary operators, then i met php devs
+04:40 < joe-node0> I just say "screw it" and use the semantically obvious "if, else if"
+04:41 < niggler> why did php have to break ternary operator :/
+04:42 < joe-node0> why did php have to execute a script and then quit?
+04:43 < joe-node0> PHP's answer to memory management is "run it once then kill it"
+04:43 < styol> Fatal error: Out of memory (allocated 32016932123874) (tried to allocate 18746 bytes)
+04:43 < joe-node0> I know, I hate that
+04:44 < RLa> why you still use php, that's biggest failure
+04:44 < joe-node0> I don't
+04:44 < joe-node0> I use Node.js for things I do server-side
+04:44 < niggler> >>> 'a' ? 'b' ? 'c' : 'd' : 'e' ? 'f' : 'g'
+04:44 < purr> niggler: (string) 'c'
+04:44 < niggler> $ php -r "echo 'a' ? 'b' ? 'c' : 'd' : 'e' ? 'f' : 'g';" --> f
+04:45 < joe-node0> I don't care how compact that is I'll never write code so obscure.
+04:46 < joe-node0> I mean I like short and sweet code too, but I like me semantics spelled out in the open.
+04:46 < styol> yeah, i usually keep it to simple if/else personally.. after 2 or 3 layers you definitely start to go wtf
+04:47 < styol> something about var foo; if (bar) { foo = true; } else { foo = false; } flares up the OCD gnomes versus var foo = (bar) ? true : false;
+04:47  * joe-node0 suspects that obscure code usages are a cheap trick used by some programmers as a way to lock management into needing their services.
+04:47 < niggler> define "obscure code"
+04:48 < niggler> a lot of strange idioms look obscure until you start using it :)
+04:48 < joe-node0> I don't have to, a wonderful example is: $ php -r "echo 'a' ? 'b' ? 'c' : 'd' : 'e' ? 'f' : 'g';" --> f
+04:48 < joe-node0> nope, I'm a clarity nazi
+04:49 < joe-node0> IDE's are for convenience, and comments are for when you come back to code you can't even remember the purpose of... :-)
+04:49 < joe-node0> happens quite a bit
+04:49 < joe-node0> something works, then people use it forever, and then one day something breaks.
+04:50 < joe-node0> so I comment things for my own benefit later on.
+04:51  * joe-node0 is a business type turned coder
+04:51 < joe-node0> so that makes me biased 
+04:54 < niggler> what does "business type turned coder" mean?
+04:54 < RLa> mba doing coding?
+04:55 < RLa> tho i have seen opposite a lot more, a coder doing business
+04:56 < niggler> mba != business type
+04:56 < joe-node0> as in I used to spec and manage projects then one day a programmer went awol on a project and I knew just enough JS to be able to jump in and pick up where he left off
+04:57 < niggler> ohh like milton!
+04:57 < joe-node0> milton?
+04:57 < niggler> lol office space
+04:57 < joe-node0> Um, no
+04:58 < joe-node0> I didn't get sent to the basement
+04:58 < joe-node0> though I have referred to my office as the "code dungeon"
+04:58 < joe-node0> so yeah, comments are my friends, that and nice clear semantically obvious code
+04:59 < niggler> do you comment every like, like "x = x + 1; /* increment x.  for example, if x was 3 before the statement, it will be 4 afterwards */"
+05:02 < joe-node0> let's say I have this...
+05:02 < joe-node0> http://pastie.org/5619735
+05:02 < joe-node0> I comment like that
+05:02 < RLa> too deep nesting
+05:02 < joe-node0> otherwise it's an exercise in pain and frustration to figure out just what the hell is happenning.
+05:03 < RLa> yeah, with that nesting and word wrapping ...
+05:03 < ashnur> i am starting to hate promises
+05:03 < joe-node0> well the word wrap is just pastie being... pastie
+05:03 < ashnur> it's like just another buzzword
+05:04  * joe-node0 doesn't like promises, prefers contracts ;-)
+05:04 < niggler> blargh way too many comments
+05:04 < niggler> my eyes are bleeding
+05:04 < ashnur> joe-node0: contracts?
+05:04 < joe-node0> ashnur: it's a joke, ;-)
+05:04 < ashnur> ah. i was just about to ask it :)
+05:05 < ashnur> i can't do something nicely with them
+05:05 < RLa> ashnur, callbacks won't do?
+05:06 < ashnur> RLa: promises use callbacks to. it's not  about what will do, because everything will do it, if you write it. it's about the fact that I don't like any of the options because some things are frikin ugly to do with them
+05:06 < ashnur> too*
+05:06 < ashnur> it's just abstracted away, so that it is hard to understand
+05:07 < ashnur> took me days :((
+05:08 < joe-node0> Here we go, all the pastie code mangling is cleaned up: http://pastie.org/5619752
+05:09 < joe-node0> same nesting but now it's nice and concise with no word-wrap.
+05:09 < mscdex> plain callbacks ftw!
+05:10 < RLa> joe-node0, instead of using modelAttributes[modelAttr] everywhere, extract it into a single variable
+05:10 < joe-node0> is it wordy, yeah a bit. But I know when I come back to it in a month and have been doing a million other things, I can pick it up again easily.
+05:11 < joe-node0> RLa: you get "talked to" in certain rooms for "redundant variables" if you do that. 
+05:11 < joe-node0> lol
+05:12 < draginx> Is there a way to send an image with frisbyjs/jasmine?
+05:12 < SomeoneWeird> joe-node0, then they're stupid
+05:12 < RLa> joe-node0, for that case, i doubt
+05:12 < joe-node0> maybe, but I didn't write that code, I just had to make it work and maintain it.
+05:13 < ryan12> Hmm
+05:13 < joe-node0> the dude that did, took off, was a PHP coder that didn't take kindly to JS
+05:13 < RLa> joe-node0, instead of that big-ass switch, use object like { 'aud_wrd_cnt': 'Audio Word Count: ', 'aud_src_length_mins': '...' }
+05:13 < RLa> this makes it much more concise
+05:14 < RLa> oh, and use quotes consistently, currently is looks like mix of ' and "
+05:14 < joe-node0> RLa: I prefer ' but it's an old habit from learning some Java, "" is for strings and '' is for chars.
+05:15 < joe-node0> I'm trying to transition to only ''
+05:15 < RLa> that's good
+05:17 < joe-node0> so I'm like 3 months into JS and I have to deal with this app that has 3 widgets all communicating via events through a Y.view 'controller' of sorts
+05:17 < joe-node0> all the widgets have modellists full of models
+05:17 < joe-node0> yeah, that's a deep pool to have been thrown into
+05:17 < RLa> if the app will live for more time, it's usually worth refactoring
+05:18 < joe-node0> RLa: I refactor all the time, and when I learn more about how to use Y.view properly with handlebars I'll probably do just that
+05:18 < RLa> good
+05:19 < joe-node0> It's just a nightmare because it's not enough to know YUI 3 and MVC-ish JS development, this app sits inside of a Joomla component which is all PHP, a language I do not have much experience in.
+05:20 < joe-node0> so all the server-side stuff is supposed to be in PHP and I'm just hating the fact that I can't use Nodejs for that (it would fight with apache for http traffic so that's bad)
+05:21 < RLa> how big the app is?
+05:21 < joe-node0> 5000 lines just for the quotation part of it.
+05:21 < joe-node0> client-side quotation generator
+05:22 < RLa> does it have multiple front-ends, for web and mobile?
+05:22 < joe-node0> I'd like to use nodejs on some other port and funnel the ajax traffic through that but I don't think that will work.
+05:22 < joe-node0> correction, I don't know how to do that... yet.
+05:22 < RLa> well, we use nodejs here with apache
+05:23 < joe-node0> RLa: proxy?
+05:23 < RLa> through mod_proxy, it works for normal ajax stuff but i have no idea for websockets
+05:23 < RLa> and we use apache only because of php
+05:23 < joe-node0> I might just get a separate domain and proxy all traffic through it to nodejs, but that's just so wrong.
+05:24 < RLa> can't switch to nginx too because of stupid rewrite rules
+05:24 < joe-node0> websockets might be the best way to keep apache and just use another port
+05:24 < RLa> with separate domain, watch for cross-domain security issues
+05:25 < joe-node0> I know it's a pain in the ass
+05:25 < joe-node0> damn pre-existing infrastructure...
+05:32 < draginx> Any idea why frisbyjs would work but not superagent..? superagent just hangs my request as opposed to frisby
+05:43 < Bergle_1> Anyone ever hit a case where   async  fs.stat(path, cb) isnt doing the cb() call back, but fs.statSync(path) returns fine. 
+05:43 < jcrew> joe-node0: it's been my experience apache will proxy socket.io but it falls back to xhr polling
+05:49 < jcrew> so, if you're only looking for XHR - it works with the reverse proxy on apache : )
+06:00 < dileep> hello noders
+06:01 < dileep> hey i need image uplaoder option using uuid,any kind of module or repositry
+06:24 < ryan12> ¥£€
+06:41 < mistertwig> i've got a question about async.js
+06:41 < mistertwig> when i'm using series, is there a way to pass something from the previous callback to the next?
+06:41 < SomeoneWeird> don't ask to ask :)
+06:41 < SomeoneWeird> you want .waterfall
+06:42 < SomeoneWeird> instead of series
+06:42 < wookiehangover> can you rephrase that as an ethical question?
+06:42 < mistertwig> ahh SomeoneWeird
+06:42 < mistertwig> that's exactly what i need
+06:42 < mistertwig> thanks lol
+06:42 < owen1> is there a common path on debian/ubuntu to use for the web apps?
+06:42 < SomeoneWeird> :) np
+06:42 < mistertwig> /var/www :P
+06:42 < owen1> mistertwig: why the smily?
+06:42 < mistertwig> owen1: why not
+06:43 < owen1> mistertwig: just making sure u'r serious
+06:43 < owen1> thanks
+06:43 < mistertwig> oh well i don't know 
+06:43 < mistertwig> it's used for apache 
+06:44 < mistertwig> so SomeoneWeird
+06:44 < mistertwig> in the example they show
+06:44 < mistertwig>     function(arg1, arg2, callback){
+06:44 < mistertwig> hmm wait
+06:44 < mistertwig> i think i got it
+06:44 < mistertwig> i'll test it out first
+07:15 < dileep> i am unable to install formidable,getting error unable to locatte package,anybody here for help
+07:33 < moszeed> quick question: if i build a REST Client in node, would the "same-origin" policiy affected ??
+07:36 <@konobi> it's not a browser
+07:38 < moszeed> but it`s javascript. ok no policiy. that`s cool ..
+07:40 <@konobi> javascript and same-origin aren't exactly related... you have same-origin issues with actionscript and vbs too
+08:33 < bradleymeck> isaacs: any idea for a cross platform way to alter execPath when executing node?
+08:35 < bradleymeck> the patch test case for fork fails hard on windows if running through a separate process so going through node itself is the only sane way… but that means having same execPath (unless using links, which on windows is confusing / make is not happy with hard linking idea after compile)
+08:41 < halfblood> thghg
+08:41 < halfblood> l;l
+08:41 < halfblood> l'll
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 < halfblood> l
+08:41 -!- halfblood was kicked from #Node.js by konobi [halfblood]
+08:42 < mbalho> that was a pretty good run
+08:42 -!- mode/#Node.js [+o mbalho] by ChanServ
+08:45 <@konobi> bradleymeck: change it? how so?
+08:46 < bradleymeck> konobi, just make process.spawn have a guaranteed different value than if invoked via `node` / via the node in the core repository's root
+08:46 < bradleymeck> symlinks don't really make for fun if you have to do it on both OS
+08:46 <@konobi> XY
+08:47 <@konobi> bradleymeck: just looking for a way to differentiate the parent from the child?
+08:47 < bradleymeck> based on execPath yes
+08:48 <@konobi> env var not sufficient?
+08:48 < bradleymeck> konobi no, it doesn't properly test the problem
+08:49 <@konobi> bradleymeck: again... xy
+08:49 <@konobi> =0)
+08:50 < bradleymeck> xy?
+08:50 <@konobi> see the topic
+08:51 < bradleymeck> konobi, I have a patch for .fork adding .execPath to the options, izs wants a test case added for this before pulling it in
+08:52 < bradleymeck> needs to work on all OS
+08:52 < bradleymeck> so I need to test that the child has 1. the new execPath 2. that the ipc is working
+08:52 <@konobi> why the new execPath?
+08:52 < bradleymeck> konobi cause thats what the patch adds
+08:53 <@konobi> but why?
+08:53 < bradleymeck> konobi what else would you test for if your execPath was set by the parent?
+08:53 < bradleymeck> setting an env is misleading and I faced a gotcha with already in this
+08:54 <@konobi> if it's a fork, i'd assume that it's a readonly variable that's shared from the parents memory space and therefore shouldn't be altered
+08:54 < bradleymeck> konobi it does not us c's fork to do the .fork due to windows, no shared exec space, its actually spawning a new child
+08:55 < bradleymeck> the misnomer has been brought up many a time
+08:55 <@konobi> yes
+08:56 <@konobi> can testing for the existance of process.send isn't sufficient either i suppose... hhhmmm...
+08:57 < chrisevans1001> Guys can you see any flaws with this: Communications + Game servers (seperate Node.js instances). Communications link together via tcp and each communications server connects to game server. When a client joins they go to primary communications server which authorises them then passes back the ip of the communications server with the least load. They reconnect to that server which then sends relevant communications
+08:57 < chrisevans1001>  to the game server. Is there a better way? I felt this was relatively scalable.
+08:57 <@konobi> bradleymeck: so you're doing multiple levels of spawn ?
+08:58 < bradleymeck> konobi in the patter of the test/simple/test-child-process-fork-* yes
+08:58 < bradleymeck> pattern*
+08:58 < chrisevans1001> (to clarify communications handles tcp connections from client, links to facebook, twitter etc - game server handles individual games (of 6 players) and relevant logic)
+08:58 <@konobi> oh, fun fun
+08:58 <@konobi> chrisevans1001: handle your load balancing at the incoming tcp level
+08:59 < chrisevans1001> good idea. im using aws and load balancer supports tcp now i believe
+09:00 <@konobi> or any actual load balancer, stud, haproxy, etc.
+09:01 < chrisevans1001> just looked that up, thanks :)
+09:24 < imm> hi
+09:44 < mchammer> hi
+09:44 < imm> hello
+09:48 < QwerT> only me?
+09:49 < mchammer> i need some help storing a huge amount of objects. i am building an isometric game and got 1.024×10¹³ tiles to save for map-creation and load on server-start. wat would be a good way to do this? is it possible at all to cache such a huge map in node.js while the server is running?
+09:49 < mchammer> each tile contains some strings and numbers
+09:52 < mchammer> right now i just save/load each tile as an object to/from mongodb which already takes some time on a  very small map of 204800 tiles
+09:52 < mchammer> should i store it into a file maybe?
+09:59 < jonaslund> arghhhhhhhhh
+09:59 < jonaslund> real world code
+09:59 < jonaslund> rhino is 200x slower than v8
+09:59 < guor> doh. it's a vm on top of a vm
+09:59 < jonaslund> partially
+10:00 < jonaslund> the worst part is that they tried too hard to "integrate" with java code instead of focusing on keeping it fast and making the integration painful/slow
+10:01 < jonaslund> I don't have any numbers for the new jvm/js from oracle but if you'd make a separate object stack and eliminate most type detection by double dispatching i think they could get within 10x slower of v8
+10:02 < Doikor> i still dont understand how its performance is so bad when compared to other jvm languages.
+10:04 < Doikor> even when comparing to other dynamic languages running on jvm (groovy)
+10:05 < Doikor> did they actually implement a real vm on top of the already existing vm from jvm?
+10:05 < jonaslund> Doikor: i think that it was designed correctness and for java integration and not speed from day one
+10:05 < Doikor> why not just use the one provided by jvm :/
+10:05 < Guest20916> One question I always have because I never used node for production level but stopped it at poc is cluster
+10:05 < Doikor> jonaslund: ok that makes sense.
+10:06 < Guest20916> Anyone used cluster module in production?
+10:06 < jonaslund> Doikor: that said, the internals are butt ugly and i think rewriting it from almost scratch would've done them good
+10:07 < jonaslund> Doikor: gonna be interesting to see where nashorn goes
+10:12 < Doikor> nice that they seem to be porting node APIs into nashorn in the Node.jar project.
+10:13 < Doikor> though dont know if they will ever release the source for that part
+10:15 < jonaslund> i think they will
+10:15 < jonaslund> (assuming it doesn't perform like a dog :) )
+10:31 < Sonderblade> when you use websockets (or socket.io or equivalent) do you usually let all server-client communication go via the socket or some of it using plain old ajax?
+10:38 < lpin> Sonderblade depends, i have an app that use both ws and ajax
+10:38 < lpin> ajax when ws is not needed
+10:39 < lpin> it's up to you thou
+10:49 < drim> I have a list of issues store in a object (object.issues). I want to display it by user (user XXXX: issue1, issue2 etc). Should I store its by user or should I do a filter or something like this after ?
+11:21 < simong> Does anyone know a good (non-GPL-licensed) lib/tool that allows you to convert office files to pdf ?
+11:21 < simong> jodconverter seems to be erroring out for some reason
+11:24 < Bergle_1> simong - not sure if this suits, but i uplaod files to gmail and download as pdf - not sure how automatable that is.
+11:24 < Bergle_1> i mean to drive there docs area.
+11:25 < simong> I don't think that'll work for us
+11:29 < nathan7> simong: You can automate libreoffice
+11:29 < nathan7> simong: but the last time I did that it was still called OpenOffice
+11:30 < stride> that'd be the same thing I guess
+11:30 < stride> isn't jodconverter still just wrapping openoffice?
+11:30 < simong> I think so, the jodconverter uses the UNO interface that soffice exposes
+11:30 < simong> I can give it a try with libreoffice I suppose
+11:31 < SomeoneWeird> Anyone know why I might be getting "Inappropriate ioctl for device" when trying to write to stdin of a spawned process?
+11:50 < nathan7> SomeoneWeird: o.O
+11:50 < nathan7> SomeoneWeird: How'd you manage that?
+11:51 < SomeoneWeird> absolutely no idea
+12:03 < Bergle_1> anyone around that is familiear with mkdirp that might tell me what im dong wrong http://posh.jaykul.com/p/5622  -  it appears that in this case mkdirp() is not actually running the callback
+12:11 < RLa> Bergle_1, it does not create the directory?
+12:15 < Chel_> question: is there a way to see javascript V8 built in object interfaces not in internet ?
+12:15 < Chel_> any local help files or builtin manual ?
+12:26 < stiang> I am switching to using generic-pool (node-pool) for handling mysql connections in my web app. Should I acquire and release a connection for each query in a web request, or once per request for all queries?
+13:42 < [Gixx]> hello
+13:44 < [Gixx]> can you help me with socket.io and Express or I should go to a different room?
+13:45 < balboah> if you ask the real question first you don't have to have two questions answered. should be twice the probability to get an answer ;)
+13:45 < balboah> now I already answered the first and won't answer the second
+13:47 < [Gixx]> Ok :) So, I'm new to node.js, but I have to do some support chat thing. I've created a very simple version which works well, so I want to "Level Up" it. I started with this tutorial: http://www.danielbaulig.de/socket-ioexpress/
+13:48 < [Gixx]> After debugging and fixing it works.. But I don't really understand, what-where-when sets the express.sid
+13:48 < [Gixx]> And while there's no such cookie, every connection attempt will fail
+13:49 < [Gixx]> I found this kind of "is.set('authorization')..." thing in several blogs, but any of them explains me where-when-how to set the cookie
+13:50 < [Gixx]> * ..io.set...
+13:51 < [Gixx]> So my question is: Can you help me understand this somehow?
+13:53 < [Gixx]> the clients should generate a sessionId and set to cookie (no sense) or the server creates it, but auth will drop the connection before it can do anything
+14:01 < ins0mnia> substack: Do you happen to know if Rynos got Reconnect to work with Shoe server-side?
+14:12 < nathan7> niggler: Whoo! You've made it to DailyJS!
+14:28 < niggler> nathan7 what's dailyjs?
+14:29 < nathan7> niggler: http://dailyjs.com/2013/01/04/controldeck-xlsx-inverted/
+14:30 < nathan7> niggler: their articles are mostly shit
+14:31 < niggler> who is alex young?
+14:31 < niggler> i assume not at the level of crockford
+14:32 < niggler> though i gotta say nathan7 that https://github.com/joyent/node/commit/0459a230631f6ff44f63d46396c474c13e6c232c means much more :)
+14:33 < niggler> and im surprised that no one does something similar with node modules
+15:13 < Exx2xxO> Hello =)
+15:14 < Exx2xxO> I've got a problem. Does anyone of you know how to use Node.js without installation? On Mac and Windows. So it starts up and runs a specific .js ?
+15:15 < damaru> hi
+15:16 < damaru> I am totally confused, I updated node trough the apt-get install on debian wheezy and not I cannot start node, on the cli
+15:16 < damaru> if I do a sudo node it does work though
+15:17 < damaru> it also affect yeoman package that I installed trough the npm
+15:18 < niggler> Exx2xxO does a  VM work?
+15:18 < alex88> hi guys, I've the var db inside the app.js, how can I get the var inside the routes function to use the db?
+15:20 < damaru> 
+15:56 < draginx> is there a way to update just global NPMs?
+15:59 < SomeoneWeird> draginx, cd to / and npm update -g ? i dunno
+15:59 < draginx> would be neat to have an official way of doing it O_o
+16:24 < MI6> joyent/node: Ben Noordhuis master * 93591a2 : v8: remove optimization switches  Remove compiler switches from $(TOPLEVE (+2 more commits) - http://git.io/jJ2mBQ
+16:31 < keithMiklas_> What's the difference between child_process.spawn and child_process.exec?
+16:33 < geNAZt> exec cannot stream stdout or stdin from the process
+16:34 < draginx> im getting a 411 length required error using superagent any ideas..? Im simply doing a request.post.attach.end
+16:41 < Exx2xxO> hey people ! Me again :D Got a short simple question: Das anybode know how to check if node.js is running? So when somebody browses to a specific url (which is a website on a webserver) and this person doesn't run node.js can I check that ?
+16:41 < Exx2xxO> With php
+16:41 < bnoordhuis> Exx2xxO: sorry, but... wut?
+16:41 < geNAZt> bo you cant
+16:42 < geNAZt> no*
+16:42 < sohcahtoa> I'm trying to parse this questionb
+16:42 < geNAZt> he want to know if a server runs php or nodejs
+16:42 < sohcahtoa> I'm stuck at Das
+16:42 < geNAZt> but the server doesnt tell you that
+16:42 < keithMiklas_> if it's fast it's running node ;)
+16:42 < geNAZt> looool
+16:43 < sohcahtoa> I am not sure that is what he is asking at all
+16:43 < Exx2xxO> okay stop :D
+16:43 < Exx2xxO> my english is bad I'll give it a new try
+16:43 < geNAZt> from where are you ?
+16:43 < Exx2xxO> germany
+16:44 < geNAZt> ja dann sags mir in deutsch
+16:44 < geNAZt> :D
+16:44 < sohcahtoa> deutschland uber alles
+16:44 < Exx2xxO> oh okay das ist praktisch xD
+16:45 < Exx2xxO> Folgendes: Ich will überprüfen ob ein Benutzer der auf meine Webseite kommt auf seinem PC node.js am laufen hat (also irgendwie...krieg ich das heut mit dem formulieren net hin)
+16:45 < geNAZt> hat der benutzer einen port nach aussen offen ?
+16:45 < geNAZt> wenn ja kann du nodejs dran binden und diesen port dann mit localhost abfragen
+16:47 < geNAZt> aber generell ohne extra software auf dem client wird das nicht gehen
+16:47 < Exx2xxO> Müsste es nicht theoretisch mit php und ner simplen abfrage auf die nur node.js antwortet klappen?
+16:48 < geNAZt> es gibt keine anfragen auf die nur nodejs antwortet
+16:48 < geNAZt> ich kann z.b. nodejs laufen haben ohne das es von aussen irgendwas annimmt
+16:49 < Exx2xxO> Ja das schon aber ich entwickle ja auch ne node.js applikation die ja von aussen was annehmen soll
+16:49 < Exx2xxO> und nur wenn die läuft soll meine webseite darauf reagieren
+16:49 < geNAZt> ja aber wozu mussst du dann wissen, das der client auch nodejs hat
+16:49 < geNAZt> achso
+16:49 < geNAZt> ne desktop applikcation
+16:49 < Exx2xxO> mehr oder minder
+16:50 < geNAZt> ja dann binde in der app einfach einen port
+16:50 < geNAZt> und ruf den per javascript deiner webseite auf
+16:50 < geNAZt> mit ajax
+16:50 < geNAZt> oder sowas
+16:50 < Exx2xxO> okay.. das geht serverseitig :D?
+16:51 < geNAZt> du brauchst den client dazwischen
+16:51 < geNAZt> webseite => app => webseite => server
+16:51 < geNAZt> so in der art
+16:51 < Exx2xxO> aso
+16:52 < Exx2xxO> man ich hasse web entwicklung... da lobe ich doch die gute alte Softwareentwicklung ^^ Da versteht man wenigstens was man tut  :D
+16:52 < geNAZt> does someone know a doctrine like orm in nodejs ?
+16:52 < geNAZt> ja du musst halt um die sicherheit drumherum
+16:53 < geNAZt> und du kommst vom server halt nicht auf den client :D das ist auch gut so
+16:53 < Exx2xxO> Das muss ich auch nicht ^^ Reicht auch wenn der Client ne Nachricht sendet auf die der Server dann reagiert :D
+16:54 < Exx2xxO> Na gut danke dir werde mich mal schlau machen und dich wieder stören, wenn ich weitere Probleme hab :P
+16:55 < geNAZt> jo kein problem :D
+16:57 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+17:02 < bnoordhuis> hm. have we been invaded by germans? again?
+17:02 < geNAZt> no
+17:02 < geNAZt> he wasnt good in english
+17:02 < bnoordhuis> ah okay
+17:02 < geNAZt> and my mother language is german :D
+17:13 < MI6> joyent/libuv: Fedor Indutny master * ba83510 : stream: fix infinite select() polling on osx  Interruption FD buffer shou - http://git.io/_-yQHg
+17:13 < jcrew> also for line ten you don't want an array of pointers
+17:15 < cellvia> what is a linklist
+17:15 < cellvia> https://github.com/joyent/node/blob/master/lib/_linklist.js
+17:16 < jcrew> cellvia: it's a list of data structures that reference the next (and sometimes previous) item in the chain
+17:17 < jcrew> not like a hash table or array, though some hash tables implement some form of linked list
+17:18 < BlissOfBeing> How can i go about adding two objects on the same key? i.e.  {12: {name: 'bliss'}} + {12: {name: 'abe'}, 13: {name: 'being'}} = {12: {name: bliss, name: abe}, 13:{name: 'abe'}}
+17:18 < abe> don't talk about me like that.
+17:18 < BlissOfBeing> ha, sorry
+17:19 < geNAZt> http://stackoverflow.com/questions/171251/how-can-i-merge-properties-of-two-javascript-objects-dynamically
+17:19 < cellvia> jcrew, interesting, what are the traditional uses of this?
+17:19 < stagas> BlissOfBeing: no you can't have two properties named 'name' there
+17:19 < cellvia> is abe a bot
+17:19 < jcrew> cellvia: i used them quite a bit in C when i had an unknown array size or i wanted a list of 'struct's
+17:20 < abe> cellvia: no.
+17:20 < cellvia> would a bot admit that he was a bot?
+17:20 < tjfontaine> cellvia: in js you would likely use them when you don't know (or expect a large amount) of objects and you only need to iterate them
+17:20 < cellvia> tjfontaine could you explain further?
+17:20 < tjfontaine> cellvia: http://en.wikipedia.org/wiki/Linked_list
+17:20 < valterguy> cellvia: depends on how it's programmed to react.
+17:21 < valterguy> cellvia: it could deny it. we would never know.
+17:21 < jcrew> i'm not sure why you'd use them in js with how flexible arrays are
+17:21 < cellvia> im just curious because im seeing it in node core but ive never seen it used anywhere
+17:22 < niggler> arrays are nasty
+17:22 < cellvia> "The principal benefit of a linked list over a conventional array is that the list elements can easily be inserted or removed without reallocation or reorganization of the entire structure because the data items need not be stored contiguously in memory or on disk." 
+17:22 < tjfontaine> jcrew: if it's easier to delete (set null) the pointers ont he object you have instead of finding it in the array (unless you store the index of)
+17:22 < cellvia> does that even apply to js
+17:22 < brianc> cellvia where in the core do you see them?
+17:22 < tjfontaine> they're used in timers
+17:23 < cellvia> https://github.com/joyent/node/blob/master/lib/_linklist.js
+17:23 < bnoordhuis> cellvia: mutating and searching arrays is relatively expensive, hence the linked list
+17:23 < bnoordhuis> cellvia: though it's somewhat up for debate if it's still a net benefit these days
+17:23 < jcrew> tjfontaine: finding something in the array seems like the same amount of work as finding it in LL
+17:24 < jcrew> loop over the thing until you get what you need, from a memory perspective that makes a lot more sense 
+17:24 < cellvia> normally youd just do a loop over the array objects and break when you find it,  but with a linked list its different?
+17:24 < tjfontaine> jcrew: finding for removal I mean, if I have an object I can set them null, deleting from the array is a bit harder
+17:24 < niggler> deleting from array is painful
+17:25 < cellvia> whats best practice for deleting from array in js
+17:25 < bnoordhuis> cellvia: it's removing yourself from the array that would hurt performance-wise
+17:25 < jcrew> .splice ?
+17:25 < cellvia> i notife in this linked list here in node:  // show the most idle item
+17:26 < cellvia> is that a extension of alinked list, or common
+17:29 < jcrew> niggler: you day trade at all?
+17:29 < niggler> its all day trading
+17:29 < jcrew> the rebate stuff?
+17:29 < niggler> there's a strange bug in the regulatory requirements
+17:29 < bnoordhuis> cellvia: it can be used as a linked list/priority queue/heap hybrid
+17:30 < bnoordhuis> it slices, it dices
+17:30 < niggler> basically, so long as you end the day without a position, you can take on an arbitrarily large position during the day
+17:30 < niggler> this is actually part of why knight capital (KCG) blew up recently
+17:31 < geNAZt> does mongodb use the objectid to store information where the document is stored to get faster access to it ?
+17:31 < niggler> 6 month plot: http://www.google.com/finance?q=KCG
+17:32 < cellvia> this is fascinating to me, im really wondering how this is used in node... i'll look at timers
+17:32 < niggler> the day it fell, it ended up taking about 440M loss due to a trading glitch
+17:32 < niggler> but like with all law-of-large-numbers games, bigger is better
+17:33 < cellvia> http://pod.tst.eu/http://cvs.schmorp.de/libev/ev.pod#Be_smart_about_timeouts
+17:33 < jcrew> are you market making or selling short for rebates or ??, i'm unclear what you do still
+17:34 < cellvia> but im noticing even in   https://github.com/joyent/node/blob/master/lib/timers.js   it doesnt seem to be using _linklist
+17:36 < BlissOfBeing> OK, I have posted a question on SO about merging my objects, its a little more complicated as I want to merge arrays on the same key. If anyone could point me in the right direction I would be grateful: http://stackoverflow.com/questions/14161964/how-can-i-merge-arrays-that-are-on-the-same-key-javascript 
+17:38 < jcrew> BlissOfBeing: use the same technique that was mentioned above and just .concat the arrays
+17:40 < mmmrk> is there a way to use sharejs with geddy framework?
+17:40 < woven> hi there, i'm using Socket.Io to connect a 3rd party site to a node app on our apache server. If I emit a message from the 3rd party site to the node app directly I get a success response, but If I use try to emit a message from a JS file outside of the HTML page I just get a message in the console the node debugger that says "served static content /socket.io.js"
+17:42 < cellvia> BlissOfBeing I am feeling your name
+17:42 < BlissOfBeing> cellvia:  :)
+17:58 < cellvia> oh derp just remembered easy way to delete values from array  .filter
+17:59 < geNAZt> BlissOfBeing: http://hastebin.com/ruyefisuyu.js
+17:59 < ikss> hmm anyone here is using node-irc perhaps?
+17:59 < geNAZt> something like that
+18:04 < cellvia> oh ikss i thought that was an irc server built in node ... but just a client
+18:06 < cellvia> https://github.com/alexyoung/ircd.js   i wonder how it compares to others
+18:09 < ikss> cellvia: i'm using 'node-irc' and i'm having some problems with using colors ;/
+18:09 < cellvia> oh and regarding _linklist,  timers.js does use it i just missed it
+18:09 < nathan7> Thingy of the day: https://github.com/nathan7/microdata
+18:10 < Owner> How long do .io domain purchases last if anyone knows....their site says nothing about how long you will own a domain.
+18:11 < Owner> oh its one year
+18:12 < geNAZt> nathan7 ? how did you get the document object into node ?
+18:14 < nathan7> geNAZt: It's not for node
+18:14 < nathan7> geNAZt: It should work for Browserify
+18:14 < geNAZt> maybe you should write it in the readme
+18:16 < FunnyLookinHat> I'm having trouble figuring out how to design a scripting engine mechanism for a basic game engine - I have an engine that updates entity positions and detects collisions and whatnot - but I want someone to be able to extend the engine with their own rules and events and whatnot
+18:16 < FunnyLookinHat> Is there a clear way to do this?  I haven't thought of one in the last few days that I've been thinking about it...
+18:16 < geNAZt> hooks and proxy objects ?
+18:16 < FunnyLookinHat> Ideally - someone would write my-engine.js and it would listen for events from engine.js and also be able to write events to the client
+18:17 < FunnyLookinHat> geNAZt, oh - using node-proxy ?
+18:17 < geNAZt> no
+18:22 < geNAZt> http://hastebin.com/guyunejide.js
+18:23 < geNAZt> so you can pass the proxyobject direct into the plugin
+18:23 < geNAZt> and the plugin should not have the chance to change the core
+18:23 < geNAZt> or whatever is in the proxy
+18:23 < draginx> Does anyone know how to make superagwent not send files in chunk mode?
+18:24 < TomyLobo> hi
+18:25 < TomyLobo> is there something like child_process.exec, except not working with a callback but returning error, stdout, stderr?
+18:26 < geNAZt> no
+18:26 < geNAZt> there is a child_process.spawn
+18:26 < geNAZt> but the only difference is that spawn streams the content, exec waits an callbacks the content
+18:26 < FunnyLookinHat> geNAZt, aaah slick thanks
+18:27 < TomyLobo> geNAZt can i somehow sleep until it finishes?
+18:27 < geNAZt> no
+18:27 < geNAZt> thats the way node workd
+18:27 < geNAZt> works*
+18:27 < TomyLobo> but why not, gah, event processing is not the end-it-all
+18:27 < geNAZt> never block or sleep or something like taht
+18:28 < geNAZt> if u block up node, node doesnt do anything. no accept of requests, no timers, no intervals
+18:28 < geNAZt> so blocking an node process is really bad
+18:28 < TomyLobo> you mean it's not threaded?
+18:28 < geNAZt> it is not
+18:28 < geNAZt> not by default
+18:28 < TomyLobo> no simultaneous handling of multiple requests?
+18:28 < MI6> joyent/node: Shigeki Ohtsu master * 2b6c561 : fs: remove unused default option in WriteStream  No bufferSize option is  (+1 more commits) - http://git.io/FbXPyg
+18:28 < geNAZt> in an event loop you can simultaneous handle more than one request in one time
+18:29 < TomyLobo> err, no
+18:29 < macmichael01> I'm trying to access an instance of my models within my app controllers but I'm not sure the proper way to do this:
+18:29 < macmichael01> http://pastebin.com/1LtSBvU1
+18:29 < TomyLobo> CPUs don't work that way
+18:29 < geNAZt> yes
+18:29 < geNAZt> while it waits for req 1, it can work on req 2
+18:29 < geNAZt> if req 2 if finished it works on req 1
+18:29 < TomyLobo> that's not simultaneous
+18:29 < geNAZt> if req 2 has to wait for a cb it goes back to req 1
+18:29 < jrajav> TomyLobo: Node.js does not use threads to achieve concurrency. Instead, it takes advantage of asynchronous functions for nearly everything.
+18:30 < TomyLobo> and you can only "wait for a callback" while doing something else if you have multiple threads
+18:31 < jrajav> TomyLobo: There are no *visible* threads in Node.
+18:31 < geNAZt> http://hastebin.com/rirukituke.js
+18:32 < geNAZt> whats about this ?
+18:33 < cellvia> what about it
+18:33 < geNAZt> if you block in one of these callbacks nothing will execute while in the block
+18:33 < geNAZt> so it is bad
+18:33 < ikss> tjfontaine: are You around?
+18:34 < daslicht> is therer something like assetic from Symfony2 for node / express? 
+18:34 < cellvia> geNAZt i dont understand, could you show an example
+18:34 < ikss> daslicht: there is at least few modules out there for connect 
+18:34 < daslicht> that you can put all asstes in one arbitrary folder and like assets ?
+18:35 < daslicht> how are those modules named ?
+18:35 < geNAZt> http://hastebin.com/xivupopisi.js
+18:35 < geNAZt> if the interval 1 hits it blocks the node while calculating the for loop
+18:35 < cellvia> yeah
+18:35 < geNAZt> so interval 2 will not be fired
+18:35 < geNAZt> and the http server will not accept any requests
+18:35 < cellvia> until 1 is done
+18:35 < geNAZt> right
+18:36 < cellvia> but yeah thats not the same as simultaneous
+18:36 < cellvia> thats very not simultaneous
+18:36 < geNAZt> thats right
+18:36 < geNAZt> i want to show why it isnt good to block on node
+18:36 < cellvia> gotcha
+18:37 < geNAZt> that node can handle various functions in the "same" time
+18:37 < geNAZt> if u dont block
+18:37 < mscdex> node.js rules!
+18:37 < cellvia> i agree
+18:37 < cellvia> what other languages are singlethreaded in this way?
+18:37 < geNAZt> so it is bad to "wait" for a exec to end
+18:39 < geNAZt> i dont know but is tornado single threaded ?
+18:39 < cellvia> clojure?
+18:39 < geNAZt> spidermonkey
+18:39 < geNAZt> :D
+18:40 < geNAZt> or seed
+18:43 <@konobi> evented systems are available for most languages
+18:43 < cellvia> but most use threads yeah?
+18:44 <@konobi> not implicitly
+18:45 <@konobi> most are just plain old blocking
+18:46 < tnorris> bnoordhuis: mind if I add the basic sequence of fetch/ff/rebase to the Contributing wiki page? seems like a lot of people don't fully understand this workflow.
+18:52 < tnorris> nm, found the for dummies page.
+19:00 < link15> hey all, how does node compare to other frameworks / servers with respect to handling a lot of persistent socket connections
+19:00 < link15> i know there is no one answer
+19:02 <@konobi> excellent
+19:02 < tjfontaine> ikss: what seems to be the issue?
+19:11 < rideh> what form mailer are people using these days?
+19:27 < CoverSlide> so go's channels or java's nio don't use threads internally?
+19:28 < superjoe> does anyone have any opinions they'd like to share with me about using bind vs var self = this ?
+19:28 < CoverSlide> superjoe: sure. you have to use bind if you're calling a named function outside of the parent function's scope
+19:29 < superjoe> CoverSlide, true, or you could move the named function inside the scope of the parent
+19:29 < CoverSlide> superjoe: but if it's a function that is reusable across multiple functions, there's no reason to copy paste the same thing into different parents to achieve that goal
+19:30 < superjoe> agreed
+19:30 < cellvia> how does var self = this replace bind?  not saying it doesnt but i dont follow how that replicates
+19:30 < cellvia> oh i see, saving the scope
+19:31 < CoverSlide> otherwise, for functions you create inside the parent, i think self is the best way to go
+19:31 < CoverSlide> i think there's some performance loss by using bind
+19:31 < cellvia> yeah?
+19:31 < CoverSlide> not 100% sure
+19:31 < cellvia> i just like bind because it makes me feel like a badass
+19:32 < owen1> anyone that uses deploy (https://github.com/visionmedia/deploy) know if it's possible to deploy to multiple hosts? dev1, dev2, etc?
+19:32 < cellvia> flippin functions like no one business
+19:32 < CoverSlide> that said, usually I use `on('event', this.myFunction.bind(this));`
+19:32 < CoverSlide> ALTHOUGH
+19:33 < superjoe> cellvia, https://gist.github.com/4455229
+19:33 < CoverSlide> if you want to make it more performant, and you assign that event handler more than once, it might be in your best interest on instantiation to prebind it to `this`
+19:33 < cellvia> nice coverslide
+19:33 < cellvia> i like that
+19:33 < cellvia> yeah
+19:34 < cellvia> you flippin functions too
+19:34 < superjoe> owen1, not sure, but I just made this recently and it may or may not fit your needs: https://github.com/indabamusic/rodent
+19:34 < mgeary> hi folks. learning about node.js. I'm trying to get dali running, and even though i've installed the "daemon" module, i'm getting the error, "Cannot find module './daemon.v0.8.16'". Suggestions?
+19:34 < cellvia> bind is like my fav thing about js, from my modest experience so far
+19:36 < CoverSlide> yeah, it's something that should have been in the language from the beginning. It's not in ES3 at all
+19:36 < CoverSlide> but it's easily shimmable
+19:37 < owen1> superjoe: interesting. thanks
+19:38 < cellvia> superjoe LOL to that squirrel picture
+19:38 < jcrugzz> you can do some very clever things with bind. Haven't gotten in the habit of using it yet. Still relatively new to js
+19:39 < cellvia> i think one of the cleverst js things i had to do was extracting a function from onclick in the markup, adding some functionality beforehand and appending it back to the end that while maintaining the event scope
+19:39 < TomyLobo> most clever*
+19:39 < cellvia> ...  i stand by cleverst
+19:40 < cellvia> language.most.bind('clever')
+19:41 < rodyhaddad> If I have the `exports` object of a module, is there a way to access its `module` object?
+19:42 < cellvia> what do you mean, from outside?
+19:42 < cellvia> confused
+19:43 < cellvia> the poitn is to put what you need in module.exports isnt it
+19:44 < rodyhaddad> yes, but I mean, is there a way of doing module.exports.module? :p I guess not
+19:45 < cellvia> haha
+19:45 < cellvia> hmm
+19:45 < cellvia> well just put what you want from module in there
+19:46 < cellvia> or you could clone module object
+19:46 < jcrugzz> rodyhaddad: not quite sure what your use case is but you can look at a module's parent module. http://nodejs.org/api/modules.html
+19:47 < cellvia> jcrugzz whoa.  nice. i did not know that
+19:47 < rodyhaddad> if it's possible to do that, then someone could do: var k = require("./test"); k.module.exports = otherObject; // that way the next person that does require("./test") will get otherObject instead of the initial value of the module
+19:48 < cellvia> good point
+19:48 < rodyhaddad> It's "stupid" I know, but could be useful for some librairies
+19:54 < jcrugzz> this is exactly why I love javascript, it inspires creativity
+19:56 < sshaginyan> Can someone explain to me how this works? var x  = []; x['one'] = 1;. then x becomes an associative array kinda like an object…..??? If this is so how do I initialize an array with key and val?
+19:56 < sshaginyan> Like this var options = ['new':1, 'edit':2, 'del':3, 'run':4, 'done':5];
+19:57 < sshaginyan> I can also do var x = []; x[0] = 1; then x['one'] = 2; which gives me [1, one:2] ……
+19:58 < tjfontaine> sshaginyan: to make the jit love you the most, it's best to not mix your key types
+19:58 < tjfontaine> sshaginyan: for your sanity and the sake of the optimizer, ignore the fact that you can do what you just did in js
+19:58 < sshaginyan> lol
+19:59 < geNAZt> yes
+19:59 < sshaginyan> I understand that an array is also an object
+19:59 < geNAZt> integer keyed array are awesome fast in v8
+19:59 < geNAZt> anything else with slow it down
+19:59 < sshaginyan> tjfontaine: But I would love to initialize it with keys 
+19:59 < sshaginyan> But I need it.....
+19:59 < geNAZt> you can
+19:59 < tjfontaine> sshaginyan: then var a = {key: value};
+19:59 < geNAZt> object ?
+19:59 < sshaginyan> that's an object
+19:59 < geNAZt> y and ?
+19:59 < sshaginyan> upper level then array
+20:00 < tjfontaine> sshaginyan: because that's what you're asking for
+20:00 < cellvia> whats wrong with it being an object
+20:00 < cellvia> if you need to call array functions you can
+20:00 < geNAZt> an object in javascript can contain anything
+20:00 < geNAZt> but you should avoid to change it often
+20:01 < cellvia> what are you thinking to do that you couldnt this way
+20:01 < mgeary> so, i'm hitting this jsdom "Cannot read property 'implementation' of undefined" error. One fix suggests that you need to have python 2.7+ installed. I have 2.6.5, and upgrading it isn't really an option. Any suggestions?
+20:02 < cellvia> yeah, dont use jsdom
+20:02 < mgeary> cellvia: any *other* suggestions?
+20:02 < mgeary> is there an alternative to jsdom?
+20:02 < cellvia> yes trying to remember the name
+20:02 < mgeary> i'm trying to get server side chart rendering via HighCharts
+20:02 < mgeary> but keep hitting snags
+20:02 < cellvia> nice
+20:03 < cellvia> yeah that sounds crazy
+20:03 < cellvia> cheerio
+20:03 < cellvia> thats it
+20:03 < mgeary> just found that
+20:04 < cellvia> https://github.com/MatthewMueller/cheerio
+20:04 < cellvia> worked well forme but dunno your use case
+20:04 < mgeary> yeah. just nap installed that
+20:05 < mgeary> but i don't yet know how to use it instead of jsdom
+20:05 < cellvia> jsdom was a huge pain in the ass
+20:05 < cellvia> thers a few articles on it
+20:05 < cellvia> godgle it
+20:07 < mgeary> bah
+20:07 < mgeary> every piece of existing node+highcharts code wants jsdom
+20:08 < cellvia> link
+20:08 < mgeary> https://github.com/davidpadbury/node-highcharts
+20:08 < mgeary> started there
+20:08 < mgeary> then ambled over here: https://github.com/metricfire/dali
+20:09 < cellvia> yeah cheerio doesnt really emulate thw window env 
+20:09 < mgeary> that dali one might work, but it wants "daemon", which is apparently deprecated. I'm running node 0.8.16, and apparently it doesn't like daemon
+20:09 < cellvia> you would have to adapt the library to use cheerio
+20:10 < cellvia> might not be as hard as it seems
+20:10 < mgeary> possibly not
+20:10 < ikss> tjfontaine: still here? :D
+20:10 < mgeary> trying to get a bare-bones equivalent going in cheerio
+20:10 < tjfontaine> ikss: yes
+20:10 < cellvia> may i ask what you consider the main reason to do the chart rendering client side?
+20:10 < cellvia> i am working on an app using highcharts client side
+20:10 < mgeary> cellvia: heh. that's a long story
+20:10 < cellvia> er sorry, main reason for server side
+20:11 < ikss> tjfontaine: i'm trying to use node-irc and i'm looking on your MI6 bot cause i'm having a problem with colors on irc... any ideas why they are ignored? ;/
+20:11 < mgeary> but the shortest answer is that the "client" in this case is actually a Titanium iPad application
+20:11 < mgeary> and the SVG generation routine is quite taxing on that processor
+20:11 < cellvia> mgeary ah hah, interesting
+20:11 < tjfontaine> ikss: are you passing a literal ^C and the channel isn't +c?
+20:11 < cellvia> mgeary yeah good point
+20:11 < cellvia> mgeary maybe i should consider it
+20:11  * mgeary feels validated
+20:11 < cellvia> mgeary lol
+20:11 < ikss> tjfontaine: at this moment i'm using your functions from bot.js format_*
+20:11 < mgeary> cellvia: well, if you can help me get this going, i'd be happy to share
+20:11 < ikss> theBrettman: channel +c hmmm ;-D good question
+20:12 < ikss> tjfontaine: *
+20:12 < mgeary> i've got a fair bit of js experience, but am new, as of today, to node
+20:12 < cellvia> mgeary im actually in the middle of mentally putting together how this app will work, so i will consider that as part of it
+20:12 < mgeary> plenty of python/django, PHP, etc. experience, but all this node stuff is overwhelming
+20:12 < cellvia> mgeary i inherited it and i have to say the json structures being passed to the browser are really terrible
+20:12 < cellvia> mgeary seems like too many weird arrays of arrays and stuff
+20:13 < cellvia> mgeary might be nice to render it server side
+20:13 < iksik> tjfontaine: uhhh it is +c ;/
+20:13 < geNAZt> maybe you should use a full canvas render for that
+20:13 < cellvia> what do you mean geNAZt
+20:13 < geNAZt> https://github.com/davidberneda/TeeChart
+20:13 < geNAZt> something like that
+20:14 < mgeary> too late for that
+20:14 < mgeary> on my end
+20:14 < cellvia> we have a highcharts license so i may as well use it i think
+20:14 < mgeary> already resorting to node is a last-ditch effort to improve performance
+20:14 < mgeary> yeah, also that
+20:15 < tjfontaine> iksik: ya, you're fighting the ircd then, make it -c and continue testing :)
+20:15 < cellvia> teechart looks like you have to buy it
+20:15 < iksik> tjfontaine: i'm not very familliar with freenode, i was trying to remove it but... heh "c ntcslk MODE cannot be set due to channel having an active MLOCK restriction policy"
+20:16 < cellvia> and not much activity on the github
+20:16 < tjfontaine> iksik: that means you'll need to use chanserv to modify it
+20:16 < iksik> oh
+20:16 < iksik> hm
+20:16 < cellvia> geNAZt but i like the idea of using canvas that way
+20:16 < tjfontaine> iksik: see /msg chanserv help set mlock
+20:17 < geNAZt> you dont need to go around jsdom
+20:17 < mgeary> cellvia: so, i've got a hello world working with Cheerio. How would i load up highcharts in the 'document' ?
+20:17 < cellvia> mgeary i like this idea of server side charting cause you could cache the images, depending on the timing of the data
+20:17 < iksik> tjfontaine: done, thanks ;-)
+20:17 < geNAZt> and load a heck of html
+20:18 < tjfontaine> iksik: you're welcome
+20:18 < mgeary> cellvia: indeed
+20:18 < geNAZt> only to parse a highchart out of it :D
+20:18 < cellvia> yeah mgeary im not so sure that you could with cheerio, cause its mainly meant for scraping and emulating jquery rather than emulating a browser
+20:19 < geNAZt> you could wirte a full html and then give it to cheerio ?
+20:19 < mgeary> so maybe i *do* have to see about taking the server to Python 2.7.x
+20:19 < mgeary> bah
+20:19 < geNAZt> and then select it out with "jQuery"
+20:19 < mgeary> always something
+20:20 < cellvia> well how does the chart end up, literally as binary image file
+20:20 < cellvia> or svg?
+20:20 < cellvia> with serverside highchart
+20:20 < geNAZt> highchart is svg
+20:20 < mgeary> the plan is to write out a svg file
+20:20 < geNAZt> so a html with and id containing only the svg should work
+20:20 < cellvia> so youre saying its the highcarts building of that svg file that is taxing the titanium app?  not the rendering of the svg?
+20:20 < geNAZt> so you can select the content of that id
+20:21 < mgeary> cellvia: correct. it's the pulling out of the SVG. We do that because a PDF is being created. Again, we couldn't do that client-side, so we do it serverside
+20:21 < mgeary> currently, the client sends up raw SVG data to the server
+20:22 < mgeary> but pulling that SVG from a given Highcharts instance takes several seconds
+20:22 < mgeary> and we have to do it 4+ times per email sent, so the user is sometimes waiting 20+ seconds
+20:22 < mgeary> unacceptable
+20:22 < cellvia> right
+20:22 < geNAZt> are the charts dynamic ?
+20:22 < mgeary> yeah
+20:22 < geNAZt> how often are they changed ?
+20:22 < mgeary> generated by data gathered at the client
+20:22 < geNAZt> ah ok
+20:23 < cellvia> so you want to send the dynamic gen data to the server, render the highchart put it into a pdf and email it?
+20:23 < mgeary> yeap
+20:23 < bradleymeck> mgeary have you done profiling to see what the bottleneck is specifically?
+20:23 < cellvia> so you dont even need to display the chart in any way on the client
+20:23 < mgeary> bradleymeck: yep.
+20:24 < cellvia> just email it in pdf form?
+20:24 < mgeary> cellvia: well, we do, but client-side, we display 1 chart, whereas in the PDF, we break that out into many sub-charts
+20:24 < cellvia> ok i see
+20:24 <@konobi> why not request all of them at the same time?
+20:25 < mgeary> konobi: looooong wait
+20:25 <@konobi> "several seconds"
+20:25 < cellvia> i think he is requesting them all at the same time, but just not building them client side
+20:25 <@konobi> serially or in parallel?
+20:26 < mgeary> konobi: this is a poor little iPad processor we're talking about. Serially
+20:26 < mgeary> but believe me, doing this client side isn't going to work
+20:26 < cellvia> i dont see why jsdom is even necessary to get this out of highcharts clientside, or cheerio
+20:26 < mgeary> that could well be
+20:27 < cellvia> if youre just grabbing the generated svg
+20:27 < cellvia> just find where thats output in the code, and circumvent any of the other stuff
+20:27 < cellvia> as in, all the DOM stuff
+20:28 < cellvia> but i dunno it may be heavily dependent on jquery
+20:28 < cellvia> take a look
+20:28 < geNAZt> https://github.com/davidpadbury/node-highcharts/blob/master/lib/highcharts/highcharts.src.js
+20:28 <@konobi> Chart.getSVG()
+20:29 < geNAZt> you get the error on building jsdom ?
+20:29 < mgeary> right. that's exactly what i'm trying
+20:30 < mgeary> well
+20:30 < geNAZt> windows or unix ?
+20:30 <@konobi> rendered offscreen?
+20:30 < mgeary> unix
+20:30 < geNAZt> debian ?
+20:30 < mgeary> ubuntu, yeah
+20:30 < geNAZt> maybe try to compile it on an other machine and import the lib
+20:30 < mgeary> the problem is, David Padbury doesn't give me all the code i think i need
+20:31 < cellvia> konobi where are you seeing that
+20:31 <@konobi> cellvia: the docs
+20:31 < cellvia> ah... hmm not seeing it in the src
+20:32 < cellvia> oh i see
+20:32 < cellvia> https://github.com/davidpadbury/node-highcharts/blob/master/lib/highcharts/exporting.src.js
+20:32 < geNAZt> i compiled jsdom on a debian machine
+20:32 < geNAZt> oO
+20:32 < geNAZt> with python 2.6.6
+20:33 <@konobi> cairosvg?
+20:34 < cellvia> "Highcharts uses either jQuery, MooTools or Prototype for some common JavaScript tasks."
+20:34 < Virunga> Hi guys, i want to receive in soft-real-time all messages of an irc channel. Could you give me an advice about whether to use only the node's http server, maintaining opened the connection, or use some other tool like socket.io, for example?
+20:34 < Virunga> Highcharts is really cool.
+20:35 < theBrettman> ikss: what question? It's been so long, I forgot!
+20:35 < cellvia> mgeary if its easier you could load something besides jquery for highcharts to use
+20:35 <@konobi> zepto
+20:36 < cellvia> oh yeah, i bet thatd cover it
+20:38 < cellvia> its using jquery  extend,  grep, bind, unbind, get
+20:38 < cellvia> and animation/ fx
+20:38 < cellvia> but most of that you wouldnt need
+20:38 < cellvia> for server side
+20:38 < geNAZt> i try to get the error u got for jsdom on building
+20:38 < geNAZt> but i dont get it Oo
+20:39 < cellvia> geNAZt, ive had issues and had to do what he is avoiding, python 2.7  
+20:39 < cellvia> in my case ia ctually had to downgrade my python
+20:39 < geNAZt> y i got that
+20:39 < mgeary> i didn't get a problem installing jsdom. i just keep getting this implementation error. Sorry, on the phone. Distracted
+20:39 < geNAZt> but when i npm install jsdom
+20:39 < geNAZt> i dont get errors
+20:39 < geNAZt> with phyton 2.6.6
+20:39 < geNAZt> python*
+20:39 < cellvia> what OS?
+20:40 < mgeary> geNAZt:  same
+20:40 < geNAZt> debian 6
+20:41 < Musk> Debian woot woot :3
+20:41 < geNAZt> <3 debian :D
+20:44 < cellvia> this is very interesting to me as i may be able to use it for my app, the non-DOM jquery use in highcharts seems minimal so it should be fairly easy to feed it a stripped down jquery for these purposes
+20:45 < mgeary> sorry. back now
+20:45 <@konobi> https://github.com/fgnass/zepto-node
+20:46 <@konobi> mgeary: if you have the svg string, why not just feed it into something like cairosvg?
+20:47 < mgeary> konobi: it's *getting* the SVG string that takes all the work
+20:47 < mgeary> what's easy is the raw data for the chart
+20:47 <@konobi> ah... =0)
+20:48 < mgeary> i could possibly get python 2.7 on my server, if that would make these other issues go away
+20:48 < mgeary> can anyone confirm that it would?
+20:48 < geNAZt> do you have a test server ?
+20:48 < mgeary> this is basically a test server
+20:48 < mgeary> hasn't gone to production yet
+20:48 < geNAZt> then you can give it a try ?
+20:48 < mgeary> yeah
+20:48 < mgeary> but i don't know if my node code is even correct
+20:49 < geNAZt> you would see it then
+20:49 < geNAZt> :D
+20:49 < mgeary> well
+20:49 < mgeary> so, if we look at this "Usage" code:
+20:49 < mgeary> https://github.com/davidpadbury/node-highcharts
+20:50 < cellvia> mgeary i cant confirm but i know it worked for me for other things ive had issues with (i think for me it was actually node-gyp or something like that)
+20:50 < cellvia> all i know is i did not enjoy working with jsdom and it was very slow
+20:50 < geNAZt> y but it should be able to get it running 
+20:50 < mgeary> ok, so on that code ^^, what i actually get is this:
+20:51 < mgeary> http://dpaste.com/863858/
+20:51 < cellvia> i dont see anything about python in there
+20:51 < mgeary> well
+20:52 < geNAZt> console.dir( window ); before line 6 ?
+20:52 < mgeary> i've pursued many avenues, with varying failures. this is the failure i get from *this* avenue
+20:52 < mgeary> geNAZt: ReferenceError: window is not defined
+20:53 < cellvia> seems like a code issue to me
+20:53 < mgeary> well
+20:53 < mgeary> again, i believe that the "Usage" from David is incomplete
+20:53 <@konobi> pastebin code!
+20:53 < mgeary> konobi: https://github.com/davidpadbury/node-highcharts
+20:53 < cellvia> lol
+20:53 < cellvia> are you saying the code you're using is the demo code
+20:54 <@konobi> mgeary: http://blog.davidpadbury.com/2010/10/03/using-nodejs-to-render-js-charts-on-server/
+20:54 < mgeary> as a starting point, yes. that's one thing i've tried
+20:54 < mgeary> konobi: yes
+20:54 < geNAZt> well if u look at the repo
+20:54 < geNAZt> its 2 years old
+20:54 < mgeary> konobi: the code on that page requires me to connect more dots than i can with my current node-fu
+20:54 < geNAZt> and it uses the last version of jsdom
+20:54 < geNAZt> maybe they changed the api
+20:54 < mgeary> and yes, 2 years is a bit concerning
+20:55 < geNAZt> http://stackoverflow.com/questions/11301119/jsdom-document-createwindow-returns-empty-for-non-empty-document
+20:55 < geNAZt> jsdom.jsdom().createWindow() => jsdom().document.createWindow() ?
+20:56 < geNAZt> jsdom.jsdom().createWindow() => jsdom.jsdom().document.createWindow() ?
+20:56 < geNAZt> sry
+20:57 < cellvia> https://github.com/davidpadbury/node-highcharts/blob/master/lib/node-highcharts.js
+20:58 < cellvia> ok i cant looka t this anymore brings back bad jsdom flashbacks
+20:58 < cellvia> gl i will let you know if i end up doing anything w/ server side highcharts
+20:58 < mgeary> thanks :S
+20:58 <@konobi> mgeary: why not try with plain jsdom and highcharts
+20:59 < mgeary> i'd be happy to
+20:59 < mgeary> i'm game for *anything* at this point
+20:59 < geNAZt> have u tried the fix ?
+20:59 < cellvia> if it were me i'd do zepto
+21:00 <@konobi> k... well you can runInNewContext to execute the plain highcharts code
+21:00 < cellvia> and reference node-highcharts
+21:01 < mgeary> geNAZt: TypeError: Cannot call method 'createWindow' of undefined
+21:01 < mgeary> jsdom.jsdom().document is undefined
+21:02 <@konobi> mgeary: i'd ignore node-highcharts all together
+21:02 < mgeary> sure
+21:02 <@konobi> the blog would make for an interesting start
+21:02 < mgeary> well, like i say, i found this-- https://github.com/metricfire/dali
+21:02 < mgeary> which looked very promising
+21:02 <@konobi> but update it based on current api offerings
+21:03 <@konobi> mgeary: nice!
+21:03 < mgeary> but i can't get it to work either
+21:03 < mgeary> it uses "daemon", which maybe(?) isn't compatible with my version of node...?
+21:03 < cellvia> "Caches chart objects, re-uses them for requests that only change the data"  thats cool
+21:03 < mgeary> though i'd be happy to downgrade my node, if that's all a fix required
+21:05 < mgeary> i run it first, and it says, "Error: Cannot find module 'daemon'"
+21:05 <@konobi> mgeary: did you clone and then run `npm install .` ?
+21:05 < mgeary> so i npm install daemon
+21:05 < mgeary> and it installs daemon 0.5.1
+21:06 < cellvia> where is the package.json file
+21:06 < cellvia> there is none
+21:06 < cellvia> lame
+21:07 < cellvia> you dont know what versions it needs
+21:07 < mgeary> bah. well… okay, i got some modules installed, and now i'm back to "Cannot call method 'createElement' of undefined"
+21:07 < mgeary> same code as that other one
+21:07 < cellvia> have you tried jsom by itself
+21:07 < cellvia> to see if it works
+21:07 < cellvia> jsdom
+21:09 < mgeary> this doesn't throw an error: document = jsdom('<!doctype html><html><body>hello jsdom</body></html>');
+21:09 < mgeary> but i still get an empty dict when i call document.createWindow();
+21:10 < mgeary> looks like i need contextify?
+21:10 < cellvia> ah yes, contextify i remember causing probs
+21:10 < mgeary> should i require it in my code? or just install it?
+21:11 < cellvia> http://stackoverflow.com/questions/10226301/building-contextify-under-windows-7-x64-for-nodejs-jquery
+21:11 < cellvia> maybe not useful for you but yeah, i had to get python 2.7 going
+21:11 < cellvia> and a bunch o visual studio stuff
+21:12 < cellvia> just try 2.7 py
+21:13 < mgeary> is there a sub-version needed?
+21:13 < mgeary> 2.7.2 okay?
+21:14 < daoudi> hi
+21:15 < daoudi> anyone can help me
+21:15 < mgeary> daoudi: that remains to be seen ;)
+21:16 < daoudi> im new in node.js and im facing a problem an need your help
+21:16 <@Nexxy> daoudi, if you have a particular question, please ask :) even better if you have some code to paste (via some sort of paste service such as gisthub.com)
+21:17 < valterguy> gisthub?
+21:17 <@Nexxy> gisthub
+21:17 < valterguy> wow. they have that registered...
+21:17 <@Nexxy> of course :)
+21:17 < valterguy> you learn something new every day. :)
+21:17 <@Nexxy> it's easier than typing gist.github.com 
+21:17 < valterguy> you're skipping just one dot...
+21:17 < valterguy> but okay. :D
+21:17 < valterguy> oh wait. git toO!
+21:18 < daoudi> i have installed node.js on my ubuntu everything is working fine but when i create a new folder in my www folder im not able to use npm 
+21:18 <@Nexxy> 11 vs 15 keysrokes
+21:18 < valterguy> Nexxy: yeah. noticed that git disappears from github. silly me.
+21:18 <@Nexxy> daoudi, sounds like a permissions error?
+21:18 < mgeary> ok, so i have python2.7 installed now
+21:18 < valterguy> daoudi: do you get an exact error?
+21:18 < mgeary> cellvia: how do i get node to use that python?
+21:19 < cellvia> i had to fix path
+21:19 < cellvia> to reference the older versio
+21:19 < cellvia> or in your case, i guess the newer version
+21:20 < s5fs> Nexxy: hai
+21:20 < mgeary> is that in a node config somewhere?
+21:20 < daoudi> npm install was able to install mongoose but node jade i got this erro pm ERR! Error: EROFS, symlink '../jade/bin/jade'
+21:20 <@Nexxy> ERMAHGERD S5FS O HAI
+21:20 < cellvia> your path var
+21:20 < cellvia> its not node config i think it drops to commandline
+21:21  * valterguy wonders if daoudi's problem is related to https://github.com/isaacs/npm/issues/2423 
+21:22 < valterguy> daoudi: you could try installing globally then...
+21:23 < daoudi> if i run the same command in the same path where the node folder it works but it doesn't work if i run the command in my projects folder
+21:23 < valterguy> what are the permissions there?
+21:24 < daoudi> 775
+21:24 < valterguy> and are you the owner or in the owner group?
+21:25 < daoudi> yes
+21:26 < shakefon> looking for a MySQL Database as a Service recommendation, or hosted with external access, AWS RDS a bit on the pricey side for 24/7 operation. Anyone able to recommend?
+21:26 < daoudi> it installs the mangoose but not the jade
+21:26 < valterguy> daoudi: weird... don't know really then.
+21:27 < valterguy> daoudi: all I can suggest is trying to install it globally, if that is a viable option.
+21:27 < L10n> could you install it in a separate folder and then copy it over?
+21:27 < wankdanker> daoudi: what is the filesystem type in which the www folder resides? and more specifically, does it support symlinks?
+21:28 < mmalecki> sr
+21:31 < mmalecki> (vim fail)
+21:33 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+21:36 < astropirate> Greetings comrades
+21:37 < cellvia> greetings :)
+21:37 < cellvia> if i want to communicate with a node process from a cronjob,  is there a better way than doing a GET request ?
+21:37 < tjfontaine> huh?
+21:38 < cellvia> lol forgive me.  i am a noob.  but the way ive seen it done before (communicating to php) was setting cronjobs that would do get request to the framework
+21:38 < cellvia> triggering a cascade of functions
+21:38 < cellvia> based on the api setup
+21:39 < shakefon> cellvia: what are you trying to achieve overall?
+21:39 < cellvia> i want to have a node process that runs reports at intervals
+21:39 < cellvia> long intervals
+21:39 < tjfontaine> do you already have an http listener active?
+21:39 < cellvia> monthly, weekly, daily
+21:40 < cellvia> well, i was thinking of makign this a separate node process, with an http listener
+21:40 < tjfontaine> do what you know how to do
+21:40 < mgeary> okay, so i've got python2.7 running, re-installed jsdom, and now i get a *different* error
+21:40 < cellvia> lol, well... i guess that was my question, if there is a better way
+21:41 < mgeary> http://dpaste.com/863983/
+21:41 < tjfontaine> cellvia: there are numerous ways to achieve it, I vote for you doing what you feel the most comfortable with
+21:41 < shakefon> can you just run the node process directly e.g. for daily at midnight - 0 0 * * * /usr/local/bin/node /path/to/your/node/script.js
+21:42 < mgeary> cellvia, geNAZt, now i don't get that implementation error, but window.jQuery evaluates to undefined
+21:42 < cellvia> hrm
+21:42 < cellvia> let me think on that shakefon, i might be able to adapt to that 
+21:42 < tjfontaine> */5 * * * * node reporter 5minavg
+21:42 < mgeary> so $(<anything) doesn't work
+21:43 < shakefon> cellvia: if you do that, then your node script.js runs the report and exits, that should negate the need for any sort of HTTP interaction
+21:43 < cellvia> im not very experienced with crons,  can i add flags
+21:43 < cellvia> right
+21:43 < cellvia> i like that
+21:43 < cellvia> but i need to be able to tell node what the frequency of the cron is
+21:43 < shakefon> cellvia: if you have your node script accept arguments from STDIN, you could specify flags 
+21:44 < cellvia> right
+21:44 < cellvia> ok
+21:44 < cellvia> i may do that
+21:44 < shakefon> you could tell node via another argument
+21:44 < shakefon> why would it need to be aware of the frequency, out of interest?
+21:44 < cellvia> yeah i would just do a -f flag  or just straight put -weekly
+21:44 < cellvia> --weekly
+21:44 < shakefon> oh so for the type of report, yea makes sense
+21:44 < cellvia> im going to have a library o metrics
+21:45 < cellvia> some need to be updated only weekly, daily, etc
+21:45 < cellvia> i dont want to run ALL the reports every time
+21:45 < cellvia> when the person makes their report module they have to put a custom prop in the package.json
+21:45 < mgeary> oho. i've got jsdom working!
+21:45 < cellvia> that says frequency
+21:45 < cellvia> congrats mgeary let me know if you get the whole shebang going
+21:46 < mgeary> long ways from there, i fear
+21:46 < mgeary> but hard to say
+21:46 < cellvia> maybe not
+21:46 < myndzi> is something like zeromq better than ipc communication if you're doing a lot of back-and-forth?
+21:47 < cellvia> i thought zeromq was ipc
+21:47 < cellvia> i think mikeal posted an article on something like that
+21:47 < cellvia> avoiding using a job queue
+21:47 < cellvia> hol don
+21:47 < tjfontaine> message queuing is a form of ip
+21:47 < tjfontaine> c
+21:48 < myndzi> well, except when it's sockets i guess
+21:48 < myndzi> i mean
+21:48 < myndzi> between different systems entirely
+21:48 < cellvia> http://www.mikealrogers.com/posts/scaling-realtime.html
+21:48 < tjfontaine> myndzi: when you say IPC you mean shared memory?
+21:48 <@konobi> still ipc
+21:48 < myndzi> i guess so :)
+21:49 <@konobi> sysv ipc?
+21:49 < myndzi> thanks @ link
+21:49 < tjfontaine> (there's also memory sans these days, so it all breaks down)
+21:49 < myndzi> i don't know konobi, i mean, i guess two computers is inter process as much as two processes on one computer
+21:49 <@konobi> yes
+21:49 < myndzi> memory sans?
+21:51 < chovy> anybody else notice gmail being really slow the last few days?
+21:51 < k_89> question: is there any way of specifying the dependencies of your project using package.json ?
+21:52 < cellvia> isnt that kind of what its for?
+21:52 <@konobi> k_89: https://npmjs.org/doc/json.html
+21:53 < chovy> konobi: npm install some_package --save
+21:53 < chovy> will automatically add it
+21:53 < k_89> k, thanks
+21:53 < cellvia> nice chovy didnt kno that
+21:53 < chovy> sorry, that was for k_89 
+21:53 < k_89> haha
+21:53 < cellvia> im sure konobi appreciates it too
+21:53 <@konobi> o.O
+21:54 <@konobi> shrinkwrap is also useful
+21:54 < chovy> i think gmail is slower because of warrantless wiretapping.
+21:54 < cellvia> lol
+21:54 < cellvia> do you really think they werent already doing that
+21:54 < chovy> all my interactions now have to be crunched by some CIA mainframe before i open them.
+21:55 < cellvia> damn thats like china stylez
+21:55 < chovy> that's true, all they did was renew the law
+21:55 < chovy> must be something else.
+21:55 < cellvia> internet damn slow in china
+21:56 < mgeary> bah
+21:56 < mgeary> i'm getting CLOSE
+21:56 < cellvia> mgeary you have  a thick callous on your forehead yet?
+21:56 < mgeary> cellvia: seriously
+21:57 < mgeary> i'm now getting a Chart object
+21:57 < mgeary> but it doesn't have a getSVG method
+21:57 < mgeary> maybe that's old code
+21:57 < cellvia> thats cuz you gotta include the exportable
+21:57 < mgeary> oho
+21:57 < cellvia> theres the highcharts library
+21:57 < mgeary> awesome
+21:57 < cellvia> and the exportable extension
+21:58 < cellvia> you should be good now
+21:58 < cellvia> *excited*
+21:58 < mgeary> BOO YAH!!!!
+21:58  * mgeary is looking at server side SVG
+21:58 < cellvia> heck yeah
+21:58 < mgeary> of course, it's not for MY chart
+21:58 < mgeary> just for a hello world example
+21:58 < mgeary> but from here it OUGHT to be good
+21:58 < mgeary> sheesh
+21:59 < cellvia> hello world has been cause or celebration, many times.
+21:59 < cellvia> for*
+21:59 < geNAZt> gz :D
+21:59 < cellvia> mgeary what were the main things you had to do
+21:59 < cellvia> for future reference
+22:00 < mgeary> i'll pastebin my view
+22:01 < cellvia> im really excited to use iannix to feed a OSC stream into various nodejs transform pipes that modify them and output to Reaper which has OSC support
+22:01 < mgeary> http://dpaste.com/863995/
+22:02 < mgeary> so, other than that, i just installed Python2.7 uninstalled jsdom, and reinstalled it with python2.7 as my default python
+22:02 < cellvia> hell yeah
+22:02 < cellvia> and it renders perfect?
+22:02 < mgeary> well
+22:02 < mgeary> i need to save the SVG out to a file and test that
+22:02 < mgeary> one sec
+22:04 < mgeary> ah
+22:04 < mgeary> well
+22:04 < mgeary> no, it looks terrible
+22:04 < cellvia> lol
+22:05 < cellvia> wonderful
+22:05 < mgeary> but
+22:05 < mgeary> from here i should be able to wire in my actual chart, and then i could compare the node SVG with the SVG from my client
+22:05 < mgeary> and figure out what the difference is
+22:05 < mgeary> even if i have to massage the SVG after pulling it out, i'm fine with that
+22:06 < cellvia> try your helloworld chart on client
+22:06 < cellvia> see how diff it is
+22:06 < cellvia> very curious
+22:06 < mgeary> easier said than done
+22:06 < mgeary> but that's a good idea
+22:06 < cellvia> well, i mean on any browser
+22:07 < cellvia> just to see if its highcharts or what
+22:07 < mgeary> right
+22:07 < cellvia> also as someone said before this is 2 years old highcharts api may have changed
+22:07 < cellvia> since then
+22:07 < mgeary> yeah
+22:08 < mgeary> well
+22:08 < mgeary> for that matter, i'll put in a different hello world chart from highcharts.com
+22:08 < cellvia> gi
+22:09 < CoverSlide> joe?
+22:09 < MI6> joyent/node: Johannes Ewald v0.8 * 872cb0d : doc: improve example of process.hrtime()  The example clarifies now that  - http://git.io/F2FlPg
+22:10 < CoverSlide> XML is Terrible. SVG is XML. Therefore SVG is terrible.
+22:10 < nlf> that's the transitive property
+22:12 < geNAZt> svg is okay
+22:12 < geNAZt> i dont know any vector based graphics for the web
+22:12 < CoverSlide> well it's a standard
+22:12 < mgeary> XML isn't terrible
+22:12 < CoverSlide> being standard doesn't make it good
+22:12 < mgeary> most people who hate XML really just hate Java
+22:12 < CoverSlide> yes it is
+22:12 < mgeary> and i can agree with that ;)
+22:13 < CoverSlide> actually, i hate xml because it's probably one of the stupedist designs for data serialization
+22:13 < CoverSlide> the fact that html became popular and then some people thought "hey, html would be good for transporting data"
+22:13 < CoverSlide> but it's not
+22:13 < mgeary> uhh
+22:13 < geNAZt> xml as a data transport is messy yes
+22:14 < mgeary> you've got the cart before the horse there
+22:14 < geNAZt> but it is not a fail :D
+22:14 < CoverSlide> xml came out after html
+22:14 < CoverSlide> and much after sgml
+22:14 < mgeary> HTML and XML both came from SGML
+22:14 < CoverSlide> yes
+22:14 < mgeary> which was a way to mark up data
+22:14 < mgeary> == transport
+22:14 < Virunga> If i remove a socket from the agent's pool triggering the removeAgent event, should i close the socket after?
+22:14 < geNAZt> would you like to write a webpage in json ?
+22:14 < CoverSlide> no, sgml and html were ways to mark up documents
+22:14 < geNAZt> or in ini ?
+22:15 < CoverSlide> you don't see anyone using TeX to transport data?
+22:15 < geNAZt> but xml + xslt would do fine
+22:15 < CoverSlide> yes, if you've already structured your data to fit inside xml
+22:15 < mgeary> cellvia: getting some JS errors using a chart def. from HC
+22:16 < cellvia> using same version of jquery and all?
+22:16 < jtomasrl> how can i fix the "Origin http://localhost is not allowed by Access-Control-Allow-Origin." problem?
+22:16 < geNAZt> set origin to *:* ?
+22:17 < mgeary> lemme standardize
+22:17 < jtomasrl> res.header("Access-Control-Allow-Origin", "*"); ?
+22:18 < CoverSlide> jtomasrl: tias
+22:18 < CoverSlide> jtomasrl: i'm guessing that's on express
+22:18 < jtomasrl> CoverSlide: restify
+22:18 < CoverSlide> ok well i don't know restify's syntax but that seems reasonable
+22:20 < jtomasrl> CoverSlide: i add it as a pre() function, it works for $.getJSON but not  for $.ajax
+22:20 < CoverSlide> hm
+22:20 < CoverSlide> uhh doesn't every jquery ajax function call $.ajax ?
+22:22 < jtomasrl> CoverSlide: but set dataType to json, maybe that works
+22:24 < jtomasrl> jsonp worked
+22:24 < Tristan128> Hey. Can I pass a readable stream to express? Like res.send(readableStream) ?
+22:26 < CoverSlide> Tristan128: no, but you can pipe streams
+22:27 < Tristan128> like stream.pipe(res) ?
+22:27 < CoverSlide> res and req are streams you can connect with pipes
+22:27 < CoverSlide> yeah
+22:27 < Tristan128> oh, awesome, thanks
+22:31 < cellvia> mgeary im looking at flotr2 and it has no jquery or prototype / mootools dependency and can save to image
+22:31 < cellvia> also the devs have built a realtime library that leverages it called envision
+22:31 < mgeary> hmm
+22:32 < cellvia> which may not be useful for you at this point, but anyways look at flotr2, it has a "download" method built right into it
+22:32 < cellvia> that dumps a png or jpg
+22:33 < cellvia> https://github.com/HumbleSoftware/Flotr2
+22:33 < mgeary> maybe
+22:33 < mgeary> no svg, though?
+22:33 < cellvia> http://www.humblesoftware.com/flotr2/index#!download-image
+22:34 <@konobi> oh, i remember that from a jsconf talk, iirc
+22:34 < mgeary> ah, so that uses a canvas-based approach
+22:34 < cellvia> yeah canvas
+22:34 < mgeary> so yeah, it'd be pixels, not svg
+22:34 < cellvia> pixels?
+22:34 < mgeary> pulling the image data out
+22:34 < cellvia> if youre putting it in a pdf why not use jpg / png
+22:34 < mgeary> not necessarily a dealbreaker
+22:34 < mgeary> yeah
+22:34 < cellvia> seems easier 
+22:34 < mgeary> maybe
+22:34 < cellvia> than dealing with svg rendering probs
+22:35 < cellvia> and inconsistencies
+22:35 < cellvia> and jsdom >_<
+22:35 < mgeary> true
+22:35 < cellvia> konobi, which one, flotr2 or envision?
+22:35 <@konobi> flotr
+22:36 < cellvia> cool
+22:36 <@konobi> though it was in relation to something else
+22:36 < cellvia> yeah flotr is the graphing library im gravitating to
+22:36 < cellvia> flotr2 rather
+22:36 < cellvia> jquery dependency is lame
+22:37 < cellvia> (highcharts)
+22:37 < zomg> highcharts is nice because everyone uses jquery
+22:37 < zomg> ;>
+22:38 < cellvia> yeah...... until you want to render server side
+22:38 < zomg> Easy, just run a headless webkit!
+22:38 < zomg> Duuuh!
+22:38 < cellvia> :)
+22:38 < cellvia> tell it to mgeary
+22:39 < mgeary> not rejecting that. do you have one you like?
+22:39 < cellvia> im curious too
+22:39 < cellvia> lets hear it
+22:40 < zomg> I was joking
+22:41 < cellvia> little do you know mgeary is ragged working on this very problem all day.  he may not have a sense of humor about it at this point
+22:41 < mgeary> ~beat zomg senseless
+22:41 < cellvia> lol
+22:42 < zomg> Well if you're really into it, you could try phantomjs I guess
+22:42 < zomg> We did some test automation using it and it seemed to work ok
+22:42 < cellvia> it just seems backward to me
+22:42 < zomg> But I don't know if you can use it for rendering
+22:42 < mgeary> gonna try flotr at this point. Getting render/export problems with HC
+22:42 < cellvia> when you can use flotr2 which alreayd has built in methods for doing this
+22:42 < cellvia> and no dependencies
+22:43 < mgeary> not bad
+22:44 < mgeary> my data "just works" in flotr (in a browser)
+22:44 < mgeary> so it should be easy to implement
+22:45 < cellvia> yeah i think im gonna do the same thing
+22:45 < myndzi> huh
+22:45 < cellvia> im realizing that ppl may want to have like 8 diff charts on one page
+22:45 < myndzi> what happened to hook.io?
+22:45 < lostcaggy> hi I'm trying to send an Unsigned long from Arduino using udp to a node.js server I can read the four bytes using msg.readUInt32LE(0) but how do I convert back to the long 
+22:45 < cellvia> and that will be slow on some computers with high charts client side
+22:45 < cellvia> and a train wreck on mobile
+22:46 < cellvia> the charts will only get more complex
+22:46 < cellvia> i guess the unfortunate part is losing some element of interactivity
+22:46 < cellvia> but i dont really need that for this purpose
+22:55 < mekwall> https://gist.github.com/4458195 - I wonder why in/out totals haven't been added to net.server yet. Should be easier then that :)
+22:56 <@konobi> mekwall: best done as a module probably
+23:01 < mgeary> hey cellvia 
+23:01 < cellvia> yeh
+23:01 < mgeary> trying to get a reference to Flotr
+23:01 < cellvia> i would use flotr2 personally
+23:01 < cellvia> but what do you mean
+23:01 < mgeary> i am
+23:02 < mgeary> so, i include flotr2.min.js
+23:02 < mgeary> just like i did highcharts.js
+23:02 < mgeary> and with highcharts, i could get window.Highcharts
+23:02 < mgeary> but with flotr2, window.Flotr is undefined
+23:03 < cellvia> you shouldnt even be using that nodehighcharts implementation
+23:03 < mgeary> i'm not
+23:03 < cellvia> oh
+23:03 < mgeary> i'm just using it as a reference, since i'm a node noob
+23:03 < cellvia> ive never done that
+23:03 < cellvia> i would make it into a module and require it
+23:03 < cellvia> or just paste the min in your code
+23:04 < mgeary> i'm game, but don't know how to make it a module
+23:04 < cellvia> and if you have to use a window object ... i guess you could  create window.Flotr yourself
+23:04 < mgeary> there aren't any full html examples of flotr2 that i can find
+23:05 < cellvia> i dont understand what you mean by using it as a reference
+23:06 < mgeary> http://dpaste.com/864030/
+23:06 < mgeary> that's my view
+23:06 < cellvia> yeah what im trying to say is dont use jsdom
+23:06 < mgeary> i'm game for that, but don't know how to do that
+23:06 < mgeary> mind offering some insights?
+23:06 < cellvia> i havent done it before but you could use node-canvas
+23:07 < cellvia> and see if flotr2 could just run with that
+23:07 < cellvia> without jsdom at all
+23:07 < cellvia> and just call the chart.download method
+23:07 < cellvia> or whatever it is
+23:07 < cellvia> from that link
+23:07 < cellvia> http://www.humblesoftware.com/flotr2/index#!download-image
+23:08 < cellvia> graph.download.saveImage(format);
+23:08 < cellvia> i think as long as node-canvas works as a drop in for canvas
+23:08 < cellvia> it should work
+23:08 < mgeary> that's too many dots for me to connect, i'm afraid
+23:10 < superjoe> what's more expensive according to CPU, a function call, or an if statement?
+23:10 < joe-node0> function call
+23:10 <@konobi> it depends
+23:10 < cellvia> mgeary  it shouldnt be too hard.... but i cant guarantee that it works tho
+23:10 < cellvia> mgeary i may mess with it soon i will look for you on here if i do
+23:11 < cellvia> mgeary i just assume since it has no jquery dependency it will work easily server side
+23:11 < mgeary> gah
+23:11 < mgeary> i had a typo
+23:11 < mgeary> Flotr is now an object
+23:11 < joe-node0> superjoe: if the IF statement is crazy involved with many function calls inside of it then obviously it is not an efficient as a simple rudimentary function call that does just one thing.
+23:12 < mgeary> hmm
+23:12 < joe-node0> but if you're comparing a value to a variable vs making a function call, then I'd go with IF statement
+23:12 < mgeary> else if (!el.clientWidth) throw 'The target container must be visible';
+23:14 < superjoe> thanks
+23:14 < superjoe> I suppose I should just benchmark it 
+23:14 < joe-node0> never hurts
+23:15 < cellvia> ahh damn
+23:15 < cellvia> guess not so easy then
+23:15 <@konobi> superjoe: depends what the VM and optimizer does with it
+23:15 < ins0mnia> anyone knows if SockJS 0.3.5 supports heartbeat?
+23:18 < mgeary> cellvia: it appears that the developers of flotr2 are saying it doesn't work in node… (?)
+23:18 < cellvia> not as it is, unfortunately, youd have to modify the library
+23:18 < cellvia> which i may attempt later but that could fall in your too many dots category
+23:19 < jcrew> cellvia: are you trying to get an image out of it or just trying to produce a graph?
+23:19 < MI6> joyent/node: Ben Noordhuis master * 5664dd2 : src: use static_cast where appropriate  Use static_cast instead of reinte - http://git.io/SvxK-g
+23:19 < mgeary> bah
+23:20 < bnoordhuis> tnorris: ^
+23:21 < cellvia> jcrew, an image of a graph
+23:21 < jcrew> would SVG output work?
+23:21 < cellvia> sure
+23:21 < jcrew> you could check out raphaeljs
+23:21 < jcrew> graphaeljs is the graphing stuff: http://g.raphaeljs.com/
+23:21 < cellvia> i didnt know about graphael
+23:21 < tnorris> bnoordhuis: heh, thanks. and thanks for the review. can't believe how many trivial things I missed.
+23:22 < cellvia> raphael works well server side?
+23:22 < jcrew> someone in here got it working a few months ago in node, can't remember who
+23:22 < CoverSlide> raphael works?
+23:22 < cellvia> http://stackoverflow.com/questions/6603250/raphael-js-server-side
+23:22 < jcrew> someone got it working in a way they would process chart data to SVG output and send that to the browser
+23:23 < cellvia> still uses phantom tho
+23:23 < cellvia> but mgeary just needs something that works
+23:24 < cellvia> mgeary did you already try this  https://github.com/travisghansen/highcharts-svg
+23:25 < torvalamo> does it have to be svg?
+23:25 < mgeary> torvalamo: no
+23:25 < torvalamo> gd is pretty fast
+23:25 < torvalamo> https://github.com/taggon/node-gd
+23:25 < mgeary> torvalamo:  but that doesn't give me charting. i'd have to roll that manually
+23:26 < cellvia> i guess phantom + highcharts could be the way to go after all as that previous person mentiond
+23:27 < mgeary> well, i'm getting SVG from HC now
+23:27 < mgeary> but it isn't rendering properly
+23:28 < cellvia> right... but youre using a 2 yr old library
+23:28 < mgeary> no
+23:28 < mgeary> 2.3.5
+23:28 < cellvia> i mean node-highcharts
+23:28 < mgeary> not using node-highcharts
+23:28 < cellvia> oh ok
+23:28 < cellvia> just straight jsdom?
+23:28 < cellvia> phantom might be better for this purpose tho
+23:29 < cellvia> http://code.google.com/p/phantomjs/wiki/QuickStart
+23:29 < cellvia> it has a bunch of svg stuff
+23:30 < samholmes> Anyone know of a good ip to location free REST service 
+23:30 <@konobi> samholmes: nope, you can use GeoIP though
+23:31 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+23:31 < samholmes> konobi: What is GeoIP; a module?
+23:31 <@konobi> yup
+23:32 < cellvia> what is the module node uses for building dependency tree
+23:32 < cellvia> er npm
+23:32 < samholmes> I'll check that out. Thanks man. :)
+23:33 <@konobi> so the svg strings are entirely different?
+23:33 < mgeary> interesting
+23:33 < mgeary> comparing the SVG from client & server
+23:34 < mgeary> looks like the server doesn't know any heights, widths
+23:34 < samholmes> konobi: know of any simple maps I could use with this geolocation data?
+23:34 < cellvia> sounds like jsdom isnt emulating those props properly
+23:34 < mgeary> maybe so
+23:34 < robertj> can you yield/resume a vm sandbox?
+23:34 <@konobi> samholmes: check the dtrace.org blogs for geoip and robinson projection
+23:35 < mgeary> might also be why the creator of dali created a patched version of highcharts
+23:35 < mgeary> sigh
+23:35 < cellvia> yeah
+23:35 < cellvia> i saw that too
+23:35 < cellvia> phantomjs
+23:35 < cellvia> worth a shot
+23:35 < mgeary> maybe
+23:35 < mgeary> sheesh
+23:35 < cellvia> dont tell me you expected this to be easy ;)
+23:37 <@konobi> can't you just set the height and width on the canvas element?
+23:37 < Daegalus> random idea, anyone want DOTA2 on Steam? I just got 4 copies to give out
+23:39 < cellvia> mgeary (a la kobobi recomendation)   when you do   new Highcharts.Chart({
+23:39 < cellvia> can you manually enter the height and width
+23:39 < cellvia> of the chart
+23:40 < mgeary> yes, but it doesn't set the many NaN or 0 values
+23:41 < mgeary> gonna try dali again
+23:41 < cellvia> if that doesnt work do phantom it looks like it was built to actually output images
+23:42 < mgeary> hmm. dali starts right up now
+23:42 < mgeary> dare i hope...
+23:42 <@konobi> highcharts-svg is built on phantom
+23:42 < cellvia> true konobi but it also seems awkward, requiring a php script
+23:43 < cellvia> but you could ref the sourcecode of how he did the node part
+23:43 < tnorris> bnoordhuis: I only have a loose grasp on endian-ness and hardware. There is no such checks in the js buffer read implementations. is that automatically handled?
+23:44 < cellvia> https://github.com/travisghansen/highcharts-svg/blob/master/javascript/chart.js
+23:45 < bnoordhuis> tnorris: no, it just writes out the bytes in different order, depending on if isBigEndian is set
+23:45 < mgeary> well
+23:45 < mgeary> dali *almost* works
+23:45 < mgeary> i get a good-looking chart
+23:45 < mgeary> lines, legend, axes
+23:45 < mgeary> … just no actual DATA
+23:46 < mgeary> oh
+23:46 < mgeary> oho 
+23:46 <@konobi> the index.php is just writing stuff to a file and then calling phantomjs with the file path
+23:46 < mgeary> the data is there, just not stroked/filled or somesuch
+23:47 < mgeary> wow, i'm close
+23:48 < woopwoop> anybody have experience with socket.io? http://pastebin.com/V6kB9zYb giving me info: socket.io started GET http://localhost:3000/socket.io/socket.io.js 404 (Not Found)  
+23:48 < tnorris> bnoordhuis: hm. thought I placed the same type of logic. must be missing something. i'll go back and check.
+23:49 < cellvia> konobi yeah... i would reference highcharts-svg but im not interested in having a php script do this
+23:49  * mgeary has achieved server side chart generation!!
+23:49 < cellvia> yeah? outputting properly?
+23:50 < mgeary> yeap
+23:50 < cellvia> sweet man
+23:50 < cellvia> try a diff one
+23:50 < cellvia> from the examples
+23:50 < mgeary> it's not 100% what i want, since dali is still set up to be a server with a client
+23:50 < bnoordhuis> tnorris: you need to swizzle iff the requested endianness is different from the host's endianness
+23:50 < bnoordhuis> tnorris: so if you're on a LE machine and isBigEndian==true, swizzle
+23:51 < bnoordhuis> tnorris: but if it's a BE machine, _don't_ swizzle
+23:51 < tnorris> bnoordhuis: ah, and that's for both read/write?
+23:51 < bnoordhuis> tnorris: yes
+23:51 < cellvia> mgeary let me know i it works with other examples
+23:52 < tnorris> cool. think I can handle that.
+23:52 < bnoordhuis> tnorris: but frankly, the easiest way to deal with that is to simply write out the bytes one by one
+23:52 < bnoordhuis> tnorris: that is however kind of tricky with floating point numbers
+23:53 < bnoordhuis> tnorris: with integral types, you simply do ((val >> 24) & 255) and you have a single byte
+23:53 < bnoordhuis> but that doesn't work with floats or doubles, of course
+23:53 < tnorris> so is using memcpy the best option?
+23:54 < bnoordhuis> maybe. its disadvantage is that you need to know the endianness of the machine you're running on
+23:57 < tnorris> bnoordhuis: would it work to add an `#define AC_C_BIGENDIAN` and toggle the `big_endian` argument?
+23:57 < bnoordhuis> tnorris: how are you going to know what the define should be set to?
+23:57 < andrewaclt> Is there a particular JS MVC framework that plays well with socket.io apps?
+23:57 < andrewaclt> ...mainly on the client side
+23:59 < tjfontaine> bnoordhuis: rely on pythons answer?
+23:59 < bnoordhuis> tjfontaine: unreliable when cross-compiling
+--- Log closed Sat Jan 05 00:00:09 2013
