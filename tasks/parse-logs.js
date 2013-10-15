@@ -66,6 +66,11 @@ module.exports = function() {
     var state = new State(fname.split('.')[0], options);
     var parsed;
 
+    // as an optimization, assume that we've already parsed the logs if the
+    // directory already exists
+    if (shell.test('-e', state.dir()))
+        return;
+
     shell.mkdir('-p', state.dir());
 
     data.toString().split('\n').forEach(function(line) {
