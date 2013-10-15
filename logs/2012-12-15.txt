@@ -1,0 +1,913 @@
+--- Log opened Sat Dec 15 00:00:19 2012
+00:03 <@isaacs> blakmatrix: that sounds like a bug
+00:03 <@isaacs> blakmatrix: can you write a little test and post an issue?
+00:04 < blakmatrix> isaacs: sure, wanted to get some one else opinion before i did :)
+00:04 < CoverSlide> blakmatrix: you're sure it's the same version?
+00:08 < myndzi> can i do something like
+00:08 < myndzi> ...nevermind, haha
+00:08 < myndzi> i'd like to make a new object with a set of given properties but of a given prototype 
+00:09 < myndzi> like, new Foo(obj) and initialize it to obj, i was wondering if this is possible without looping
+00:09 < myndzi> like this = obj or whatever
+00:09 < myndzi> but you can't assign to this
+00:09 < CoverSlide> Object.create ?
+00:09 < CoverSlide> hmm no i think you need to loop
+00:10 < myndzi> actually that looks like what i want
+00:10 < myndzi> i didn't know about it :)
+00:10 < myndzi> so i'd do like
+00:10 < myndzi> Object.create(foo, obj);
+00:10 < myndzi> it seemed like an obvious thing to exist
+00:10 < CoverSlide> well the second parameter is a properties object
+00:10 < blakmatrix> CoverSlide: hmmm yeah looks like a older version of node issue possibly, most nodejitsu joyent machines are on 8.6  still, down grading on my mac resulted in same error
+00:11 < myndzi> properties is all i want
+00:11 < myndzi> it just seemed silly to loop to set the properties of the object when they can completely replace the properties of the new object
+00:12 < myndzi> and if i return a value from a constructor, that is what gets assigned, not the 'this' object?
+00:12 < myndzi> so i can still use the new Object() syntax instead of Object.create everywhere?
+00:15 < samholmes> tjholowaychuk: Dude?
+00:15 < samholmes> tjholowaychuk: All you did is remove + support for routes? Lol, that's a bit ad-hoc.
+00:15  * samholmes is talking about page.js
+00:19 < AAA_awright> tjholowaychuk: You going to take action on https://github.com/visionmedia/node-growl/issues/27#issuecomment-11369121 ?
+00:20 < hipsterslapfight> AAA_awright: isn't he asking for you to submit a pull request there?
+00:20 < samholmes> tjholowaychuk: The only reason I say this is because it would seem like * suffers the same issue.
+00:20 < AAA_awright> hipsterslapfight: You can't pull-request a npm package
+00:20 < samholmes>  /route/:something(regex*) would not work.
+00:21 < samholmes> But you don't want /route/*/something to not work either if you remove * support. This is basically what you did with +.
+00:21 < AAA_awright> I'm making the assumption that IF there's a package.json checked into the repository, that's the file that gets pushed to npm and not some other package.json (e.g. I don't check in my package.json files)
+00:24 < astropirate> isaacs, do packages show up instantly after publishing or do I have to wait? It shows the package listed under my account page but  the package page says "Undefined" for the package name
+00:24 < astropirate> isaacs, ignore me
+00:24 < astropirate> just came up
+00:25 < CoverSlide> it's pretty quick
+00:25 < CoverSlide> although i think the npmjs.org page takes a minute to refresh
+00:28 < styol> How do you guys deal with iterating over an object with a for loop that contains an async function (such as a database query) and not returning to a parent callback (not within the for loop) until all the iterations have completed including their async responses?
+00:29 < clever> styol: async.forEach
+00:30 < styol> clever: as in the async module, correct?
+00:30 < clever> yep
+00:30 < styol> thanks
+00:30 < clever> styol: i think the forEach method will run every item in paralell
+00:30 < clever> but you also have forEachLimit to only do x at once
+00:31 < styol> hrm.. any particular reason one might choose one over the other? guessing thats documented and i look before asking
+00:31 < styol> *and i should look
+00:31 < hipsterslapfight> you can do forEachSeries if you want them in order
+00:32 < timeturner> anyone know the best way to run a series of async functions in series
+00:32 < clever> styol: if you use .forEach directly, it will wind up with one pending request on the db for every row
+00:32 < clever> styol: so it may wind up trying to do 100 requests at once
+00:32 < CoverSlide> timeturner: "best" is very subjective
+00:32 < timeturner> in which the next async function depends on the return value of the previous
+00:32 < CoverSlide> timeturner: and there are 50w029803928402392908342 answers
+00:32 < styol> clever: ahh gotcha, i see what you mean
+00:32 < timeturner> ok well, the one with the least amount of code
+00:33 < timeturner> least amount of code with vanilla js
+00:33 < clever> styol: forEachLimit will put a cap on how many it will do at once
+00:33 < clever> styol: as they run the callback function, it will spawn more, until it runs out
+00:33 < clever> once all of them have run callback, it will run the callback you gave it
+00:33 < CoverSlide> vanillajs? just nest callbacks
+00:33 < timeturner> a little more than that :P
+00:34 < styol> clever: perhaps a good idea at scale indeed and this object in particular may become beefy
+00:34 < styol> *as this object
+00:34 < timeturner> something that allows me to do: [funcA, funcB, funcC] foreach
+00:34 < styol> clever: guessing the tradeoff is speed though
+00:35 < styol> timeturner: <guess> perhaps step https://github.com/creationix/step </guess>
+00:36 < superjoe> I noticed that after a long period of time, post requests that I make stop returning
+00:36 < superjoe> sorry, long period of time meaning, about the 1000th time that I make a post request, I don't get an 'end' event
+00:36 < superjoe> is this a common phenomenon?
+00:36 < superjoe> I have yet to come up with a simple test case, just hoping there is a shortcut to victory here
+00:38 < ryanrolds_w> Odd question, but any DNS provider recommendations? They must support wildcard records and allow customers to adjust TTL.
+00:43 < superjoe> ryanrolds_w, I like amazon's route 53
+00:44 < styol> timeturner: I wouldn't listen to me if i were you btw, but i suppose async does it also with "Control Flow" line of deliciousness
+00:45 < EyePulp> async is a great library.  using the async.series with object keys instead of an array right now.
+00:45  * EyePulp is late to the conversation
+00:45 < styol> I love that it has no dependencies :)
+00:46 < styol> which probably doesn't mean all that much
+00:48 < CoverSlide> it works in the browser
+00:49 < styol> doh, I've got an object not an array
+00:50 < EyePulp> I like the idiom this guy uses for it:  http://iamsim.me/NodeJS/2012/04/10/bootstrapping-nodejs-with-async/
+00:50 < EyePulp> scroll down to his first example
+00:51 < markdaws> styol: do an _.keys (http://underscorejs.org/) then in the async function you can use the key to get the value from the object
+00:51 < EyePulp> he uses the async.apply() to pass "this" through to each function.  Then each function is set up as foo(self,callback){ //self == this in the outer scope }
+00:52 < styol> markdaws: ah.. any particular reason why _.keys versus Object.keys?
+00:52 < CoverSlide> _.keys if you're using underscore
+00:52 < CoverSlide> which i recommend not to
+00:53 < CoverSlide> and _.keys in the browser if you're targeting es3 browsers
+00:53 < markdaws> styol: I generally use _ quite a bit for helper functions, so habit :)
+00:54 < styol> markdaws: gotcha gotcha, thank you for the suggestion though, it did help
+00:55 < styol> thank you also clever and CoverSlide 
+00:55 < styol> <3
+01:00 < ryanrolds_w> superjoe, thanks
+01:01 < superjoe> np
+01:07 < warz> off topic, but im trying to secure my http-based api. i was just going to go with a simple token based access http header, required in all requests. should i be using the http basic auth header for this, and provider both a token and secret, or should i just use my own header?
+01:08 < warz> if anybody has any insight, itd be appreciated
+01:10 < CoverSlide> if you're using http-basic, make sure you're using https
+01:11 < warz> id still probably provide a token and secret to be used, in place of username and password. same thing, but i figure the same goes even if i just use a token and my own header.
+01:11 < warz> ssl is probably required either way.
+01:11 < AAA_awright> warz: HTTP Basic over TLS is the mos secure
+01:11 < AAA_awright> *most secure
+01:11 < AAA_awright> Just make sure that you use the appropriate checking to authenticate the server to the client
+01:12 < AAA_awright> Or consider using client certificates instead of HTTP headers
+01:15 < CoverSlide> you could also go the s3 route and require a timestamped hash
+01:15 < CoverSlide> pretty fucking secure there too
+01:16 < CoverSlide> that way you won't even need the user to send the secret / password
+01:16 < warz> ya, i just want to start with something simple that i can build on
+01:18 < CoverSlide> http basic is easy
+01:18 < timeturner> TLS == SSL?
+01:19 < CoverSlide> SSL is / was the predecessor to TLS
+01:21 < timeturner> umm, maybe a stupid question but would it work the same as http access wise?
+01:22 < timeturner> and api wise it's the same to create an http server vs a tls server right?
+01:22 < AAA_awright> TLS = SSL 3
+01:22 < timeturner> I see tls.createServer in node's docs
+01:23 < timeturner> so I can pass in the function that express generates just like I do with https.createServer right?
+01:23 < timeturner> along with a tls cert etc
+01:24 < mscdex> isaacs: what constitutes an "abandoned" module?
+01:24 <@isaacs> mscdex: if there are updates to be made, and the owner isn't making them
+01:24 <@isaacs> mscdex: especially, if you're updating a module in github, or something, and the original publisher is awol
+01:25 < mscdex> how is that determined? number of outstanding github issues?
+01:25 <@isaacs> mscdex: i use my human brain
+01:25 < mscdex> :\
+01:25 <@isaacs> mscdex: and only if you and the owner can't work it out amicably
+01:25 <@isaacs> so try to do that first.
+01:25 <@isaacs> because i'm soooo so lazy
+01:26 <@isaacs> mscdex: bottom line, whatever's best for the node community, that's what should happen
+01:26 <@isaacs> the "rules" are just guidelines.  it's a mostly-anarchic dictatorship.
+01:26 < mscdex> isaacs: is there a policy on modules that are strictly for the client?
+01:27 <@isaacs> mscdex: the policy is that that's fine
+01:27 <@isaacs> mscdex: but i'm not going to make changes to npm strictly for the benefit of browsers.
+01:27 < mscdex> no i mean i've seen many modules that have no tie to node at all and are published to npm
+01:27 <@isaacs> yeah
+01:28 <@isaacs> that's fine
+01:28 < mscdex> ok
+01:28 <@isaacs> most useful JavaScript programs are useful in some way to node users.
+01:28 <@isaacs> node is for websites, and websites create code for browsers, so it's all kind of connected
+01:28 <@isaacs> publishing javabeans in there, i mean, ok, kind of pushing it.
+01:28 < mscdex> even modules you can't require() ?
+01:28 <@isaacs> but i publish nave into npm, and tha'ts a bash program
+01:28 < superjoe> isaacs, we're using your LRU cache at work
+01:29 < superjoe> thanks for publishing it!
+01:29 <@isaacs> superjoe: rad :)
+01:29 < CoverSlide> what about dependents
+01:29 < CoverSlide> if there's dependent modules
+01:29 < CoverSlide> wouldn't that basically mean you shouldn't ever never delete it unless all the dependents go away
+01:29 <@isaacs> CoverSlide: so, that's the thing, it's way too complicated to codify into a set of rules in a reasonable way, and every individual case is usually pretty easy to decide, so there's not much to be gained by making firm rules either.
+01:30 <@isaacs> CoverSlide: show me a module that ought to be deleted, and has actual dependents, and we'll discuss me
+01:30 <@isaacs> *we'll discuss it
+01:33 < CoverSlide> and then after a round of rock-paper-scissors?
+01:33 <@isaacs> CoverSlide: maybe :)
+01:33 <@isaacs> CoverSlide: whatever it takes.
+01:36 < CoverSlide> isaacs: by the way, now that iriscouch isn't free, how much is your bill? or does jason give you a special rate?
+01:36  * isaacs is a special iriscouch vip
+01:36 < JasonSmith> He washes dishes
+01:36 < CoverSlide> awesome
+01:36 <@isaacs> yeah... also that.
+01:36 <@isaacs> running an open source project is kinda like being a mob boss.
+01:37 <@isaacs> you go places and just expect them to give you shit for free.
+01:37 <@isaacs> and then they do
+01:37 < deoxxa> then eventually you're hunted down by a bunch of 1920's detectives in really cool hats
+01:37 < deoxxa> which, by the way, isn't exactly a negative
+01:38 < CoverSlide> those hats that were named after a linux distribution?
+01:50 <@isaacs> gibbon gumshoe?
+02:06 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+02:07 -!- ServerMode/#Node.js [+o konobi] by wolfe.freenode.net
+03:06 <@Nexxy> \o/
+03:06 <@Nexxy> welcome to #node.js, no package squatting allowed! jerks get kick-banned! you are being watched!
+03:07 <@Nexxy> let's start making our own propaganda posters
+03:07 < s5fs> i love posters
+03:08 < AAA_awright> I'LL TAKE A FREE POSTER
+03:14 < mscdex> Nexxy, \o/
+03:33 <@Nexxy> mscdex, \o/
+03:33 <@Nexxy> s5fs, I like turtles
+03:35 < mscdex> i love node.js
+03:39 < timeturner> what would the world be like without node?
+03:44 < codingstream> painful
+03:47 < s5fs> i did 10 years of work without node. it was verbose.
+03:57 < that4chanwolf> The world would be faster without node.
+03:57 <@Nexxy> go on
+03:58 < vanetix> get your troll on
+04:01 < timeturner> trolls need an automatic kick
+04:02 < that4chanwolf> ...do you assume I'm trolling the moment I say node is slow?
+04:03 < mscdex> yes!
+04:06 < ehershey> heh
+04:06 < ehershey> what's wrong with verbosity?
+04:31 < ljharb> isaacs: i've got redis and couchdb running, but `npm run dev` doesn't do anything.
+05:06 < amagee> hey I'm trying to install: https://github.com/c4milo/node-inotify but getting errors like this: http://dpaste.com/846187/  .  Can't seem to find a solution anywhere.  Does anyone have any ideas?
+05:18 < ljharb> what's the npm module that throws an error if it finds any coffeescript in your app? i can't find it
+05:19 < SomeoneWeird> hah
+05:19 < SomeoneWeird> i like the sound of that
+05:21 < ljharb> it was all over the twitters awhile back and now i can't find it :-(
+05:21 < ljharb> i want to put it in all the repos
+05:23 < cainus> hey all... anyone know if there's a way in express to read the variables set with app.set() in the request handlers?  there doesn't seem to be an req.app.get()
+05:23 < timeturner> it's just app.get()
+05:24 < cainus> what if app isn't in scope though?
+05:24 < ljharb> SomeoneWeird: https://twitter.com/horse_js/statuses/247807437057445889 https://twitter.com/horse_js/statuses/246633162216730624
+05:24 < timeturner> then make it in scope
+05:24 < ljharb> cainus: make sure app's always in scope :-)
+05:24 < cainus> so declare all my handlers in one file then, I assume...
+05:24 < timeturner> no
+05:24 < timeturner> just make app in scope
+05:24 < ljharb> SomeoneWeird: i found it! https://npmjs.org/package/coffeefilter
+05:24 < timeturner> by passing it around
+05:24 < cainus> ahh
+05:24 < cainus> hmm alright thanks
+05:25 <@Nexxy> ljharb, coffee filter
+05:25 < SomeoneWeird> \o/
+05:26 < ljharb> lol Nexxy thanks, i found it by searching my old tweets and i found https://twitter.com/nexxylove/statuses/236357552449921024
+05:26 <@Nexxy> hahaha
+05:26 < ljharb> so thank you twice.
+05:26 < SomeoneWeird> :p
+05:26 <@Nexxy> ljharb, you're welcome :D
+06:12  * md_5 currently has a game server proxy written in java which handles ~1000 encrypted connections. Do you reckon being single threaded node could work with this?
+06:13 < timeturner> node can handle tens of thousands of connections
+06:13 < timeturner> and you can scale up pretty quickly
+06:13 < timeturner> all in relative terms of course
+06:14 < md_5> timeturner but aes encryption isnt really cheap, and this isnt like an http server, it has to deal with a stream of data, reaching 30kbps/connection in worst case conditions
+06:15 < md_5> can a single loop handle that?
+06:15 < timeturner> http://stackoverflow.com/questions/5695107/socket-io-how-many-concurrent-connections-can-websockets-handle
+06:15 < timeturner> it depends on your configuration
+06:15 < timeturner> infortunately there's no clear cut answer that I can give you
+06:15 < timeturner> unfortunately*
+06:16 < md_5> would you recommend clusters?
+06:16 < timeturner> definitely
+06:16 < md_5> afaik there is no way to share variables between them
+06:16 < md_5> which makes it shitty if you need to keep a list of players
+06:16 < md_5> or something
+06:16 < timeturner> well you can use the cluster module at first
+06:16 < timeturner> to max out on the number of cores you have
+06:16 < timeturner> then you can use something like zmq
+06:16 < timeturner> or redis
+06:17 < timeturner> and scale out to multiple machines
+06:17 < md_5> redis wouldnt be applicable
+06:17 < md_5> thats a keyval store, not really relevant for a game server/proxy
+06:18 < md_5> "You are looking for shared memory, which node.js just does not support. You should look for alternatives, such as querying a database or using memcached."
+06:19 < ljharb> a keyval store - what do you think normal memory is?
+06:19 < SomeoneWeird> actually redis would be very relevant
+06:19 < ljharb> one of those should work just fine to share memory
+06:19 < md_5> probably not worth the hassle if I can do it just as well / better in java. Just looking to dip my feet into node
+06:21 < ljharb> avoiding java is always worth the hassle
+06:22 < md_5> Will node use AES-NI is the cpu has it?
+06:22 < timeturner> java needs to be outlawed
+06:22 < timeturner> seriously
+06:22 < md_5> ie backed by openssl
+06:23 < md_5> "It also offers a set of wrappers for OpenSSL's hash, hmac, cipher, decipher, sign and verify methods. "
+06:23 < md_5> thats a positive
+06:23 < SomeoneWeird> nodejs.org/docs/latest/api/crypto.html
+06:23 < timeturner> it's all in the docs
+06:23 < md_5> any good profilers for node?
+06:23 < md_5> yeah I got that quote from the dos
+06:23 < md_5> cs
+06:24 < timeturner> node-profiler
+07:03 < md_5> How can I make jade not minify the output?
+07:04 < AAA_awright> md_5: There's no special process it uses to 'minify' the output, what you see is what it's producing
+07:04 < AAA_awright> If you want to add whitespace you'll have to run it through a pretty-printer
+07:04 < md_5> ah
+07:05 < md_5> how might I do that?
+07:05 < AAA_awright> But the additional whitespace does mess stuff up sometimes, especially if you put a series of inline elements on their own lines
+07:05 < deoxxa> var pretty_printer = new ImaginaryModuleThatYouCanGoogle(); console.log(pretty_printer(ugly_html));
+07:05 < AAA_awright> md_5: I'm... not sure. See deoxxa
+07:05 < deoxxa> syntax error btw
+07:05 < deoxxa> but w/e
+07:05 < SomeoneWeird> lol
+07:06 < md_5> li a(href="#")="Link"
+07:06 < md_5> umm
+07:06 < SomeoneWeird> ?
+07:06 < deoxxa> that's so much more readable than html
+07:06 < md_5> how can I do multiple elements on the same line?
+07:06 < deoxxa> <li><a href="#">Link</a></li>
+07:06 < deoxxa> html is so much more to type too
+07:06 < SomeoneWeird> ejs ftw
+07:06 < deoxxa> ejs i can support, yeah
+07:06 < md_5>                             li
+07:06 < md_5>                                 a(href="#")="a"
+07:07 < md_5> that works
+07:07 < md_5> but its messy
+07:07 < ljharb> ugh, html is so much more readable than jade.
+07:07 < deoxxa> md_5: WOW IF ONLY YOU COULD USE HTML
+07:07 < AAA_awright> md_5: Just do HTML in-line like above
+07:07 < ljharb> jade is gross.
+07:07 < SomeoneWeird> ^^
+07:07 < AAA_awright> ljharb: I call hacks
+07:07 < samholmes> I'm trying to solve this issue for tj https://github.com/visionmedia/express/issues/1447
+07:07  * md_5 does not want to use html
+07:07 < deoxxa> md_5: you're already using html
+07:07 < AAA_awright> Yeah
+07:07 < AAA_awright> Well, you're already using the DOM?
+07:07  * md_5 does not want to use vanilla html
+07:07 < AAA_awright> HTML is a serialization of the DOM
+07:08 < AAA_awright> Jade is another serialization of the DOM
+07:08 < samholmes> What I'm struggling with though is separating out the inline regexps from the rest of the path before doing all the path -> regexp replaces.
+07:08 < AAA_awright> EXI is a binary, compressed representation of the DOM
+07:08 < AAA_awright> (or not 'the DOM' just, simply 'DOM')
+07:09 < deoxxa> ha, exi
+07:09 < deoxxa> haven't heard about that for a while
+07:09 < ljharb> AAA_awright: HTML isn't a serialization of the DOM. the DOM is a model of HTML.
+07:09 < AAA_awright> md_5: Use in-line HTML. That's what HTML excels at, is markup. Hence the ML in HTML.
+07:09 < md_5> its alright, #express helped
+07:09 < ljharb> jade is a serialization of HTML that is modelled by the DOM.
+07:10 < AAA_awright> ljharb: No, it's the other way around. The DOM is an data model in memory, and it has to be serialized into a string of bytes using an encoding format like HTML, EXI, or Jade.
+07:10 < AAA_awright> Or, parsed from HTML into DOM by user agents.
+07:10 < ljharb> AAA_awright: the browser parses HTML into the dom. it can't possibly be the way you're describing.
+07:10 < ljharb> the Document Object Model is in fact a model of the document described by the HTML
+07:11 < AAA_awright> Uh, right
+07:11 < AAA_awright> But that's what I just said?
+07:11 < ljharb> i recognize that you can indeed convert parts of the DOM back into HTML, but that's not the way it works usually.
+07:11 < deoxxa> so really the DOM is an in-memory representation of the document
+07:11 < ljharb> jade has to get converted to HTML, then to the DOM - jade can't be turned directly into the DOM
+07:11 < ljharb> right
+07:11 < deoxxa> and the document is an abstract entity that can't be expressed!
+07:11 < deoxxa> oh noooooo!
+07:11 < AAA_awright> The DOM is the data model. We can't ship that around though, we have to serialize it first for the network, hence HTML, Jade, etc
+07:12 < ljharb> right, but jade can't get shipped around either
+07:12 < ljharb> HTML is what gets shipped
+07:12 < AAA_awright> Yes, Jade can be turned into a DOM. I have such a parser.
+07:12 < ljharb> not in the browser, which is where it matters
+07:12 < deoxxa> AAA_awright: $20 says you could ship the DOM's memory image around with some work
+07:12 < AAA_awright> You'd be shipping some serialization of it. The DOM is an API.
+07:12 < ljharb> deoxxa: i can do that right now with zero work - it's called HTML :-p
+07:12 < AAA_awright> It's a theoretical construct for operating and computing on.
+07:13 < deoxxa> AAA_awright: hence the "'s memory image" part
+07:13 < deoxxa> ljharb: that's not a memory image you ninny
+07:13 < AAA_awright> That's what EXI is pretty much, a shipment of the binary blob of memory
+07:13 < AAA_awright> Optionally compressed
+07:13 < deoxxa> ljharb: unless your hardware's memory somehow comes out as html
+07:13 < deoxxa> ljharb: which means your hardware is an html document
+07:13 < deoxxa> awwwww shit
+07:14  * deoxxa confused
+07:14 < ljharb> lol it's an image, yes
+07:14 < ljharb> which in meatspace is a 2d representation of a 3d object. html is a flat representation of a DOM. or something.
+07:15 < AAA_awright> A serialization - a series of bytes
+07:15 < AAA_awright> You know, serial
+07:15 < deoxxa> serial is bad
+07:16 < deoxxa> node.js taught me this
+07:16 < AAA_awright> Well gasp, better stop using Node.js then, it almost exclusively uses streams!
+07:16 < deoxxa> we need a parallelisation of html
+07:17 < cellvia> what would parallelisation of html entail?
+07:22 < deoxxa> cellvia: confusion and sadness
+07:22 < yawnt> hey deoxxa 
+07:22 < deoxxa> HELLO
+07:23 < yawnt> HOW ARE YOU
+07:23 < deoxxa> QUITE FINE
+07:23 < deoxxa> playing happy wheels
+07:23 < deoxxa> makes me lol
+07:23 < SomeoneWeird> br0 
+07:24 < SomeoneWeird> shuTtuP
+07:24 < yawnt> LOL DUDE YOU LOOK WEIRD
+07:26 < SomeoneWeird> :C
+07:29 < amagee> hot
+08:48 < SomeoneWeird> What's the best way to implement authentication using express?
+08:48 < ljharb> SomeoneWeird: i use passport, works great
+08:53 < deoxxa> SomeoneWeird: i'm with ljharb, passport is pretty nice. implementing a custom strategy isn't too bad either.
+08:53 < ljharb> also there's lots of custom ones floating around
+09:01 < JasonWoof> how can I read in a password from the terminal without it being echoed?
+09:02 < JasonWoof> I'm running v0.6.19
+09:02 < JasonWoof> I tried tty.setRawMode(true)
+09:02 < JasonWoof> which gives me data events on each keypress, but it shows in the terminal
+09:03 < HeWhoComes> Hi room....
+09:04 < HeWhoComes> I'm new to node...coming from an sql background...any1 have any advice on frameworks??
+09:05 < SomeoneWeird> sql isn't exactly a programming language
+09:06 < JasonWoof> SQL ( /ˈɛs kjuː ˈɛl/ "S-Q-L";[3] or Structured Query Language) is a special-purpose programming language designed for managing data in relational database management systems (RDBMS).  -- wikipedia
+09:06 < SomeoneWeird> well, yeah
+09:06 < SomeoneWeird> but you know what I mean
+09:06 < HeWhoComes> yes..of course you're right...
+09:06 < JasonWoof> sorry to be technical
+09:07 < JasonWoof> but, yeah, I'm thinking the same thing, I think. HeWhoComes: you know node isn't a database server right?
+09:07 < JasonWoof> HeWhoComes: what do you want the framework to help you do?
+09:07 < HeWhoComes> yes...I'm aware I want to use it with mongodb 
+09:08 < deoxxa> i'm new to pancakes, coming from an internal combustion engine background
+09:08 < HeWhoComes> i've seen alot about backbone.js, mongoose and using possibly some others
+09:08 < SomeoneWeird> lmao de
+09:08 < SomeoneWeird> deoxxa, 
+09:08 < SomeoneWeird> >.<
+09:08 < deoxxa> HeWhoComes: ignore frameworks, embrace modules
+09:09 < deoxxa> HeWhoComes: http://www.nodebeginner.org/ should get you started
+09:09 < JasonWoof> deoxxa: :) so can we help you get the hood hot enough to cook them? ;)
+09:10 < JasonWoof> deoxxa: cool like (just read the intro) I might read that
+09:11 < JasonWoof> I tend not to like frameworks
+09:11 < JasonWoof> I fiddled with express for a bit, then wrote something that did what I wanted it to do from scratch
+09:11 < HeWhoComes> I'm a little confused to be honest...too many ingredients and cooks that have different approaches maybe??
+09:12 < JasonWoof> I looked at several template engines, didn't see one that worked the way I wanted it to, so I ported my php template engine to coffeescript, and now I use that.
+09:12 < JasonWoof> HeWhoComes: read the book/page that deoxxa just sent you
+09:12 < HeWhoComes> I found this tutorial that speaks about models http://backbonetutorials.com/organizing-backbone-using-modules/
+09:12 < deoxxa> HeWhoComes: do you want to learn how to use node.js, or do you want to make a single application and never ever use node again?
+09:13 < HeWhoComes> well..I'd like to learn node.js to be honest
+09:14 < HeWhoComes> the problem is that the application(s) I want to experiment with are a bit complex
+09:14 < deoxxa> HeWhoComes: if you want to do the first thing (i.e. the smart thing), you'll want to read a somewhat comprehensive guide on how to use node so you have somewhere to start from. the guide i linked you to is pretty good in that regard, and doesn't tell you "download x, y and z modules, then type this code in exactly as you see here". it actually explains how and why the code works the way it does.
+09:15 < HeWhoComes> Thnks deoxxa I'm looking through it now..and it certainly sems to give a better idea of the structure
+09:15 < deoxxa> HeWhoComes: good news is that once you have the basics down (which don't take long), you can use those skills to build more useful things :D
+09:16 < HeWhoComes> the funny thig is I thought I understood javascript..and then I stepped away for a few years...lol...figures!!!
+09:16 < deoxxa> heh yep
+09:17 < deoxxa> it's a bit of a jump from jquery and friends to node
+09:20 < HeWhoComes> thanks for the help...I've got a lot of work to do..but it's obvious what the rewards are...I've been looking for days for a reasonable explanation to all the infinite data that's out there...this guide really changes my approach!!!
+10:26 < nerd_ema> hi all
+10:26 < nerd_ema> there is a method for return an image only from url on node.js?
+10:26 < deoxxa> nerd_ema: use programming
+10:27 < yawnt> deoxxa: you know code-fu?
+10:27 < gildean> nerd_ema: sure, just write the necessary server to do it
+10:27 < yawnt> nerd_ema: look for a `static middleware`
+10:28 < gildean> nerd_ema: what kind of urls are you talking about?
+10:28 < deoxxa> yawnt: black belt, yondan
+10:28 < yawnt> deoxxa: teach me master
+10:29 < deoxxa> to access the class, you must first access the prototype
+10:29 < gildean> nerd_ema: there are quite a few modules and readymade servers for static files, or are you planning to create images on the fly programmatically?
+10:29 < SomeoneWeird> lol idiot deoxxa 
+10:30 < nerd_ema> gildean: i have an image on a directory, i want return the image without use : .readFileSync, and create new image and canvas, and drawing image on canvas and return canvas data
+10:30 < deoxxa> when you pour javascript into a browser, it becomes the browser
+10:30 < deoxxa> when you pour javascript into a server, it becomes the server
+10:30 < Josh> yo deoxxa 
+10:30 < deoxxa> when you pour javascript into a toaster, it -becomes- the toaster
+10:30 < deoxxa> be like javascript, my friend
+10:30 < yawnt> WHY YOU NO AVAILABLE SWORD ART ONLINE 24
+10:30 < yawnt> WHY
+10:30 < deoxxa> sup Josh
+10:31 < Josh> deoxxa, So you can toast with JavaScript?
+10:31 < deoxxa> NO
+10:31 < Josh> :D
+10:31 < deoxxa> you learn javascript so that you may never use javascript
+10:31 < SomeoneWeird> that wasn't it's intended use
+10:31 < gildean> nerd_ema: do you want the canvas to be created serverside? or just like a normal clientside canvas to which you inject images with ajaxy get-reqs/websockets?
+10:31 < deoxxa> you needa more disciprine
+10:31 < Josh> <deoxxa> you learn javascript so that you may never use javascript O_o
+10:31 < Josh> That what do you Use instead :P
+10:32 < nerd_ema> gildean: nothing xD i have solved ;)
+10:32 < nerd_ema> is correct for you?
+10:32 < nerd_ema> var tmpPath = path.join(dirPath, pos_tmp_x + "*" + pos_tmp_y + ".png"); if (fs.existsSync(tmpPath)) { 	var img = fs.readFileSync(tmpPath); 	 	res.end(img); } 
+10:33 < nerd_ema> http://pastebin.com/1pLamAaV
+10:33 < deoxxa> don't worry about handling errors
+10:33 < yawnt> nerd_ema: i don't think you can save a file containing "*"
+10:33 < deoxxa> that's not necessary
+10:33 < deoxxa> yawnt: you can, but it's patently crazy
+10:33 < yawnt> YOU ARE CRAZY
+10:34 < nerd_ema> ahahah xD whyyyy?
+10:34 < nerd_ema> i use * for delimit the index for x and y
+10:34 < deoxxa> xD xD xD LoL RoFl
+10:34 < Josh> ^
+10:34 < Josh> :D
+10:34 < deoxxa> soooooooo randum!!!!!!!!!~~~~~~~
+10:34 < deoxxa> teh penguin of dooooom!!!!!!! LoL
+10:35 < yawnt> http://www.youtube.com/watch?v=ba7rRfKIHxU
+10:35 < yawnt> i just can't stop laughing
+10:35 < deoxxa> nerd_ema: * is kind of hard to use in a filename if you use a terminal
+10:35 < nerd_ema> i not use that filename in terminal
+10:36 < deoxxa> yawnt: lol
+10:36 < nerd_ema> x - y.png is better?
+10:36 < yawnt> deoxxa: i mean.. LOOK AT IT
+10:36 < yawnt> "i own the world"
+10:36 < yawnt> lololol
+10:40 < nerd_ema> someone can tell me what is the most correct way for return an image if exist from the url?
+10:44 < SomeoneWeird> use a static middleware
+11:16 < samholmes> Anyone here familiar with the exact specification on tjholowaychuk's routes?
+11:17 < samholmes> for express
+11:17 < gildean> samholmes: what do you mean?
+11:18 < gildean> i'm familiar with express itself, but i've never read the source completely
+11:18 < samholmes>  /path/:key/*/+
+11:19 < samholmes> Thoughs are all the elements of a route that I'm aware of
+11:20 < samholmes> I've looked at the source, and found that keys can have some kind of . format before the : ?
+11:21 < gildean> oh?
+11:22 < gildean> samholmes: do you have a specific problem in some route?
+11:22 < samholmes> https://github.com/visionmedia/express/blob/master/lib/utils.js#L262
+11:22 < gildean> samholmes: or just trying to map out possibilities?
+11:22 < samholmes> gildean: Yes, and I'm working on a patch
+11:22 < samholmes> https://github.com/visionmedia/express/issues/1447
+11:22 < samholmes> pathRegexp needs to be rewritten
+11:25 < gildean> samholmes: i'm not really sure why you'd need additional regexp in the route?
+11:25 < samholmes> gildean: /foo/:id([0-9]+)
+11:26 < samholmes> matches only /foo/1 ... /foo/23 ...
+11:26 < samholmes> not /foo/bar
+11:26 < samholmes> It's magical
+11:29 < gildean> samholmes: yeah, it's just that you can do the check within the route, or write a app.params function in which you make sure the route is something expected
+11:29 < gildean> samholmes: but yeah, why not
+11:30 < samholmes> gildean: If the route didn't match /foo/bar then a 404 could happen
+11:31 < samholmes> if you checked :id to be a number within the route handler, then you would have to manually 404.
+11:31 < samholmes> having inline regexes in the route path is very useful
+11:31 < gildean> samholmes: yeah, i get your point
+11:31 < samholmes> too bad tj didn't get the algorithm right though.
+11:32 < substack> new bouncy@2.0.0 out
+11:32 < gildean> samholmes: i'm pretty sure tj talked about something similar in #express just a few days ago
+11:32 < samholmes> I'm almost finished. I'm just having trouble understanding line 269 - 277
+11:32 < gildean> substack: is the api the same?
+11:32 < samholmes> gildean: I believe it was with me. ;P
+11:32 < gildean> samholmes: haha, ok
+11:33 < substack> gildean: largely
+11:33 < substack> except req.respond() went away
+11:33 < samholmes> gildean: I reported this issue with the + in page.js. He said he would "fix it" yesterday. He did a half ass job.
+11:33 < samholmes> So, I'm gonna fix it. :D
+11:33 < substack> gildean: now you can just bouncy(function (req, res, bounce) {})
+11:33 < substack> and bouncy is using http-raw to drop into raw mode
+11:35 < gildean> substack: so if i've used bouncy(function (req, bounce) {}); i need to add the res parameter?
+11:36 < substack> no it checks the cb.length
+11:36 < substack> you should only need to update your code if you used bounce.respond()
+11:37 < gildean> ok, then that should just work
+11:37 < gildean> but hopefully better/faster/stronger
+11:37 < substack> yes
+11:37 < substack> all of the above
+11:37 < substack> about 20% faster
+11:37 < gildean> nice
+11:37 < substack> and it's back to using the core http parser in node
+11:37 < substack> so less wonky errors
+11:37 < nathan7> 'morning
+11:38 < substack> hopefully EPIPE is dead for good this time
+11:38 < nathan7> Someone remind me what the method to make a socket not keep a process alive is
+11:38 < nathan7> unref?
+11:39 < nathan7> hrm
+11:39 < nathan7> I have a logger module that shouldn't keep the process alive
+11:53 < samholmes> https://github.com/visionmedia/express/blob/master/lib/utils.js#L275
+11:54 < samholmes> on this line, what does the whole format bit do?
+12:34 < stagas> samholmes: probably handles the /path.format? so /path and /path.json would work, the second gives you req.params.format = 'json'
+12:43 < rump> how can i throttle inserts in mongodb-native?  i'm not finding a drain event or similar
+12:47 < samholmes> stagas: hmm. Look at the regex though, it just does (\.)? and nothing around it.
+13:29 < AndreasMadsen> How do I generate a xcode project for nodecore?
+13:38 < db42> what is the recommended way to step into an nodejs script ?
+13:39 < gildean> nodejs script?
+13:39 < deoxxa> db42: one leg at a time
+13:39 < db42> i want to be able to break into a running app and examine stuff interactivly
+13:39 <@konobi> print it out onto a peice of paper, set it on the ground and... take a step to the left...
+13:40 < db42> you are all very funny here...
+13:40 <@konobi> db42: webkit-dev-agent
+13:40 < deoxxa> heh
+13:40 < gildean> deoxxa: oh? i always jump in both feet together
+13:40 < deoxxa> gildean: there's your problem
+13:40 < deoxxa> gotta take it slow
+13:40 < gildean> sounds boring
+13:41 < deoxxa> you sound boring :<
+13:41 < gildean> might be
+13:41 < SomeoneWeird> lmao
+13:41 < db42> any express users here ?
+13:41 < SomeoneWeird> db42, use gdb
+13:41 < db42> SomeoneWeird, is has sane javascript support ?
+13:41 < SomeoneWeird> probably >75% of us
+13:41 < SomeoneWeird> nope
+13:41 < SomeoneWeird> (not that i'm aware of)
+13:41 < db42> so why recommend that ?
+13:41 < SomeoneWeird> because it's like the only thing you can use
+13:42 < SomeoneWeird> afaik
+13:42 < db42> if i have a session cookie, is there a sane way to get the session store info for it manually (via another connection) ?
+13:42 < db42> SomeoneWeird, i'm looking for something like python's pdb… not something low-level...
+13:42 < deoxxa> db42: do you have access to where the app is running?
+13:42 < db42> deoxxa, yeah it's in the same app context
+13:43 < db42> (just not via the express code path, it's from socket.io)
+13:43 < deoxxa> db42: you can throw a signal at node to tell it to open its port and embrace your warm debugging probe
+13:43 < db42> ohh, you are takling about that
+13:43 < SomeoneWeird> oh then yeah
+13:43 < phrearch> db42, sure thats not hard to do
+13:44 < db42> phrearch, i'm trying to figure out from having express.session inside my socket.io socket, how to get the instance (they both share the same cookie afterall)
+13:44 < phrearch> i tried that like https://github.com/phrearch/l3m0n/blob/master/lib/l4n.js#L60
+13:44 < phrearch> db42: i did the same kinda thing there with ws
+13:45 < db42> phrearch, the Q is how do i extract with a sessionid, the session info itself from express, not sure of the syntax (i'm assuming it's not 100% like that ws one)
+13:45 < db42> (and i've just started using express, so i'm not sure how the memory store query syntax is)
+13:46 < db42> but yeah, i'm heading some code like you did
+13:46 < phrearch> the cookie contains the sessionid, but its encrypted. you can use the sessionstore to retrieve it
+13:47 < db42> i currently have in the socket.io auth code, the express.session object, and then data.headers.cookie info
+13:47 < phrearch> thats all you need :)
+13:47 < phrearch> i guess
+13:47 < db42> me too, just not sure on how to combine getting the info out :)
+13:48 < db42> and having no simple interactive debugger in nodejs, doesn't help me to easily figure it out
+13:48 < phrearch> node-inspector helps there
+13:48 < phrearch> you can set breakpoints and use the console in webkit to test variables
+13:49 < phrearch> sometimes i miss pdb in nodejs, but node-inspector is quite good
+13:49 < db42> ok, i'll check it out
+13:49 < db42> someone really needs to make a pdb :)
+13:49 < phrearch> node-dev and node-inspector work well together
+13:49 < phrearch> yea indeed
+13:50 < phrearch> gtg. good luck :)
+13:59 < TheNewSound> has anyone experience installing nodejs on a synology nas (PPC)
+14:22 < db42> how can i require something from a submodule ?
+14:27 < roxlu> hi guys!
+14:28 < roxlu> I've asked this in #libuv too, but it's weekend so kind of quite in there.  But I'm wondering how I can compile libuv for ios ?
+14:44 < db42> how can i access a submodule require from a module ?
+14:45 < db42> i.e. get connect version from express ?
+14:47 < db42> amazing...
+14:56 < shesek> db42, why would you want to do that?
+14:57 < db42> shesek, to use a submodule function… nm, got it already
+14:57 < shesek> db42, don't do that
+14:57 < db42> why not ? if i want to use the connect version thats installed in express, and not another one..
+14:57 < shesek> just install the module you need yourself
+14:57 < db42> but then there might be a version mismatch
+14:58 < shesek> db42, why should it matter to you?
+14:58 < db42> nm, i'm just hacking my way around here, want to know stuff
+14:58 < shesek> just install the version that your code works with directly
+14:58 < db42> finally i have session info from express into my socket.io socket
+14:58 < shesek> if express upgrades to another version of connect, your code might break
+14:58 < db42> shesek, just hacking stuff here, i know
+15:32 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+15:33 < ricardograca> Any reason why sequelize can't have a Model.delete(5) type of method instead of having to execute two queries to do the same thing?
+16:09 < shihan> im a little confused... i've got node installed under /export/installed/node, when i install packages with -g, they go into ....../node/lib/node_modules, but when i "require" from a node application, it looks in ..../node/lib/node/ am I doing something wrong or did i miss something in the install?
+16:24 < nlf> is there a way to get a filename of my own module programmatically?
+16:25 < nlf> i saw process.mainModule.filename, but that returns the same string for files required from my mainModule
+16:33 < nlf> actually, that wasn't an accurate description
+16:33 < nlf> i want to get the filename of the module that required my module
+17:28 < Stilo> anyone know works with cookies programming in node.js?
+17:30 < coderarity> Stilo: are you using express?
+17:30 < Stilo> no
+17:49 < ezrafree> hello
+17:49 < mscdex> node.js rules!
+17:50 < ezrafree> i am trying to simply include a config.js file which will contain variables i wish to access in both node and as well as in my local javascript, i've set up a config.js using "exports" but i get this error in my console: Uncaught ReferenceError: exports is not defined 
+17:50 < ezrafree> any thoughts on what i may be doing wrong? or further reading i should do?
+17:51 < gildean> ezrafree: how did you export the configs?
+17:51 < aandy> hmm, off topic, but do anyone know how char encoding is handled on the "new" domain names with é æ ø ü etc - does utf8/iso matter? or how is it suppose to be used
+17:51 < gildean> like module.exports or with exports.someconfig etc.
+17:52 < ezrafree> gildean: what is the recommended pastebin type solution here? or does it matter?
+17:52 < ezrafree> oh, i used exports.var = function (var) { return var; };
+17:52 < misterhat> hello friends
+17:54 < gildean> ezrafree: are the configs just variables?
+17:54 < ezrafree> gildean: yes, they are
+17:54 < gildean> if so, you can just exports.var = 'var'; or exports.var = 1; etc.
+17:54 < evelyette> hi
+17:54 < evelyette> I've got some problems with node.js
+17:55 < gildean> then just var configs = require('./configs'); and use the variables in the configs like configs.var etc.
+17:56 < evelyette> I have the following index.jade: http://dpaste.com/846451/ whenever I send a message by pressing on the Button Send, the page is refreshed and the message is not sent
+17:56 < evelyette> any ideas ?
+17:56 < coderarity> mscdex: hooray!
+17:56 < ezrafree> gildean: i still get "exports is not defined" when i try it that way as well
+17:57 < gildean> evelyette: yeah, you need to prevent the default behavior in the submit event with event.preventDefault()
+17:57 < gildean> ezrafree: can you paste the code somewhere?
+17:57 < nlf> crap.. i'm having a require caching related issue i think
+18:05 < misterhat> does node run at a decent speed on the raspberry pi?
+18:10 < drx_> good question @misterhat I want to know too
+18:15 < ezrafree> gildean: http://pastebin.ca/2293863
+18:19 < gildean> ezrafree: the port should be a number and not a string, but other than that it should just work
+18:22 < gildean> ezrafree: what version of node are you running?
+18:25 < ezrafree> you know, i don't even know... is there any way i can find out?
+18:25 < zomg> ezrafree: node -v
+18:26 < ezrafree> v0.9.4-pre
+18:27 < gildean> ezrafree: why not try the stable version, i'm guessing this is a dev-version problem (like having to define exports or something)
+18:28 < gildean> current stable is 0.8.16
+18:28 < ezrafree> gildean: ah ok, thanks i will give that a shot
+18:32 < MI6> joyent/node: isaacs master * 01db736 : Merge branch 'streams2' (+72 more commits) - http://git.io/LgirpA
+18:33 <@isaacs> boom
+18:34 < gildean> isaacs: streams2 is done for now?
+18:34 <@isaacs> gildean: there's still a few fixes to be made.
+18:34 <@isaacs> but they'll be done on master.
+18:35 < gildean> cool, does that mean we're one step closer to v1?
+18:35 <@isaacs> gildean: every step is a step closer to a future state.
+18:35 < matbee> lol
+18:36 <@isaacs> gildean: every second that passes is one second closer to the heat death of the universe.
+18:36 < gildean> isaacs: unless it's a step backwards
+18:36 <@isaacs> gildean: this train goes in one direction: forwards.
+18:36 < matbee> or dead stop
+18:36 <@isaacs> even revert commits are forward motion.
+18:36 < misterhat> hello friends
+18:36  * isaacs away for now
+18:36 < misterhat> bye isaacs
+18:38 < gildean> well, hopefully v1 is out before the complete state of entropy is achieved
+18:40 < mrvisser> has anyone had any luck installing cairo+node-canvas on smartos (joyent) ?
+18:42 < mrvisser> I have cairo installed VIA pkgin, but node-gyp fails to build node-canvas, the crux of the error message is: ../src/Canvas.h:19:25: fatal error: cairo/cairo.h: No such file or directory
+18:42 < ezrafree> gildean: i just installed 0.8.16 and am still getting the same error...
+18:42 < ezrafree> is there any way i can define exports like the error seems to want me to do?
+18:42 < mrvisser>   /opt/local/include/cairo/cairo.h exists, my guess is that it can't find that
+18:43 < gildean> ezrafree: strange, i just tested your code with a simple console.log at the end, at it works
+18:43 < ezrafree> gildean: hmm i will try a console.log or two and see what i can find out
+18:56 < drx_> any idea what would cause this:  https://gist.github.com/4298116
+18:56 < drx_> installing JSDOM and contextify with NPM just doesn't seem to work
+19:36 < bingomanatee> 69
+19:36 < bingomanatee> hi node
+19:37 < bingomanatee> I'm looking for something like require to resolve dependencies, only not specifically for loading files - something that orders a series of tasks in series according to which tasks require which other taks 
+19:37 < bingomanatee> any suggestions?
+19:41 < bingomanatee> Is anyone here?
+19:52 <@isaacs> bingomanatee: async?
+19:52 <@isaacs> bingomanatee: npm install async
+19:52 < bingomanatee> cool.
+19:52 < bingomanatee> thx
+19:53 < timeturner> do most people use mail services like mailchimp or do they run their own mail server like haraka/postfix/sendmail?
+19:58 < chovy> does npm install do npm update as well?
+20:04 < ljharb> timeturner: until recently (when it stopped being free), you'd have been an idiot not to use google apps
+20:04 < ljharb> timeturner: if you mean for a sending service though, i use sendgrid
+20:11 < bingomanatee> google apps is not free anymore?
+20:11 < bingomanatee> darn.
+20:13 < ljharb> nope
+20:13 < iain> bingomanatee: ?
+20:14 < iain> really?
+20:14 < ljharb> they announced it last week
+20:14 < iain> not free one bit?
+20:14 < ljharb> existing users grandfathered in, new users not free one bit
+20:14 < iain> really?
+20:14 < bingomanatee> yeh well I was a bit tunneled in last week. 
+20:14 < iain> I just am in shock
+20:15 < bingomanatee> well, its not an exorbitant rate. 
+20:15 < ljharb> http://googleenterprise.blogspot.ca/2012/12/changes-to-google-apps-for-businesses.html
+20:15 < bingomanatee> I'm surprised it took this long.
+20:15 < ljharb> $50/user isn't an exorbitant rate, at *all*
+20:15 < matbee> nope
+20:15 < matbee> there's still google apps for users, right?
+20:15 < ljharb> it's just that it was such an awesome tool for *one* user to get gmail on a custom domain
+20:15 < matbee> free?
+20:15 < ljharb> matbee: consumer stuff isn't called "google apps"
+20:16 < matbee> it was for me :P
+20:16 < ljharb> "google apps" only refers to custom domain, enterprise stuff
+20:16 < iain> the problem is that 25GB isn't enough for everyone
+20:16 < ljharb> O.o
+20:16 < bingomanatee> WPP.
+20:16 < ljharb> i bet 99% of people never go over 1 or 2 GB
+20:16 < iain> the CEO has an inbox that could grow beyond 50
+20:17 < ljharb> if 25gb isn't enough in your email, you're doing something wrong
+20:17 < ljharb> then the ceo should probably trust the people he hired instead of micromanaging
+20:17 < MI6> joyent/libuv: Ben Noordhuis master * 273cecc : unix: don't memset(0) in uv_udp_init()  It's inconsistent with other init - http://git.io/bFGDvg
+20:17 < iain> and google don't offer any real alternative to the max
+20:17 < ljharb> CEOs should *not* get every email
+20:17 < iain> which is a real pita
+20:17 < fosfori> Is alexyoung's ircd.js the best node irc server around?
+20:17 < ljharb> iain: you can always pay more to get more space, in any version of gmail.
+20:17 < iain> ljharb: sorry, you don't know anyone that actually built a company then
+20:17 < ljharb> lol ok.
+20:18 < ljharb> i'll pretend i don't know the founders of most of the companies you've heard of.
+20:18 < iain> ljharb: its about, can we contact google to give more space?
+20:18 < ljharb> of course. it's in the settings. has been for years.
+20:18 < ljharb> https://www.google.com/settings/storage/?hl=en
+20:18 < ljharb> 100GB, up to 16TB available
+20:18 < iain> ljharb: you clearly think that 25GB is enough
+20:18 < ljharb> first of all, it certainly is, second of all, you've been able to upgrade to 16TB for like 3 years.
+20:19 < bingomanatee> Yes, they aren't giving us enough free storage. shame on them.
+20:19 < ljharb> storage space is infinite and free for all intents and purposes.
+20:19 < bnoordhuis> i remember when we had 10 MB hard drives
+20:19 < bnoordhuis> we were happy, we didn't know any better
+20:19 < ljharb> those were the days
+20:19 < bingomanatee> When I was a kid we put each bit in an egg carton crevice, and we were happy!
+20:21 < ljharb> iain: perhaps 25GB isn't enough if your employees are idiotically emailing around word docs, pdfs, and powerpoints, but that's what google docs, dropbox, and the rest of the internet is for. email should just just text (and animated gifs) and 1GB should be enough for pretty much anyone
+20:21 < ljharb> *just be
+20:24 < RLa> ljharb: what is using most space in enterprise setups: scanned documents, max reso, in colors, in bmp format
+20:25 < RLa> and user emailing them around, attaching copy on every Reply
+20:25 < timeturner> any recommendations for a search engine?
+20:25 < ljharb> RLa: i realize that. if the CEO allows that kind of inefficient use of resources, he should be fired.
+20:25 < timeturner> I was looking at lucene but there don't seem to be any bindings for node
+20:25 < ljharb> it's inexcusable in 2012 to email around large attachments.
+20:26 < RLa> timeturner: check out elasticsearch and solr, boht are based on some lucene variant
+20:26 < RLa> and i think i have seen c lucene bindings for node
+20:26 < mrvisser> timeturner: I've been using elasticsearch, there is a binding for node to ES's HTTP REST API as well.
+20:27 < timeturner> yeah those are for clucene though which is great because it's C but it hasn't been updated for a while compared to lucene
+20:27 < mrvisser> I've wrapped that API to make something a little more user friendly, but overall its been solid
+20:27 < timeturner> sweet
+20:27 < timeturner> will check out elasticsearch
+20:27 < timeturner> how do you keep them in sync with your database?
+20:27 < mrvisser> I'm sure there are solid solr bindings to nodejs as well, so pick the right tech. between solr and ES, then pick the right binding after :)
+20:27 < timeturner> I'm using mongo for example and need one collection searchable
+20:28 < timeturner> yeah
+20:28 < timeturner> need to look at solr too
+20:28 < mrvisser> timeturner: elasticsearch has something called rivers that you could use
+20:28 < iain> ljharb: try 10 years of history
+20:28 < mrvisser> there is actually a MongoDB river I believe, which may just index a full collection for you
+20:28 < iain> ljharb: a need to retain at least 6 years if not more, of emails, and then all the extra on top
+20:29 < ljharb> 7 years, is the law, i believe
+20:29 < ljharb> and you don't have to retain it in gmail, just somewhere. you can back it up with imap and *delete it* from gmail and still be in compliance.
+20:29 < mrvisser> timeturner: https://github.com/richardwilly98/elasticsearch-river-mongodb/
+20:29 < iain> ljharb: so, even that, he has 10 years+
+20:29 < iain> but so close to the limit
+20:29 < iain> how does one deal with that?
+20:30 < iain> when he needs to be able to dip in
+20:30 < timeturner> mrvisser: thanks!
+20:30 < iain> and backing up isn't gonna cut the mustard
+20:30 < timeturner> will take a look at that as well
+20:30 < ljharb> you only need to "dip in" when you're sued. how often is that happening?
+20:30 < ljharb> it's pretty simple. you use Mail.app or Outlook and load the backup.
+20:30 < ljharb> it will be slow with a large collection of course, but still.
+20:31 < ljharb> and i'm quite certain there's services you can pay that will provide you a browsable backup to comply with that specific law, that will enable you to delete it from your active email system.
+20:31 < ljharb> and you still haven't acknowledged that "paying google more" is a totally viable option.
+20:31 < ljharb> therefore i don't think there's any problem
+20:37 -!- isaacs changed the topic of #Node.js to: Node.js - https://github.com/joyent/node/wiki/Api-changes-between-v0.8-and-v0.10 - http://logs.nodejs.org/node.js/
+20:39 < fanweixiao> Does there has a npm project for implelement a download-rate-limitable download server?
+20:42 <@Nexxy> isaacs, \o/
+20:42 < Joman> Hello
+20:42 <@Nexxy> hi Joman 
+20:43 < Joman> I need to develop a small web project. I have to decide between learning PHP or NODE.  Is node really a PHP replacement?
+20:43 < aandy> uhm
+20:43 < ljharb> php is a language. node uses javascript
+20:43 < ljharb> node is the mechanism by which you can replace php with javascript, i suppose
+20:44 < aandy> if you're asking if you should learn javascript or php, i'd say javascript
+20:44 < lohkey> Joman: you can use both
+20:44 < niggler> Joman how are you deploying this project?
+20:44 < lohkey> i've seen a fair amount of web companies use php for their web tier and node.js for their real time tier
+20:45 < Joman> IT's a web application, classified ad website
+20:49 <@Nexxy> Joman, if you were to develop an app in PHP, you will still need to learn javascript for the front-end
+20:49 <@Nexxy> it might be faster to go with node, as it's javascript everywhere!
+20:50 < db42> php is easier to start with 
+20:50 <@Nexxy> I personally had a much easier time learning JS than I did PHP
+20:50 < sayd> i'd look into python instead of php
+20:50 < lohkey> it's not a bad thing to have to have a mental context switch when going from client code to server code
+20:50 <@Nexxy> but maybe that's just because js is actually somewhat consistent 
+20:51 < db42> js has no BCL :(
+20:51 < niggler> javascript scoping is somewhat painful
+20:51 < Cronoh> php is more than a language, it is a large database of helper functinos :)
+20:51 <@Nexxy> lol Cronoh 
+20:51 < timeturner> php is a muddled mess of stuff
+20:51 < db42> that seems to work for many people
+20:52 < timeturner> that clouds the server-client model and relationship
+20:52 <@Nexxy> lol db42 
+20:52 < fanweixiao> hi everyone, got a problem. I am building a file download server, is there a way to track download speed?
+20:52 <@Nexxy> pretty sure a lot of that is beyond the scope of Joman's quesetion
+20:52 <@Nexxy> -e
+20:53 < fanweixiao> I want to limit the download speed to 800K if client have a high speed internet connection
+20:53 < Joman> Thanks guys..... i'll give Node a try instead of PHP
+20:53 < fanweixiao> for saving network bandwidth
+20:53 <@Nexxy> use iptables
+20:54 < RLa> "<niggler> javascript scoping is somewhat painful" <- then what would be PHP's scoping? :)
+20:54 < fanweixiao> so, can I figure out the total download speed in my program?
+20:55 < gluxon> RLa: PHP's scoping is actually quite refined..
+20:55  * gluxon likes it :)
+20:55 <@Nexxy> fanweixiao, count the bytes going out and divide by time?
+21:11 < piklu> can u suggest me the best book to read for javascript, I need to work in node.js, jquery and yui, i want to have a firm solid ground of JS
+21:12 < astropirate> piklu, I am a big fan of http://eloquentjavascript.net/
+21:13 < astropirate> Anyone here good at web design? want to contribute some work to an opensource project website? :)
+21:13 < astropirate> pm me! i'll brb
+21:22 < _numbers> i have a .js that uses module.exports to return the object from within a closure. how can i use this in the browser? i am trying with lazyload.js and/or RequireJS
+21:22 < _numbers> but i get err module is undefined
+21:23 < _numbers> i want to do:   require ['lib.js'], (lib) -> # now can use `lib` in browser
+21:26 < db42> is there a coffescript backend for node ? :)
+21:26 < _numbers> db42: towerjs
+21:26 < Marcky898> i have a question about node-mysql
+21:27 < Marcky898> How come my callback is never triggered?
+21:27 < Marcky898> connection.query(
+21:27 < Marcky898> 			'INSERT INTO trees SET ?',
+21:27 < Marcky898> 			qryData, 
+21:27 < Marcky898> 			function(){}
+21:27 < Marcky898> 		);
+21:27 < db42> wow, towerjs looks cool, other recommended frameworks ?
+21:27 < db42> Marcky898, use PASTEBIN!
+21:28 < Marcky898> oh
+21:28 < Marcky898> o.o
+21:28 < Marcky898> well its just that i insert somethigng but the callback is never fired
+21:28 < Marcky898> :'(
+21:28 < Marcky898> lol
+21:29 < db42> i dont use that, so i have no idea
+21:29 < db42> _numbers, does towerjs support redis ?
+21:30 < _numbers> db42: i'm sure there's a node-redis module you can add
+21:30 < db42> as the db model
+21:30 < db42> what are other towerjs like frameworks are recommended ?
+21:31 < topi`> looking at the Twisted in python world, it seems there are no sensible ways to debug a callback-based system. I mean, with callbacks, it gets hard to know how you were exactly called. How does node.js address this?
+21:31 < _numbers> db42: i'm working on one now but i haven't published all of it
+21:31 < _numbers> there aren't too many
+21:32 < _numbers> you can find a list of frameworks on the node.js github wiki page
+21:32 < db42> k
+21:32 < db42> maybe it's time i start learning mongodb instead of redis for storing data
+21:32 < db42> might simplify things for what i need 
+21:32 < _numbers> topi`: we use node-inspector
+21:33 < Marcky898> node-inspector loveee
+21:35 < topi`> _numbers: how does that work? in Twisted, there's "manhole", it allows you basically to telnet to the server and inspect python objects
+21:37 < _numbers> topi`: set `debugger` breakpoint in the code like normal js. then run `node-inspector` from cli. then run your node binary with  the --debug-brk flag.
+21:37 < _numbers> then browse to http://localhost:8080
+21:38 < topi`>  hmm, interesting
+21:38 < topi`> does this bear any reminiscence to the method of debugging client side javascript?
+21:38 < topi`> or is it just a feature of the V8 engine?
+21:39 < _numbers> yes its the exact same thing chrome devtools uses
+21:39 < _numbers> its the webkit debugger
+21:40 < topi`> I see
+21:40 < topi`> i'm kinda new to javscript
+21:42 < _numbers> thats good
+21:45 < db42> nice, what is the recommended mongo package for njs?
+21:56 < db42> how is mongoose ? recommended as an ORM ?
+22:08 < aandy> mongo is a bit like your high school gf. sure it's pretty, but a bit high maintenance
+22:08 < aandy> db42: depends on your need, as db choices always do, so think in terms of your model/controllers, then fit a db onto afterwards
+22:09 < aandy> that being said, mongo can fit many projects, just as sql db's can fit almost anything. so two good generic choices
+22:10 < aandy> usually using something you know well, or something that's very flexible to build the project with, then optimizing for faster queries/smarter lookups when you have a good overview of your actions
+22:14 < db42> aandy, high manitenance how ? 
+22:15 < db42> is there anything more flexiable than it ? 
+22:17 < aandy> i'm actually very supportive of mongo, but it does have some quirks that you need to understand before you lose any data. i mean, sure it depends how you put things together, but personally i think relational db's are very flexible, although i rarely use them in a finalized project (but for sketching as i just mentioned)
+22:18 < aandy> you could go by http://kkovacs.eu/cassandra-vs-mongodb-vs-couchdb-vs-redis and check whichever you think will fit you best. nothing's set in stone :)
+22:18 < timeturner> what quirks do I need to know about before I lose my data in mongo?
+22:18 < aandy> (that's nosql btw)
+22:19 < aandy> timeturner: if you come from never having used mongo, then understanding what the doc structure means for queries is a good first check. how to shard and do replication is another - and as for data loss, make sure you understand how replication, arbeiters and failover works before you expand/implode
+22:20 < aandy> all of the above doesn't necessarily lead to data loss, but could lead to having to do new layouts, meaning you'd rebuild from your original data source (so mongo 101: don't throw out your original data until you're set)
+22:20 < db42> ohh, i'm going single server, it's just a test i'm doing to learn express / nodejs better
+22:21 < denysonique__> Hi
+22:21 < aandy> by all means use mongoose. it's widely used in the node community, and having a feel for what mongo is, is nothing but a good thing
+22:21 < denysonique__> what is the name of the logger used on this channel?
+22:25 < _numbers> lol check out this bad boy: haml to html to coffeecup to javascript to coffeescript converter http://codepen.io/mikesmullin/full/cpuhF
+22:26 < _numbers> just made it
+22:31 < db42> _numbers, rofl, cool :)
+22:33 < db42> you can do anything in anything :)
+22:38 <@Nexxy> the only limit is your own... imagination
+22:38 < mscdex> colors! \o/
+22:38 <@Nexxy> weeee
+22:39 <@Nexxy> wait
+22:39 <@Nexxy> yes
+22:39 <@Nexxy> 345
+22:39 <@Nexxy> hm
+22:40 <@Nexxy> color code steganography
+22:40 < mscdex> :O
+22:40 <@Nexxy> I did that in mircscript once
+22:40 <@Nexxy> color codes wrap
+22:40 <@Nexxy> lol
+22:41 <@Nexxy> mscdex, lol
+22:41 <@Nexxy> ^ hidden color codes
+22:48 < db42> is it possible some how to pass a socket.io socket (client-side) between pages ?
+22:57 < aandy> db42: how do you mean?
+22:57 < db42> aandy, i use jquery mobile, and as multi page for now
+22:57 < db42> i dont want to start a new socket.io socket for each page...
+22:58 < aandy> you'd probably keep the state server side and have the client connect on page views. if you want to keep the same connection you should probably use ajax styled pages
+22:59 < db42> yeah i dont have experience with that
+22:59 < db42> so i guess for now i'll just go with the other option :)
+23:01 < gildean> why not send the data for the pages also with the websocket?
+23:01 < aandy> gildean: that's what i meant by ajax, although it wasn't what i said technically
+23:01 < gildean> you can just dump a bunch of json in a specific event on the socket
+23:02 < gildean> aandy: yep, i get you
+23:02 < aandy> but depending on how big a part of the app is websockets, and how big a part of it is html content / history, it might be a bit overkill to flush everything through a socket
+23:02 < gildean> how's so?
+23:03 < aandy> i mean sure you have the history api, but it seems like a longer route to something that could be handled by sessions serverside
+23:04 < gildean> well yeah, if it's mainly a webpage and not an app per se, then it wouldn't be as good
+23:04 < aandy> i don't know what he uses socket.io for, so i'm speculating
+23:04 < gildean> yeah, it depends completely on the type of application
+23:08 < aandy> gildean: do you have a stance on scaling websockets? i've never really had a need for it, but wondering if it should just be scaled out as usual by instances and a session store
+23:10 < aandy> db42: https://github.com/LearnBoost/Socket.IO/wiki/Configuring-Socket.IO you could also try toying with the heartbeat interval - but client side you'd still destroy/create a new socket io client on page switches
+23:13 < gildean> aandy: not really, i haven't had to even think about it, but i'd guess the normal scaling with new instances would be the easiest way to go
+23:19 < JasonWoof> how can I prompt the user (in the terminal) to type a password without it being visible? tty.setRawMode(true) doesn't seem to disable terminal echoing in node 0.6.19
+23:25 < aandy> JasonWoof: maybe the `read` module?
+23:25 < aandy> read({prompt: 'Enter pw: ', silent: true}, ...);
+23:27 < aandy> https://github.com/isaacs/read
+23:31 < JasonWoof> aandy: that looks like it would work, but I'm trying not to pull in a bunch of dependancies, especially ones that aren't in debian
+23:32 < JasonWoof> oh, readline is builtin
+23:33 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+23:55 < JasonWoof> clever... so mute-stream is a class of writeable stream which you can set to not output anything
+23:55 < JasonWoof> and the `read` module passes that to readline as the output stream
+23:59 < hatch> any offer any suggestions as to why (after a Brew upgrade) `npm -g ls` can no longer find the globally installed modules? only a couple blank lines are printed out
+--- Log closed Sun Dec 16 00:00:28 2012
