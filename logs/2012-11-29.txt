@@ -1,0 +1,1817 @@
+--- Log opened Thu Nov 29 00:00:04 2012
+--- Day changed Thu Nov 29 2012
+00:00 < bnoordhuis> tnorris: then there's probably no memory leak. rss can grow because libc decides not to return memory to the operating system
+00:00 < tnorris> bnoordhuis: ok cool. Then I'll update the bug with that information.
+00:29 <@isaacs> Nexxy: OMG YOU ARE CORRECT!
+00:31 < zane_> Is there any way to get a stack trace on a "FATAL ERROR" (process out of memory)? http://stackoverflow.com/questions/13616770/node-js-fatal-error-js-allocation-failed-process-out-of-memory-possible
+00:36 < tnorris> zane_: for testing, have you tried increasing --max_old_space_size on your process?
+00:36 <@isaacs> nathan7: nave 0.4.2 should work with oh-my-zsh
+00:36 <@isaacs> nathan7: thanks for the help!
+00:36 < tnorris> not a solution, but curious if by adjusting that you can alter the circumstance of the error.
+00:37 < zane_> tnorris: I did try that at one point, yes, it was hard to determine if it was having a real impact
+00:38 < tnorris> zane_: have you been able to determine what the process is doing when it errors?
+00:38 < tnorris> (I mean, if it's running a specific function or the like?)
+00:38 < zane_> tnorris: nope, that's why I want the stack trace. Or a flame graph. Or ANYTHING that would lead me to this information, really
+00:38 < zane_> tnorris: the fact that it only happens on prod makes it damn near impossible to figure out
+00:39 < tnorris> zane_: is there a consistent time after which the process will fail?
+00:39 < zane_> Nope. I've seen it happen in 5 minutes after launching the node app, and I've seen it survive for 24 hrs
+00:40 < zane_> makes me think there's a specific condition attached to specific user(s) which triggers it
+00:40 < tnorris> I assume data is flowing in/out from the network? is it performing filesystem IO?
+00:40 < zane_> File IO happens mostly just to serve jade templates. MongoDB hits (on an external server in the same amazon security ccluster) are much more frequnet.
+00:41 < coryvirok> hello all. can anyone point me to a good, minimal example of implementing a custom write stream?
+00:43 < tnorris> zane_: couple things. Might try minimal logging on all fs/net io calls. see if there is a specific circumstance when this happens.
+00:43 < tnorris> zane_: also i would setup a rotating script using node-heapdump (https://github.com/bnoordhuis/node-heapdump) and output the contents every min or so until it crashes.
+00:44 < zane_> tnorris: hmm, I just happened to look @ nodetime's File System - Req/Min stat, and it's going as high as 500 req / min
+00:45 < zane_> tnorris: That seems really high for just jade (which should be caching anyway)... could that include network (sockets)?
+00:45 < tnorris> TooTallNate: do you know if the process emit's an even when it runs out of memory, or does it just crash?
+00:46 <@TooTallNate> tnorris: not positive, but I believe it just gets killed
+00:46 < tnorris> zane_: mother. 500 fs reads/min? how many jade templates do you have?
+00:46 <@TooTallNate> by the kernel, so the process doesn't have any time to do any additional stuff
+00:46 < tnorris> TooTallNate: bummer, thanks.
+00:46 < zane_> tnorris: um, like 6
+00:46 < zane_> tnorris: granted, I give them different input each time, eg, a "username" so it can show a "welcome" within the prompt
+00:46 < tnorris> zane_: ok, so shouldn't the templates be stored internally then called from memory? or is there something i'm missing?
+00:47 < zane_> tnorris: that sounds right to me...
+00:48 < tnorris> zane_: is that handled by another library?
+00:48 < zane_> tnorris: assuming that the nodetime statistic "requests per minute" referrs only to actual file reads (NOT socket IO), then this could very well be the problem...
+00:48 <@TooTallNate> zane_: you usually call .compile() and then just invoke the returned template function repeatedly
+00:49 < zane_> tnorris + TooTallNate: I'm using express
+00:49 <@TooTallNate> express definitely caches the templates
+00:49 < zane_> AFAIK, this means I don't explicitly compile
+00:49 <@TooTallNate> zane_: OH, but only in production mode
+00:49 < zane_> I'm in production :(
+00:49 < zane_> NODE_ENV=production forever start index.js
+00:50 <@TooTallNate> zane_: so unless you're setting NODE_ENV=production, they're getting recompiled each time
+00:50 <@TooTallNate> oh well then *shrug*
+00:50 < zane_> any way to double-check that the var is being passed to the process tho?
+00:50 <@TooTallNate> zane_: console.log(process.env.NODE_ENV)
+00:51 < acidjazz> yay nodemon is broken as f
+00:51 < acidjazz> just like most all modules ive used
+00:54 < tnorris> zane_: also you can use the following to see fs io while the process is running `sudo iotop -bktqqq -d 2  | grep -v "[0].00 K/s    0.00 K/s" | grep " node "`
+00:55 < zane_> tnorris: was just about to ask if there was a way to do that ;)
+00:55 < zane_> damn, iotop is not found
+00:55 < tnorris> zane_: are you using ubuntu on ec2?
+00:55 < zane_> not on CentOS?
+00:56 < zane_> CentOS / ec2
+00:56 < zane_> will that tell me which files are being accessed, btw?
+00:56 <@mbalho> WOOP WOOP http://hackaday.com/2012/11/28/adding-node-js-based-sensors-to-the-parrot-ar-drone/
+00:57 < tnorris> zane_: no, that will just tell you if it's doing fs io. one sec and I'll grab you a command for watching a folder for io.
+00:59 < tnorris> zane_: does centos have inotifywatch?
+01:00 < tnorris> zane_: then you could use `inotifywatch -v -e access -e modify -t 60 -r <path_to_templates>`
+01:00 < zane_> nodice :(
+01:01 < zane_> unless *checks YUM*
+01:03 < wereHamster> is it best-practice to not include tests in npm modules?
+01:03 <@mbalho> ... parsing double negative ...
+01:03 <@mbalho> it is best-practice to include tests in npm modules
+01:04 < wereHamster> and the reason being.. ?
+01:04 <@mbalho> javascript doesnt take up that much space and it is nice to install modules and run their test suites
+01:04 < tnorris> mbalho: +1
+01:04 < wereHamster> not? du -sh node_modules -> 44MB. That's a lot of text.
+01:05 < wereHamster> only about 15 packages
+01:05 <@mbalho> sounds like some bloated modules
+01:05 <@mbalho> you can use devDependencies
+01:05 < mrluc> +1 devDependencies
+01:05 < tnorris> wereHamster: also remember that some modules compile on install. not sure how much that will add, but it will add some.
+01:05 < zane_> tnorris: interesting, I did a watch on just the jade directory; only 5 reads in 60s
+01:06 < vicapow> hey guys
+01:06 < zane_> tnorris: then I did a watch on root, and within 2 seconds I got an "upper limit!" error
+01:06 < wereHamster> mbalho: bloatet with useless stuff that I don't need. Such as.. wait for it... tests
+01:07 < tnorris> zane_: mother... if node can't allocate memory it needs (e.g. another process spikes and fills mem) then it will fail with out of mem.
+01:07 < tnorris> zane_: so it's possible that node isn't your problem.
+01:08 < zane_> Oh my god, that would totally explain this: http://stackoverflow.com/questions/13613995/node-js-memory-leak-causes-system-to-lose-available-memory-even-after-node-rest
+01:08 < zane_> ... if the problem isn't even node...
+01:08 < tnorris> TooTallNate: So I'm currently tracking 30 tickets I've commented on, but are still open (and still going strong). is there a better way for me to do this and not flood updated issues?
+01:08 <@mbalho> wereHamster: of that 44mb how much is the actual test code, not dependencies or fixtures 
+01:09 < tnorris> zane_: heh, well at least your app is running fine. ;-)
+01:10 < ericelliott> weird.. I have an env file that does: export foo="bar"  and I'm trying to source it in the start script block in package.json like: source buildconfig.env;node test/server.js
+01:10 < zane_> tnorris: except for crashing every 5min - 24 hours
+01:10 < ericelliott> those values aren't being set, though
+01:10 < zane_> tnorris: so... I assume that was sarcasm ;)
+01:10 < ericelliott> well, they're being set, probably, but they're not readable in server.js
+01:11 < tnorris> zane_: well, in the case that it's not node running out of memory. tell me, have you tracked how much mem is used up until it crashes?
+01:12 < zane_> tnorris: I  don't understand this concept well, but aren't temporary files used for sockets? Eg, increading ulimit increases the # of possible sockets? And you can look at the temporary files in  a process to see open sockets?
+01:12 < zane_> tnorris: Yep; heap and RSS are both < 200 Mb at all times, though RSS does grow over time, 200Mb doesn't seem that bad
+01:13 < Cause> How do you set up express redis and passport so that you can have sessions shared across different subdomains?
+01:17 < tnorris> zane_: are you using sockets or ports?
+01:17 < zane_> tnorris: errr... *scratches head* express for inbound requests, request (node module) for outbond...
+01:18 < zane_> tnorris: sockets? haha
+01:18 < tnorris> zane_: when you call .listen() do you pass a filename or a port number?
+01:18 < zane_> ah, port
+01:18 < wereHamster> mbalho: if I take the size (du -s) of all files which match *test*, then 11MB
+01:19 < zane_> tnorris: to be specific, app.listen(8888);
+01:19 < tnorris> zane_: ok, you can check how many connections you have on a port by `netstat -an | grep <port>`
+01:20 < zane_> tnorris: I'm seeing roughly 10-20 at a time. I guess the question is, does that correlate to the file requests? If so, it explains them, if not, they must be something else.
+01:21 < tnorris> zane_: well, if your jade templates are being cached then I wouldn't expect to see any fs io after each one is called.
+01:21 < tnorris> zane_: so they shouldn't correlate.
+01:22 < tnorris> zane_: check your systems free memory with `free -m`
+01:23 < zane_> Mem:          7687       3232       4454          0        317       1963
+01:23 < tnorris> that will help you monitor if another process if filling up mem and preventing allocation to node.
+01:23 < tnorris> zane_: is there a second line with "-/+ buffers/cache"
+01:23 < tnorris> you should be more interested in that.
+01:23 < zane_> -/+ buffers/cache:        951       6736
+01:24 < tnorris> yeah. so your system has plenty of memory.
+01:24 < zane_> I'm using inotifywatch on each of the folders in root, 1 by 1, trying to find the source of the io
+01:24 < tnorris> heh, good idea.
+01:25 < tnorris> zane_: i'm out. but be back tomorrow. keep me updated.
+01:25 < zane_> total  access  filename 119    119     /lib/modules/2.6.21.7-2.fc8xen/
+01:25 < zane_> 119 accesses of whatever the hell that is ^ in 10 seconds
+01:29 <@Nexxy> \o/
+01:33 < mscdex> \o/
+01:34 < ang3lfir3> rawr.... 
+01:34 < ang3lfir3> ne one awake ?
+01:36 < Orbitrix> 6:32pm here, so, yes
+01:38 < acidjazz> i got app.get('/user/login', user.login); .. then in routes/user.js exports.login = function(req, res) { console.log(req.param); };
+01:38 < acidjazz> why is req.param null
+01:38 < acidjazz> hitting node/user/login?user=user&login=login
+01:38 < mdedetrich> hey boyz and girlz
+01:39 < ang3lfir3> Orbitrix, lol that's no guarantee
+01:40 < ang3lfir3> mdedetrich, hola
+01:40 <@Nexxy> acidjazz, are you sure you don't mean req.body?
+01:41 < acidjazz> Nexxy: what is req.body supposed to be
+01:41 <@Nexxy> the body of your request
+01:41 <@Nexxy> like
+01:41 <@Nexxy> req.body.user
+01:42 <@Nexxy> acidjazz, or perhaps req.params
+01:43 < acidjazz> yea params is empty too
+01:43 < acidjazz> req.query is there... 
+01:44 <@Nexxy> oh, maybe you're not using a bodyParser?
+01:45 <@Nexxy> try putting an app.use(express.bodyParser());
+01:45 <@Nexxy> in your config
+01:47 < styol> acidjazz: query strings should indeed be part of req.query (IE: req.query.user)
+01:50 < acidjazz> styol: i see
+01:50 < acidjazz> so i shoudl be looking for .query
+01:50 < acidjazz> i thought i saw examples having .param and .params
+01:51 < styol> acidjazz: Yahp, if you console.log(req.query); you should see the provided query strings. It's actually been awhile, perhaps they are there too.. log all the things! :)
+01:52 <@TooTallNate> acidjazz: req.params is for params defined in your route path
+01:52 <@TooTallNate> like "/:userid"
+01:52 <@TooTallNate> would be req.params.userid
+01:52 < acidjazz> oh so huh
+01:52 < acidjazz> and thats like what /23423/ 
+01:52 < acidjazz> like if you wanted to have a dynamic route path?
+01:53 <@TooTallNate> acidjazz: and then there's the req.param() *function* which returns the first available match in req.body, req.query and req.param
+01:53 <@TooTallNate> req.param('userid')
+01:53 <@TooTallNate> :D
+01:53 <@TooTallNate> acidjazz: right, for dynamic paths
+01:59 < styol> Any recommendations for load testing / benchmarking?
+02:02 < styol> The nodeload module seemed pretty neat, but has some issues preventing it from working properly on later versions of node (in particular no method 'destroy' on a deprecated use of http.createClient)
+02:03 < styol> Not sure if AB is a proper tool for it, something more like jmeter I suppose for replicating various requests
+02:07 < Azra-el> hello. assuming that i have an array like [1,2,3,4]    how can i create a 2d array that has as keys the first array and as value the same array but make sure the key is not the same as the value. ex. [1:4,2:1,3:2,4:3]
+02:09 < mscdex> Azra-el: use an object, not an array if you want keys
+02:09 < mscdex> {1:4, 2:1, 3:2, 4:3}
+02:10 < Azra-el> mscdex ... is this a known pattern of some sort that i can search for?
+02:10 <@TooTallNate> Azra-el: http://www.quirksmode.org/js/associative.html
+02:13 < ang3lfir3> Azra-el, its a hash table 
+02:14 < Azra-el> ang3lfir3 reading up on it
+02:15 < ang3lfir3> your question sounded like a CS test question..... you cheating on ur homework :p ???
+02:15 < ang3lfir3> guarteeing uniqueness is something you will have to do outside the structure ... thats not its responsibility
+02:16 < Azra-el> neah.... testing nodejs with mongoose (learning it basically) and im making a secret santa for our department
+02:17 < Azra-el> and lol at cheating... im 30 :P 
+02:18 < thl0> is there a way to force nodejs require to be case sensitive even on a Mac?
+02:19 < ang3lfir3> Azra-el, I'm 33 so there im older than you 
+02:19 < ang3lfir3> :p 
+02:19 < thl0> we have this problem that tests pass locally (Mac) but fail on build server (Linux) because filenames had case typos
+02:19 < ang3lfir3> or am I 32 .... shit i forget
+02:19 < Azra-el> ang3lfir3 ..  i meant im not having CS :P
+02:19 < thl0> I'd like them to fail on Mac as well by forcing node.js require to conside case
+02:20 < ang3lfir3> Azra-el, lol i know .... just making you feel younger.... my gift to you
+02:23 < ang3lfir3> thl0, we usually use a nanny test for something like that yo make sure that the require names are the same as the file names
+02:24 < ang3lfir3> basically collect all the module file names and check all instances in code that match some regex to makes sure they match said key .... its horrible code to write but the test can be more informative as well 
+02:25 < ang3lfir3> even tell the person which require is in the wrong case and in which file ... etc
+02:25 < ang3lfir3> granted I do that kinda stuff in C# so YMMV
+02:25 < Azra-el> ang3lfir3 .. thanks :)
+02:26 < ang3lfir3> Azra-el, I do what I can :) 
+02:26 <@TooTallNate> thl0: the only solution unfortunately is to ensure you use the correct filename case when requiring
+02:28 < thl0> TooTallNate: thanks
+02:29 < othiym23> thl0: you can make HFS+ filesystems be case-sensitive, but I'd only do that on data-only partitions
+02:29 < othiym23> thl0: the problem is that lots of apps (especially from Adobe) and OS bits aren't careful enough with the case of file names
+02:29 < othiym23> but it is is possible to enforce that at a filesystem level
+02:30 < polyrhythmic> 20
+02:36 < acidjazz> where can i get a sweet example on how to handle req.session
+02:43 < acidjazz> is there a native way in this v8 javascript to count the properties of an object
+02:44 < othiym23> acidjazz: Object.keys(object).length
+02:44 < othiym23> not the most efficient method in the world, but it'll work
+02:46 < othiym23> you can also do var n = 0; for (var i in object) if (object.hasOwnProperty(i)) n++;
+02:46 < othiym23> and then n will contain the number of non-inherited properties on that object
+02:47 < acidjazz> yea i know of that.. wondering if there was some v8 cool new koolaid
+02:47 < badem4o> Is anyone here an expert with handlebars?
+03:09 < acidjazz> where can i find a quick guide/example of using sessioning for users
+03:13 < Raynos> timoxley: ping
+03:13 < timoxley> Raynos pong
+03:13 < trabus> bong
+03:13 < Raynos> timoxley: you suffer from NIH
+03:13 < Raynos> half the modules you've written are available on npm.
+03:14 < trabus> Sorry, I live in Washington, it's the mandatory response to ping now
+03:18 < Raynos> timoxley: I've written a bunch of the same modules you have. We should collab!
+03:37 < acidjazz>   res.send(JSON.stringify({success: req.session.user}, null, true)); <- how come i get {} if req.session.user is not there.. and not {success: false} ? or {success: undefined} ?
+04:03 < niggler> is there a standard license for NPM components?
+04:09 < timeturner> niggler: MIT
+04:09 < niggler> timeturner because i see some components with dependencies that are far from MIT
+04:10 < niggler> take xlsx.js (used by the xlsx node module) which is under the 'Microsoft Office Extensible File License'
+04:10 < niggler> not OSI-blessed
+04:17 < misterhat> o new topic
+04:18 < niggler> misterhat you familiar with open-source-ish licenses?
+04:18 < misterhat> nope
+04:21 < niggler> i love how google points to NPM for most of the first page of links for "MIT +no-false-attribs License"
+04:22 < guest999> i wanted to understand how underlying tls connection handled asyncronously. Is it using epoll?
+04:24 < niggler> ok what's the "correct" way of writing code that simultaneously sets up exports properly and allows you to use it in the browser?
+04:24 < niggler> ive seen at least 4 different ways
+04:25 < TooTallNate> es6 modules
+04:25 < TooTallNate> once they're out
+04:25 < misterhat> cam
+04:25 < misterhat> can't wait*
+04:25 < misterhat> i also love the new class syntax
+04:26 < misterhat> gunna be great
+04:34 < MI6> joyent/node: isaacs streams2-net-perf-wip * f1b7b16 : streams2: Handle pipeChunkSize properly (+1 more commits) - http://git.io/qoJwtQ
+04:47 < MI6> joyent/node: isaacs streams2-net-perf-wip * 64f454c : streams2: Remove pipe if the dest emits error - http://git.io/ArLqkw
+04:50 < cainus> hey all... anyone know of a good solution for documenting an API?  something like docco I guess, but not for internals
+04:51 < trypwire> hey guys. i'm writing a command line tool that talks to  a serve running on nodejitsu… how do i write tests around the command line tool that doesn't rely on hitting the server?
+04:51 < trypwire> (i imagine it's bad practice to rely on the server working properly for my CLI tests to pass)
+04:51 < cainus> fake out the server
+04:52 < trypwire> cainus: can you elaborate?
+04:53 < cainus> wellllllllll personally I'd wrap it all in a function that takes your server object as a param
+04:53 < cainus> then you can pass in anything
+04:54 < cainus> there are other ways, but I like doing it explicitly like that
+04:54 < trypwire> my CLI tool just uses https://github.com/mikeal/request to send requests to my-site.jit.su
+04:54 < cainus> so you pass a fake server instead
+04:54 < cainus> ooooh
+04:54 < cainus> you can pass a fake request object then
+04:55 < cainus> sometimes I actually create a real server in my tests for it to talk to though
+04:55 < trypwire> so if in my commandlinetool.js i have var request = require("request")
+04:55 < cainus> just because creating and tearing down a server is so simple and fast in node
+04:55 < trypwire> you can do that in the middle of a test?
+04:56 < cainus> this way might be easier on you:  http://howtonode.org/testing-private-state-and-mocking-deps
+04:59 < trypwire> cainus: holy shit :D
+04:59 < trypwire> this is like… mind blowing
+05:00 < cainus> a little bit too magical for me, but it should work
+05:03 < trypwire> jesus. this makes so much sense
+05:04 < trypwire> <3
+05:04 < trypwire> thanks a lot dude
+05:04 < cainus> also possible:  https://npmjs.org/package/proxyquire
+05:04 < cainus> anyway... np
+05:13 < trypwire> does anybody here use vim for their node coding?
+05:13 < trypwire> or, has anybody here tried vim and used something else?
+05:14 < Aria> I use vim. Long term vi user really.
+05:14 < trypwire> specifically for code you've written in javascript (node, browser, etc)
+05:14 < Aria> Came back to vim after vim 7 came out and fixed the pathologically slow syntax highlighting.
+05:14 < trypwire> Aria: can i ask you what your workflow is like?
+05:14 < trypwire> do you use iterm2? tmux? gnu screen? 
+05:15 < trypwire> tabs in your terminal?
+05:15 < Aria> vi file, edit, save, control-Z, do other stuff. Other pane (iterm2, two panes side by side, sometimes a squat little terminal at the bottom of one for a daemon I'm running)
+05:15 < Aria> Run my app in one pane, edit and do other code maintenance in the other.
+05:15 < Aria> Lots of suspend process, do stuff, fg to resume.
+05:16 < Aria> No screen, no tmux. I like my native scrollback too much.
+05:16 < Aria> (and you only have to close your terminal when you reboot. And rebooting is for blasted MacOS security updates)
+05:16 < trypwire> what does your vim setup look like?
+05:16 < trypwire> nerdtree? ctrl-p? snipmate?
+05:16 < Aria> No.
+05:17 < trypwire> anythign?
+05:17 < Aria> Syntax highlighting and folding for the languages I write. That's it.
+05:17 < trypwire> holy shit lol
+05:17 < trypwire> that is _badass_
+05:17 < Aria> A) I can type. B) I have a terminal right there.
+05:18 < trypwire> do you use tabs in vim?
+05:18 < Aria> No.
+05:18 < trypwire> lol wow. so badass!
+05:18 < Aria> Several windows, split.
+05:18 < Aria> :set winheight=50
+05:18 < Aria> And a lot of 5 <control-w> j
+05:18 < Aria> (you can use repeats on pane switches)
+05:19 < trypwire> do you find yourself closing/reopening files too ofteN?
+05:19 < gkatsev> pretty much everything in vim takes a [count]
+05:19 < Aria> "What IDE do you use?" "Unix"
+05:19 < trypwire> like what do you do for project management?
+05:19 < Aria> No, because I suspend my vim sessions rather than close files.
+05:19 < trypwire> just be badass?
+05:20 < Aria> Also, I've practiced focusing on what I want to work on. vim  filea fileb filec -o
+05:20 < Aria> Project management? Like what? I never cd out of the root of my git clone.
+05:20 < trypwire> have you ever done a ruby project in vim?
+05:20 < trypwire> rails*
+05:20 < Aria> Yes.
+05:21 < Aria> No, not rails. Rails and I never got along.
+05:21 < Aria> But I was a long-time rubyist.
+05:21 < misterhat> Aria: are you someone famous?
+05:21 < substack> I built a rails program for data entry that ran on arctic and bering sea icebreaker vessels for scientific research
+05:21 < Aria> misterhat: Not terribly, but I've been around.
+05:21 < substack> my only rails app
+05:21  * Aria grins at substack
+05:21 < Aria> Nice.
+05:22 < trypwire> :set winheight=50 is money
+05:22 < trypwire> holy shit
+05:22 < Aria> I contributed to active record 0.5. But then got frustrated with my good ideas being rejected (finally implemented in 2.x!)
+05:22  * Aria grins at trypwire
+05:22 < seb_> Hello, I have coded a command line tool (installed with npm install -g) and it needs to access to data (csv files) present in the package directory. Does someone know how to reach these files ?
+05:22 < Aria> https://github.com/aredridel/dotfiles
+05:22 < trypwire> Aria: yes! please and thank you!
+05:22 < substack> and then I built some sinatra apps for stitching together large tiles from aerial photography
+05:22 < substack> gis woo
+05:23 < Aria> Ooh. Nice. Sinatra is excellent. 
+05:23 < trypwire> <3 looking at vim configs
+05:23 < substack> Aria: except for how I needed to roll my own thread pool since ruby sucks at farming out jobs to workers
+05:23 < Aria> substack: Yes, yes it does!
+05:23 < substack> ug and polling
+05:23 < Aria> substack: But you made a very small library for that, right ? ;-)
+05:23 < Aria> Ew, yeah.
+05:24 < Aria> There's a REASON I'm here in #node.js
+05:24 < substack> same
+05:24 < trypwire> so… express > sinatra?
+05:24  * substack has had lots of concurrency skirmishes
+05:24 < substack> trypwire: meh
+05:24 < Aria> Express is pleasant to me but by no means the bees knees. I'd like it better if it were several smaller pieces.
+05:24 < wookiehangover> concurmishes
+05:24 < Aria> (that said, it's still small)
+05:24  * Aria grins at wookiehangover
+05:25 < substack> used to write a lot of python and perl
+05:25 < substack> more perl than python
+05:25 < substack> and then I had a haskell phase for about 3 years
+05:25 < Aria> Huh, fun!
+05:26 < wookiehangover> then 4 years of Ruby and PHP, right? >_<
+05:26 < wookiehangover> phruby
+05:26  * gkatsev is untainted by php
+05:26 < gkatsev> wookiehangover: phuby.
+05:26 < substack> I spent like 4 months on php in high school
+05:26 < substack> but I already knew perl and liked that better so it didn't stick
+05:27 < Aria> Hehe.
+05:27 < Aria> I do PHP for my day job. We make fun of it.
+05:28 < Aria> But we're using node on the backend. It'll take over by accident.
+05:28 < trabus> I feel like starting with Actionscript completely ruined and prepared me for JavaScript
+05:28 < Aria> Hehe. Actionscript is the devil.
+05:28 < Aria> But it does leave you ripe to learn Javascript well.
+05:28 < trabus> tell me about it
+05:28 < gkatsev> at work, we do javascript and flash. Though, I generally avoid the flash stuff. We always make fun of flash.
+05:29 < trabus> I had no idea what to do outside of a frame
+05:29 < gkatsev> why does actionscript ruin js for you?
+05:29 < Aria> <aside> So we have this chat server at work that uses "actionscript" for configuration / customization. Turns out the "actionscript interpreter" is "rhino-1.8.5.jar" and it just calls the files ".as"</aside>
+05:29 < gkatsev> they're both ecmascript?
+05:29 < gkatsev> I mean, I guess if it was actionscript 1...
+05:29 < trabus> it's the implementation, and AS3, not really the same
+05:29 < Aria> gkatsev: Have you met actionscript 3? And the radioactive albatross that it has as an object model?
+05:30 < trabus> AS3 wants to be soo OOP
+05:30 < gkatsev> I have. And yes, it's a weird mix of classical and prototypal inheritance
+05:30 < Aria> Yeah. It's like Javascript from bizarroland.
+05:30 < trabus> it really broadened my horizons though
+05:30 < trabus> I barely understood protoypes when I used AS1/2
+05:31 < Aria> Hehe. Oy!
+05:31 < trabus> but AS3 made so much sense for some reason
+05:31 < gkatsev> because AS3 was much much better
+05:31 < trabus> but now going back prototypes make more sense
+05:31 < trabus> it was much much better in implementation
+05:33 < Aria> Yeah, AS3 was a much better object model.
+05:33 < trabus> frames sucked
+05:33 < Aria> (was? is.)
+05:33 < Aria> (Anyway. AS2 and AS1 have an even more radioactive and even more dead albatross bolted on)
+05:33 < trabus> we basically used gotoAndPlay as function calls
+05:34 < gkatsev> it's still AS3, but using the flex framework, you get a lot of good stuff
+05:34 < Aria> Ayep.
+05:34 < gkatsev> specifically, flex 4 and newer
+05:34 < Aria> Yeah, flex is almost tolerable.
+05:34 < trabus> I did educational software, with lots and lots of animation
+05:34 < Aria> Aright. On that note, it's time for sleep. Night, all.
+05:34 < trabus> night
+05:35 < Aria> I'm gonna get my vim-using badass butt in bed, so I can be up at 6am for a crazy deploy.
+05:35 < gkatsev> lol
+05:36 < trabus> I've been trying to learn vim for a year, but I keep unlearning it. I think my downfall was ST2 vintage mode
+05:36 < trabus> "it's close enough, I'll totally keep using vi commands"
+05:37 < gkatsev> come over to #vim
+05:37 < gkatsev> I've learned so much there
+05:40 < trabus> I did up a cheatsheet in google docs last year about this time https://docs.google.com/drawings/d/1sFLkwBae2ii0fHV7DVjU-eSnkiEdHOWP0IXCX1L-q_I/edit
+05:41 < trabus> I want to change it to have ST2 shortcuts now
+05:42 < trabus> only problem is that some of the vim shortcuts don't work in ST2
+05:43 < gkatsev> http://www.viemu.com/vi-vim-cheat-sheet.gif also, this one is interactive: http://sheet.shiar.nl/vi
+05:43 < gkatsev> st2 is ok. I still prefer vim. I've spent too much time.
+05:44 < trabus> the interactive one is nice
+05:44 < trabus> the other one hurts my eyes
+05:44 < gkatsev> heh
+05:44 < gkatsev> it's good
+05:44 < trabus> which is why I did my own
+05:44 < gkatsev> heh
+05:45 < mscdex> R.I.P. desktop keyboard -- 1999-2012
+05:45 < mscdex> :-(
+05:45 < trabus> I've got a few weeks of slowish time at the end of December, I may try and work at it again
+05:46 < trabus> that's a long run
+05:46 < gkatsev> trabus: you should just jump in full-time. Otherwise, it doesn't work.
+05:46 < gkatsev> mscdex: nice. What keyboard?
+05:46 < mscdex> it was an HP
+05:47 < mscdex> came with my HP Pavilion Desktop
+05:47 < mscdex> :-)
+05:47 < mscdex> a 400mhz Celeron beast
+05:47 < gkatsev> heh
+05:48 < gkatsev> I kind of want to get a Model M.
+05:48 < mscdex> i don't care for those clicky keyboards
+05:48 < mscdex> a friend of mine loves them though
+05:49 < gkatsev> clickiness is awesome
+05:50 < gildean> i used to have a real clicky keyboard, now my main ones are a bulk-hp/logitech and a ms natural ergonomic kb
+05:50 < trabus> I really want to get a mechanical keyboard eventually
+05:50 < gildean> the ms makes some noise, the hp is silent
+05:50 < tmpvar> das keyboard pwns (http://www.daskeyboard.com/)
+05:50 < mootpointer> I have a das keyboard.
+05:50 < tmpvar> me too :)
+05:50 < mootpointer> With the cherry blues.
+05:50 < mscdex> i just replaced the keyboard with one i had out in my old spare parts -- an old compaq ps/2 keyboard :-)
+05:50 < gkatsev> nice
+05:50 < mootpointer> Cherry brown is a bit softer.
+05:50 < mscdex> made in the same country as my old one
+05:51 < mscdex> hopefully this will last another 13 years
+05:51 < gkatsev> I don't care much for the sound, though, I do like the clicks. The feel is really what I want.
+05:51 < mootpointer> When I changed jobs, I pulled the keyboard apart and gave it a good clean.
+05:51 < mootpointer> gkatsev: Yeah. I'm all about the long travel.
+05:52 < trabus> my chicklets are a bit disappointing
+05:53 < mscdex> yeah it was weird, only a handful of the keys stopped working suddenly tonight
+05:53 < mootpointer> None of this low profile keyboard nonsense.
+05:53 < mscdex> i even tried cleaning and everything, but no dice
+05:53 < trabus> my buddy swears by the old IBM Model M
+05:53 < Lorentz> I have a model m, two actually
+05:54 < Lorentz> Use it at home since it's too loud for work
+05:54 < trabus> was looking at http://www.pckeyboard.com/
+05:54 < mscdex> haha
+05:54 < mscdex> too loud
+05:54 < Lorentz> cherry browns (leopold) at work, my wife has topre realforce
+05:55 < Lorentz> loud enough that legend is there was a previous programmer who also had a model m, but he had to leave because someone filed a OH&S complaint about noise
+05:55 < trabus> haha
+05:55 < Lorentz> yes it is that loud
+05:56 < trabus> I used to have a coworker that could make anything sound like a model m
+05:56 < gkatsev> at my work no one will notice because the AC/heater is too fucking loud
+05:56 < trabus> angry typist
+05:58 < Lorentz> mscdex: keyboards often have a matrix underneath for the buttons
+05:58 < Lorentz> meaning losing one trace would lose you x number of keys
+05:58 < Lorentz> which is arbitary, usually they're close together
+05:59 < Lorentz> time for a new keyboard for you
+05:59 < mscdex> yeah, i'm not sure if i'll just stick with this one or go out and buy one
+06:00 < Lorentz> might as well get one that'll last forever
+06:00 < Lorentz> my model m's 25 years old, still going
+06:09 < trypwire> hey guys
+06:10 < trypwire> how do i use this http://nodejs.org/docs/latest/api/vm.html#vm_vm_runinnewcontext_code_sandbox_filename
+06:10 < trypwire> with relative directories
+06:10 < mscdex> trypwire: the filename there is just for informational purposes
+06:11 < mscdex> trypwire: you can use any string you like, it's what's shown in stack traces iirc
+06:11 < MI6> joyent/node: isaacs streams2-net-perf-wip * cbbc85b : streams2: Unpipe on dest.emit('close') - http://git.io/9qe1gQ
+06:14 < ljharb> isn't fs.createWriteStream supposed to replace the contents of the file by default? it's not doing that for me, unless i truncate the file first with ">"
+06:23 < trypwire> does fs.readFile automatically parse JSON?
+06:23 < mscdex> trypwire: no
+06:23 < trypwire> err sorry, readFileSync
+06:23 < trypwire> it seems to
+06:24 < trypwire> nvm… i think I'm' dealing with a different error
+06:24 < othiym23> trypwire: if you want to automatically parse JSON in a file using a synchronous load, use require
+06:26 < ljharb> anyone? can fs.createWriteStream replace a file's contents?
+06:26 <@isaacs> ljharb: it should replace the file by default, yes.  share your code.
+06:26 < ljharb> ah thanks, ok
+06:28 < ljharb> isaacs: https://gist.github.com/aa8ff91745794f807378
+06:28 <@isaacs> ljharb: you need to writeStream.end() and wait for the "close" event before you know it's really done
+06:29 <@isaacs> ljharb: remember, fs functions are async.  if you read the file right away, it hasn't written yet.
+06:29 < ljharb> right - i'm running a command-line script, and using bash to tail the file
+06:29 < ljharb> when the script (and node) exit, i assume the file is closed?
+06:30 < trypwire> is there a way to step through node code during a test?
+06:30 < ljharb> the file permissions on the file are 664, but i assume if node has write perms at any point it will have them at all points (without a chmod)
+06:34 <@isaacs> ljharb: you still have to call writeStream.end() when you're done
+06:34 < ljharb> ok, that must be what i'm not doing. even if node exits, the file descriptor stays open?
+06:38 <@isaacs> ljharb: no, it closes forcibly by the os
+06:38 <@isaacs> ljharb: but your write is killed
+06:38 < ljharb> ah, i see
+06:38 <@isaacs> ljharb: if it hasn't landed yet maybe
+06:39 <@isaacs> ljharb: file systems are obnoxious
+06:39 < substack> fact
+06:39 < ljharb> ok so then i have another question - when do i call writeStream.end() ? https://gist.github.com/014cacd8b1b32f477e53
+06:39 < ljharb> i imagine i could do it with a butt-ton of promises, but that can't be the best way
+06:39 <@isaacs> ljharb: once you're done with your writing
+06:40 < ljharb> the gist shows that i'm not sure, because i've got multiple streams in a forEach all writing, whenever *they* end
+06:40 <@isaacs> ljharb: USE THE MAGICAL POWER OF A COUNTER! https://gist.github.com/5661f0b7d6c7e7bcae38
+06:40 < ljharb> lol
+06:41 <@isaacs> ljharb: :D
+06:41 < ljharb> is that *really* the most elegant way to do it? :-(
+06:43 < _xaka_> ljharb: don't you gonna get the mix of data chunks of files by this flow?
+06:43 < ljharb> _xaka_: i'm going to get a random order of each chunk generated by the forEach, but i don't care about that
+06:44 < ljharb> _xaka_: as long as each chunk is itself in the right order - which is why i'm writing it on each stream's 'end'
+06:45 < _xaka_> oh, i missed "output" var, my bad
+06:45 < _xaka_> that's why i don't like "var a,b,c" and prefer "var a; var b; ..." :)
+06:45 < ljharb> gah - isaacs so i'll keep your solution because i like explicitly closing the file. but as it happens, it was replacing it every time, but since it was writing identical content i couldn't tell :grr:
+06:46 < ljharb> _xaka_: that's just cause you're not used to chaining variable decs :-) i miss them when they're separate.
+06:46 < trypwire> hey guys. i'm using this method to test my app http://howtonode.org/testing-private-state-and-mocking-deps
+06:46 < trypwire> but the whole vm.runInNewContext thing only works on the top level
+06:47 < trypwire> as in, i can load the first module, but any modules that it loads don't get run in the same fake context
+06:49 < trypwire> or should i test only single modules at a time i guess?
+06:56 <@isaacs> ljharb: I think using a counter and adding two lines to your program is pretty elegant, yes.  compared with a whole library just to do that.
+06:57 < ljharb> :-) fair enough. i'm sticking with it
+07:07 < abrkn> =)
+07:07 < abrkn> what's the general view on defer vs nested cb / async.js?
+07:17 < AAA_awright> abrkn: Varied
+07:17 < AAA_awright> I don't abstract any of that, the async module is a no-no
+07:18 < AAA_awright> Nested callbacks aren't necessary, either
+07:18 < AAA_awright> You can do most anything async can do in 5-6 lines of code
+07:18 < AAA_awright> And the upshot is you don't have to guess what async is going to do, you can see it
+07:19 < timeturner> people should write their own flow control functions for trivial stuff
+07:19 < timeturner> I wrote my own parallel function and it accepts variable arguments etc.
+07:19 < timeturner> it's good for learning
+07:23 < abrkn> ok
+07:24 < abrkn> heres the same thing, one with Q: https://gist.github.com/4167346 and one with async: https://gist.github.com/4167349
+07:24 < abrkn> i think they are both very hard to read :(
+07:26 < abrkn> could reduce nesting a lot in the async.js by extracting out in functions, but then would have issues accessing locals
+07:33 < _numbers> how can i tell npm to install everything under the testDependencies section of package.json
+07:34 < abrkn> file:///C:/Program%20Files/nodejs/node_modules/npm/html/doc/install.html
+07:34 < abrkn> uhh
+07:35 < abrkn> npm install <name> [--save|--save-dev|--save-optional]
+07:36 < _numbers> there are many packages under that section. i'd like to avoid naming them individually
+07:36 < _numbers> `npm install` ignores these by default i suppose
+07:37 <@isaacs> _numbers: s/testDependencies/devDependencies/
+07:37 <@isaacs> _numbers: testDependencies isn't a thing.  it's devDependencies
+07:38 < _numbers> oh tower.js is using it. i guess its their customization
+07:40 < abrkn> yikes, look how many files in their blog :P
+07:41 < abrkn> http://towerjs.org/
+07:43 < razzle> what's the best framework? :)
+07:43 < razzle> using express now
+07:46 < _numbers> i'm just barely trying out tower but its already super impressive
+07:46 < abrkn> doesnt it just generate hundreds of files?
+07:47 < abrkn> in coffee!
+07:47 < Youdaman> any couchdb users here? i'm after recommendations for structuring my couchapp and whether to use the Evently approach or the boiler approach of mikael or this new kanso thingy
+07:47 < _numbers> ya they are like coffee freaks. they use it instead of jade/haml and instead of yaml
+07:47 < abrkn> what happened to html
+07:48 < abrkn> cofeescript: "Nothin' comes out when you compile that shit, just a bunch of stderr gibberish and motherfuckers act like they forgot about plain JavaScript" @simenbrekken
+07:48 < abrkn> :P
+07:48 < _numbers> i love it
+07:52 < myndzi> is there a way to reduce the timeout of dns lookups so it doesn't take forever to fail?
+07:52 < myndzi> (the inherent lookup in http.request)
+07:59 < abrkn> setTimeout?
+08:02 < myndzi> well, i think it's a system call of some kind
+08:02 < myndzi> i didn't want to explicitly abort so much as reduce the timeout
+08:02 < myndzi> i think i'll work around it though
+08:07 < Youdaman> sorry i disconnected -- anyone here using couchdb?
+08:27 < dook> What's an HTTP request module that gives me full access to the request object (header line and all)?  "request" doesn't seem to be it.
+08:28 < substack> header line as in raw header data?
+08:28 < substack> or do you mean status codes?
+08:32 < dook> Yeah raw header data
+08:32 < dook> Using an API that requires a hashed sig of the request previous, header and all.
+08:33 < [AD]Turbo> hi there
+08:33 < dook> Hi
+08:47 -!- mode/#node.js [+o piscisaureus_] by ChanServ
+08:47 < ome> #libuv seems dead. so I ask my question here again.
+08:47 < ome> Considering that most of Node.js and V8 is written in C++, why is that libuv is written in C?
+08:47 < eXpired> Why wouldn't it be?
+08:48 < eXpired> I know nothing about libuv.
+08:48 < eXpired> But there's nothing wrong with writing a lib in C and interoperating with C++
+08:50 < ome> eXpired: well, it's the platform layer for Node.js, so you would expect it to be the same language. But if not, I am wondering why?
+08:51 < eXpired> Probably coder familiarity.
+08:51 < eXpired> Some people know C better than C__
+08:51 < eXpired> C++
+08:51 < eXpired> Also, lots of people consider C to be better performance-wise than C++ compilers.
+08:52 < bigkevmcd> C++ name mangling likely
+08:53 < bigkevmcd> integrating with C is far easier than integrating with C++
+08:53 < bigkevmcd> then write C++ on top (or whatever language you like)
+09:00 < gmg85> what IDE/Editor do you guys use on javascript/html projects?
+09:00 < Youdaman> VIM
+09:00 < Youdaman> sorry caps
+09:00 < Youdaman> vim.
+09:00 < substack> also vim here
+09:00 < substack> considering using dominictarr's editor though
+09:00 < Youdaman> which is that?
+09:00 < substack> I would just hack it to include the subset of things I use in vim
+09:01 < substack> http://npmjs.org/package/hipster
+09:01  * Youdaman visits
+09:01 < Youdaman> lol
+09:01 < Youdaman> "Okay, so today I wrote a text editor in node.js and named it "hipster". Because I am an asshole. (and no one had already used the name for something more stupid)"
+09:02 < gmg85> do you guys have identation problems with vim/javascript?
+09:02 < Youdaman> gmg85: there are plugins for it
+09:02 < gmg85> Youdaman, let me check them out
+09:09 < kdridi> hello
+09:09 < kdridi> have you ever suffer from an "Error: socket hang up" ?
+09:09 < kdridi> that seems to happen when i open above 1000 connections
+09:10 < kdridi> i mean i have a script that fetch 6000 urls using async.parallel
+09:11 < kdridi> after a while, the node pid take 100% of the CPU and then "Error: socket hang up"
+09:11 < kdridi> ant idea ?
+09:11 < kdridi> i fetch the url by using "fetch" or "node-crawler" and the same kind of problem occurs
+09:13 < abrkn> stop doing 6000 parallel
+09:13 < kdridi> abrkn, ok
+09:14 < kdridi> does the problem come from the sockets or from the too much memory ?
+09:14 < kdridi> what is the max memory i can use in nodes ?
+09:16 < Doikor> i think v8 had 1gb limit at some point. not sure if that has been removed. but you really dont want to go that high. once the gc kicks in your app is going to hang for way too long once you start going into the 100s of mb range
+09:18 < kdridi> Doikor, hum… it seems that when it happens, i use above 1gb 
+09:18 < kdridi> how do i trace the allocations ?
+09:23 < Doikor> https://github.com/Jimbly/node-mtrace i mostly use this. dunno if something better exists
+09:25 < kdridi> Doikor, thx
+09:38 < fg3> yo
+10:50 < Ore4444> Hello
+10:51 < Ore4444> How come I can't install the latest version of Node.js using the .msi file on Windows 8?
+10:51 < Ore4444> Setup always fails without any error or debug message
+10:55 < RLa> wow people using win 8 already
+10:55 < RLa> i guess that's what you get for staying on cutting edge
+10:56 < Ore4444> Windows 8 in released!
+10:56 < Ore4444> is
+10:56 < Ore4444> stable
+10:57 < Ore4444> Do you have any idea what may cause the problem?
+10:57 < Ore4444> I get the same behaviour when trying to install Node 0.9.3 AND 0.8.14
+10:57 < onr> i successfully installed and using Node.js on Windows Server 2012
+10:57 < RLa> sorry, i have no idea
+10:57 < Ore4444> Also, the checksum of the setup file is correct
+10:58 < RLa> onr, is that based on win 8?
+10:58 < onr> RLa: i think so
+10:58 < Ore4444> How do I even find out what is the problem?
+10:58 < RLa> event log?
+10:58 < onr> what's the problem, Ore4444?
+10:58 < RLa> hm, how exactly it "fails"?
+10:59 < Ore4444> Setup starting copying files
+10:59 < onr> that is expected behavior
+10:59 < Ore4444> Then, suddenly it "rolls back" all changes
+11:00 < Ore4444> all *actions*, sorry
+11:00 < onr> without saying anything?
+11:00 < Ore4444> And I get a standard "Node.js Setup Wizard ended prematurely" window with a "Finish" button
+11:00 < Ore4444> That's all I get
+11:00 < onr> that's bad
+11:01 < RLa> does win 8 have the event log?
+11:01 < Ore4444> "because of an error. Your system has not been modified."
+11:01 < RLa> maybe it says something
+11:01 < Ore4444> Maybe. How to I view it?
+11:01 < RLa> CP->Admin tools->Event Viewer
+11:02 < RLa> at least that's how you do it on older wins
+11:02 < onr> same on 8
+11:03 < onr> well, at least on server 2012 standard
+11:03 < Ore4444> Yep, I have it
+11:03 < Ore4444> But I've never used it before
+11:03 < skebcio> hi -- has anyone here tried to compile node.js on QNX (alias neutrino) ? 
+11:05 < Ore4444> WOW
+11:05 < Ore4444> It's working now!
+11:05 < Ore4444> I think I know what happened
+11:06 < Ore4444> I had previously shut down the "Windows Event Log" service in services.msc to improve performance
+11:06 < Ore4444> Now, I re-started it. Then, I tried installing Node again and it worked!
+11:06 < Ore4444> Is it possible that Node is dependent on the Windows Event Log?
+11:07 < RLa> what in the windows isn't :)
+11:10 < onr> Ore4444: did you also disable Application Experience service?
+11:24 < Ore4444> I'm having trouble installing an npm module called "grunt-bbb", but I believe it's a Node problem
+11:24 < Ore4444> https://gist.github.com/4168347
+11:25 < Ore4444> Looks like it's trying to git clone "git://github.com/amir20/phantomjs-node.git" but fails
+11:25 < Ore4444> When I manually check this repository, it does exist.
+11:36 < Thomas`-> from #socket.io : Hey, whats the best way to compare socket objects to make sure they are the same connection?
+11:37 < Thomas`-> socket.id = s.id?
+11:45 < Clex> Yes Thomas`-, you can identify sockets with their id, it's unique.
+11:46 < Thomas`-> Thanks
+12:16 < NodeX> http://news.techworld.com/applications/3413594/job-basket-gets-new-webcast-function-built-using-mongodb/
+12:16 < NodeX> Node gets a mention - powers the chat
+12:17 < nb-ben> how would I check if a file is a directory, synchronously?
+12:17 < nb-ben> nvm, found solution
+12:18 < nb-ben> sorry for being stupid lol
+12:24 < AAA_awright> Interesting, but I call BS on "SQL can't do that"
+12:24 < RLa> what it can't do
+12:25 < AAA_awright> Lots of queries a second, appearently, Re: http://news.techworld.com/applications/3413594/job-basket-gets-new-webcast-function-built-using-mongodb/
+12:25 < NodeX> who said "SQL can't do that?"
+12:25 < AAA_awright> RTFA?
+12:25 < RLa> it's not fast because it's schemaless but because it's unsafe by default
+12:26 < NodeX> it doesn't say that at all
+12:26 < NodeX> it says that it would take 3 months to do the same job in SQL
+12:27 < NodeX> RLa : it's fast because there is no SQL joins / tables .. has nothing to do with "unsafe"
+12:27 < RLa> it has, non-fsynced write is way way faster than fsynced
+12:28 < NodeX> RLa : in that particular app it's all safe writes anyway
+12:28 < AAA_awright> It's called paraphrasing, for the sake of brevity. "I want to build an app that can easily deal with 10,000 queries a second without spending thousands of pounds on servers and MongoDB lets me do just that."
+12:28 < RLa> but you have point too
+12:28 < NodeX> well your paraphrase is wrong
+12:28 < AAA_awright> Um, that's what the entire article is about almost
+12:28 < NodeX> can you pull 10k req/s out of a 4gb box using SQL ?
+12:28 < AAA_awright> "Hey look how much faster and cleaner MongoDB is!"
+12:29 < NodeX> it is faster and cleaner
+12:29 < RLa> are those read or write queries?
+12:29 < NodeX> reads
+12:29 < RLa> if all your data looks like documents it's better, otherwise i guess not
+12:29 < NodeX> about 3,500 writes per sec on that box
+12:30 < AAA_awright> It's kind of hard to compare them, since usually you do optimization with caches off
+12:30 < RLa> i get roughly same read performance with mysql and mongodb on my machine, simple lookup by primary key/objectid
+12:30 < NodeX> the point is being missed but nvm
+12:32 < AAA_awright> The point is it's an incorrect point :p
+12:32 < NodeX> and yet it's not
+12:32 < NodeX> can you get 10k reqs/s out of a 4gb box using mysql?
+12:32 < AAA_awright> How are you supposed to measure that again?
+12:32 < NodeX> and by you I mean you
+12:32 < NodeX> now you're arguing semantic
+12:33 < AAA_awright> Last I tried, years ago, I got 60k reads/s
+12:33 < NodeX> setup a test case and fire 10k reads at it
+12:33 < NodeX> out of a 4gb ram box, I dont believe you for 0.5 of a second
+12:33 < AAA_awright> Now that was on a single HTTP resource with query cache, but that's just "arguing semantics" yes?
+12:33 < NodeX> trolls
+12:33 < NodeX> troll *
+12:34 < RLa> doesn't it also depend how big your row/doc is, io speed, cpu speed and lot of other factors?
+12:34 < AAA_awright> Don't blame me if MongoDB doesn't have a query cache
+12:34 < AAA_awright> RLa: You'd think
+12:34 < NodeX> I am talking the average size of a row in both SQL and a document store
+12:34 < NodeX> I benchamrked both, I would not go talking about somehting I didn't fully research
+12:35 < RLa> if it's all coming from caches then protocol parsing could add considerable overhead and so cpu speed also matters
+12:35 < NodeX> it's here nor there
+12:35 < NodeX> same box, same data, different speeds
+12:35 < NodeX> only thing that differs is the database
+12:36 < RLa> how big the dataset was?
+12:36 < NodeX> again it's not relevant
+12:36 < NodeX> for the sake of arguments, 4m documents
+12:36 < RLa> for io lookup it matters, if whole data fits into ram it's not relevant
+12:37 < RLa> if all data fits into ram, redis might be the best choice :)
+12:37 < NodeX> AAA_awright is claiming he can get 60k req/s from mysql 
+12:37 < NodeX> that speaks to the database which is the point of the article
+12:37 < NodeX> "oh mysql can do XYZ but only if the data is this big and has this etc etc"
+12:37 < NodeX> that's not a valid point
+12:38 < RLa> i would not attempt benchmark without data size on disk 10x RAM size and random key lookups
+12:38 < NodeX> again that's not relevant
+12:38 < NodeX> the only thing that's relevant is the actual data in the app and how it's looked up
+12:39 < NodeX> nosql is NOT one size fits all so it doesn't need to benchmark and ACID everything
+12:39 < NodeX> becuase it's how it deals with the app at hand that counts
+12:39 < NodeX> that's not MongoDB specific either, that's doc stores in general
+12:40 < AAA_awright> Also you can't compare this /ceteris paribus/ per se, you have to configure the engines with their best configuration, under real-life conditions (random access) (I assume this goes without saying, but just that it's easy to overlook setting the right indexes)
+12:41 < AAA_awright> I'm using MongoDB myself, though I'm starting to run into problems, you can't index by key, and you can only have 64 indexes per collection (?!)
+12:41 < SomeoneWeird> redis ftw
+12:42 < AAA_awright> Redis is... all in-memory
+12:42 < NodeX> I use redis in everything
+12:42 < RLa> if you have money to buy ram then why not
+12:43 < SomeoneWeird> AAA_awright, by default, yes
+12:43 < AAA_awright> If you thought MongoDB was hard enough to write for, Redis has no references you can index
+12:43 < AAA_awright> First they came for my write transactions, but I didn't need write transactions, so I didn't speak out, then they came for my indexes, etc
+12:43 < AAA_awright> so now you're left with storing duplicate data and managing it all yourself
+12:44 < NodeX> but I dont see why you wouldn't want your app - any app to be the fastest it can be
+12:44 < AAA_awright> I never said such things
+12:45 < NodeX> given that we're not bound by synchronous using node - I dont see why anyone would want to limit their app in terms of speed and efficiency
+12:45 < AAA_awright> But you know, when you're re-writing over the same MongoDB document multiple times, and when you start to have 30 indexes on collections, and you have to store the same data in multiple documents because there's no JOINs, it kinda becomes sluggish
+12:46 < [jasper]> hello guys, I'm trying to figure out a way to setup a nice backend server for a website to communicate using socket.io .... I'm used to program object orientated with java....trying to figure out the best way to setup a nice server using javascript...are there any good sites on this?
+12:46 < AAA_awright> I do voodoo with my data that I don't really have a good database for
+12:46 < AAA_awright> There's no easy, fast solution
+12:48 < Thomas`-> Hey again/ Theres just 1 other thing I cant figure out and its how to do socket.get("data") to work syncronously (opposed to async)?
+12:50 < SomeoneWeird> you can't, Thomas`- 
+12:50 < dscape> if i do `npm test | my/node/script`
+12:50 < dscape> is there a way to capture errors that happen in npm test in my/node/script?
+12:50 < Thomas`-> SomeoneWeird, that sucks. why is it not possible?
+12:50 < Sly> dscape: process.stdin.resume()
+12:50 < Thomas`-> they data is in a local hash table
+12:50 < Sly> And then parse stdin
+12:50 < dscape> Sly: nah that doesnt work
+12:50 < Sly> Really?
+12:50 < Sly> O_O
+12:51 < dscape> trye it
+12:51 < dscape> try it
+12:51 < Sly> It worked last time I used it.
+12:53 < dscape> Sly: node -e 'throw new Error("foo")' | node -e 'process.stdin.resume(); process.stdin.on("data", function () { console.log("SLY", arguments); });'
+12:53 < Sly> OH.
+12:53 < Sly> Errors.
+12:53 < Sly> My bad. xD
+12:53 < Sly> Missed that part.
+12:53 < dscape> Sly: yeah thats what i meant when i said errors
+12:53 < dscape> LOL
+12:53 < Sly> Yeah, that won't work.
+12:53 < dscape> :X
+12:53 < dscape> Sly: can you think of any alternative?
+12:54 < dscape> where is the guy named tootall when you need him!
+12:54 < Sly> rofl
+12:55 < Sly> Yeah, I don't know of a way to catch those errors through a pipe.
+12:55 < Sly> I'd like to know if there is a way, though.
+12:56 < dscape> mmm
+12:56 < dscape> #sadpanda
+12:56 < dscape> #unsatisfiedpanda
+12:56 < Sly> :(
+12:56 < dscape> idk
+12:56 < Sly> #needstorequestfeaturepanda
+12:56 < Sly> :x
+12:56 < dscape> isaacs: i blame you and this nodejs thing you made
+12:56 < Sly> ROFL
+12:58 < Tim-_-> Sly1838?
+12:58 < Sly> Nah.
+12:58 < Sly> Just Sly.
+12:58 < Tim-_-> word
+13:02 < Ore4444> onr: I did disable Application Experience service. 
+13:05 < onr> Ore4444: i'd enable
+13:07 < Ore4444> OK
+13:08 < Ore4444> Please check out the following gist:  https://gist.github.com/4168366 (line 526)
+13:08 < Ore4444> I'm having trouble installing 'grunt-bbb' using npm
+13:08 < Ore4444> I asked in their freenode channel, and they told me it's a nodejs-windows incompatibility problem
+13:09 < Ore4444> Needless to say, I have Git installed and when I run the 'clone' command manually, it issues successfully
+13:11 < djazz> how can I in node use child_process.execFile to start a command like this? DISPLAY=:0 WINEDEBUG=-all wine /path/to/Jazz2+.exe -minimzed -server -port=10051 ?
+13:11 < AAA_awright> dscape: I think that credit goes to ry
+13:12 < djazz> i tried using the "env" propery to set DISPLAY and WINEDEBUG but it didn't work
+13:12 < nb-ben> anybody with jsdom experience, how would I get the result of my DOM manipulation in plain text afterwards?
+13:14 < nb-ben> I'm just trying to load a file, manipulate it, and then save it
+13:14 < nb-ben> how would I go on about doing so? :P
+13:17 < djazz> i get the errors "Command failed: Client is not authorized to connect to Server" and "Application tried to create a window, but no driver could be loaded. Make sure that your X server is running and that $DISPLAY is set correctly."
+13:18 < [jasper]> hej guys, I'm looking for node documentation on how to correctly setup a backend
+13:18 < [jasper]> with modules and stuff
+13:18 < [jasper]> like how it's done in java with object orientated
+13:18 < [jasper]> is there anything like this?
+13:19 < Doikor> sounds like you should start by learning how objects and inheritance works in javascript.
+13:19 < [jasper]> Doikor is there such a way as object orientated programming in javascript?
+13:19 < [jasper]> the same wy it's done in java?
+13:19 < Doikor> not the same way. javascript uses prototypal inheritance.
+13:20 < RLa> maybe you want coffescript or typescript
+13:20 < [jasper]> why would I want that
+13:20 < [jasper]> if it can be done with just javascript I prefer that
+13:21 < [jasper]> I used backbone to get some kind of structure in the frontend part..
+13:21 < [jasper]> but I have no idea how to structure the backend with a good system
+13:22 < [jasper]> some examples would help a lot
+13:23 < supersym> what kind of b-e?
+13:24 < Doikor> well you could just use the same models/collections in the backend you used in frontend
+13:24 < Doikor> they are both done in javascript after all
+13:24 < [jasper]> Doikor it's not about the models..
+13:25 < [jasper]> never mind..
+13:25 < Doikor> well then you just put each model in its own file and use nodes module system to load them etc.
+13:36 < [jasper]> Doikor if I rephrase my question.
+13:36 < [jasper]> If I have the following code: http://pastebin.com/L2QrGLmw
+13:36 < [jasper]> how could I put this in a seperate file which gets loaded from my main file?
+13:37 < [jasper]> so I can kind of divide my code over several files
+13:38 < SomeoneWeird> [jasper], http://pastebin.com/Gid8Gcnd
+13:38 < SomeoneWeird> then require('./thatfile.js') will equal server
+13:38 < [jasper]> and the server will automatically be started then?
+13:39 < Doikor> if its written like that then yes.
+13:50 -!- mode/#node.js [+o Nexxy] by ChanServ
+13:51 < [jasper]> Doikor how would I go about namespacing then?
+13:51 < [jasper]> in a server environment?
+13:57 < severla> hi all … i'm trying to write some bindings and i'm getting error … src/bindings.cc:11:83: error: call of overloaded ‘New(int)’ is ambiguous … related to v8::String. Would anyone help me figure out what's wrong? Here's the code and the error report https://gist.github.com/4169198
+14:00 < [jasper]> hej guys, could anyone take a look at http://pastebin.com/wWBBrngr
+14:01 < [jasper]> is it possible that I can now Include the file where that is in
+14:01 < [jasper]> and then use that database var?
+14:04 < SomeoneWeird> [jasper], http://pastebin.com/1QUCgCja
+14:05 < SomeoneWeird> http://nodejs.org/api/modules.html
+14:05 < [jasper]> SomeoneWeird what if I want to export more then just that?
+14:05 < SomeoneWeird> then you use exports.<name> = <variable>
+14:06 < SomeoneWeird> so exports.database = database; in the file, then in another file var database = require('./database').database;
+14:26 < MI6> joyent/libuv: Ben Noordhuis master * 3a30258 : windows: fix uv_backend_fd() return value  uv__new_artificial_error() ret - http://git.io/Xz6Rdw
+14:38 < MI6> joyent/libuv: Ben Noordhuis master * 2be240d : unix: initialize thread pool mutex and condvar  It accidentally worked be - http://git.io/vpObew
+14:42 < MI6> joyent/libuv: Shigeki Ohtsu master * fa11db9 : test: fix finished consumer number check - http://git.io/G7XAXA
+14:46 < niggler> anyone use node on osx?  I've tried to use the basic server on the home page (running on the mac) and using ab to test it, but it falters anytime i use more than 1 connection (-c 2, for example)
+15:00 < drojas> anyone using derby?
+15:10 < timkuijsten> is node 0.10 with the new stream implementation expected to be released within a couple of weeks? currently writing some prototypes that implement a readable stream on 0.8.. on 0.10 that would be much easier and cleaner..
+15:12 < fwg> timkuijsten: expected in january
+15:12 < der_On> hello. I'm currently trying to do file upload using formidable, but somehow form.parse() does not fire it's callback at all
+15:12 < timkuijsten> fwg: tnx
+15:17 < timkuijsten> i'll try using the readable-stream npm in the meantime..
+15:48 < Kakera> is there a way to read a buffer byte-by-byte without having to manually remember and increment the offset?
+15:49 < Kakera> something similar to a .NET Stream
+15:50 < mscdex> Kakera: i usually just attach a counter variable to the Buffer object
+15:50 < sosnon> what resources are recommended for learning/mastering node in #node.js?
+15:53 < gildean> sosnon: if you know some js already, the best thing imo is to pick a simple idea and start writing your own app
+15:53 < gildean> while utilizing the plethora of modules out there
+15:56 < MI6> joyent/libuv: Ben Noordhuis master * 99a8d4a : unix: remove unnecessary static var init  wq doesn't have to be initializ - http://git.io/dEL3aQ
+15:56 < Kakera> yeah, now that I think of it, it's probably better to avoid pulling it more dependencies
+15:57 < sosnon> gildean: sure, so far i've read through this http://www.nodebeginner.org/ and this http://nodemanual.org/latest/nodejs_dev_guide/index.html and various other articles, i've skimmed through the official API reference, plenty basic examples, the geddy source, parts of express's source but still feel like i should probably learn more about best practices/patterns
+15:59 < sosnon> so far the gist for me is: plow through the docs of flatiron/express/geddy/tower/... and crawl your way towards a usable app (by plugging in plenty of other modules for file uploading/streaming/...) or just ('just') set up your own rudimentary MVC, connect to your data store and then (finally) start to add features to your app
+15:59 < sosnon> there's always app.js and meteor, maybe, but they still have to major in some regards, probalby (also reading docs again...)
+16:00 < sosnon> correct me if my impression is off or too blatant
+16:00 < gildean> you've already written something with node?
+16:01 < gildean> like started doing some small apps just to try it out?
+16:01 < sosnon> not really, admittedly
+16:01 < warz> i just think the big thing to master is how to keep your code organized while working and growing a large project
+16:01 < gildean> that would be my first step, you learn much more by doing
+16:01 < warz> ive worked on a few larger projects at work using node and the code for them all ends up getting pretty nasty really fast
+16:02 < Thomas`-> is there any way to get info on circular structures? - .stringify doesnt work
+16:02 < Thomas`-> oh i ment to ask this in javascript channel
+16:02 < sosnon> warz: yeah, that's where my questions are going; are there already such patterns for (larger) projects (beyond proper module usage/object setup patterns etc.)?
+16:02 < gildean> sosnon: i made this in about two-three hours or so, main work went to the frontend: https://github.com/gildean/ServerInfo
+16:02 < gildean> i like writing small apps like that just for fun
+16:03 < tracker1> sosnon.. my first couple apps were backend processors, and then the email spool (essentially using a db for a list of emails to send), then started on an initial API.. not I've got a more feature complete API using express... so far it's come together pretty well.. .there's a lot you need to do by hand, but I equate this to using say bootstrap, because other options make way too many assumptions for you.
+16:03 < warz> sosnon, i honestly think youre only going to learn good organization practices by actually practicing yourself and realizing where your structure makes things difficult and then fixing it in your next project, etc.
+16:03 < warz> or, if youre lucky enough to have somebody mentor you
+16:03 < warz> because theres really no forced structure
+16:04 < warz> sort of back to the PHP days in which its way too easy to write real bad code, so you have to always be thinking ahead
+16:04 < warz> thats just from my point of view anyway
+16:04 < warz> im sure everybody is different here
+16:04 < sosnon> well, it boild down to the usual 'learning by doing' like with any language/framework, sure; still, if you come across any good resources feel free to recommend them to me
+16:05 < sosnon> yeah, the php comparison came to my mind, too
+16:06 < gildean> sosnon: well, beyonds the module-structure and so, the best practices on the language are pretty much the same as in javascript anywhere
+16:06 < sosnon> something like django or rails which would enforce a certain kind of military structure/practices is (luckily?) still missing? or is this bullcrap?
+16:06 < tracker1> sosnon, also you should embrace the modularity, even if you're using some related structure... for instance.. I reference ../config, which references ../config/index.js that will load the appropriate configuration json/object for that environment... this way I can replace how that loads without affecting other areas... now I have ../config/util which goes a step farther, and has adapters to load each config section as a set of gener
+16:06 < tracker1> ic-pools.. so I can config.tedius.main.acquire(function(err,db){ ... }) for various resources.. ampq, sql, etc.
+16:06 < gildean> sosnon: so you could read something from crockford etc. for more information on js
+16:07 < tracker1> gildean.. I've gotten pretty happy with the callback pattern of (err, prop1, ...prop N, next)
+16:08 < tracker1> still irks me when utils/interfaces are released that don't follow it...
+16:09 < sosnon> but using one of express/tower/geddy/flatiron/... is not a sin, is it? (they tend to impose their own structures to a cetain extend, as far as i can see)
+16:09 < mscdex> node.js rules!
+16:10 < gildean> sosnon: lots of people use them (me included), so no, there's no problem there imo
+16:10 < flexd> Hm, is there a way of keeping track of child processes of node and respawning them of they die?
+16:10 < flexd> Or I might be doing this in a very dumb way hehe :=)
+16:11 < tracker1> sosnon, well, with express.. you can drop the binding of routing and rendering engine and use connect directly.. you can choose different authentication modules.. for my API service, it checks for a querystring/body/header for an api key for each request, and adds a user object for that user to request... other modules work differently.. you don't have to do much.. it just adds enough.
+16:12 < gildean> tracker1: but implementing your own routing and rendering takes some doing, so if you just want to create an app quickly that works, i've had no problems with express
+16:12 < tracker1> flexd, I use cluster, and have the on('exit') log and respon another worker.
+16:13 < tracker1> gildean, exactly... express works on the main wiring..
+16:13 < tracker1> but you can still do things as you desire...
+16:14 < gildean> flexd: doesn't the spawned process trigger either 'exit' or 'error'
+16:14 < sosnon> nobody seems to use geddy though there is an ORM built in, even some adapters already; the model seems solid; so why is that? or did i just miss something?
+16:14 < flexd> tracker1: Isn't cluster for managing node processes itself?
+16:14 < flexd> gildean: Yea, but I seem to have broken this :/
+16:14 < tracker1> like loading routes/controllers from different files based on convention ../router/(/.+-(controller|get|post|put|delete).(js|coffee)//)
+16:14 < tracker1> flexd, pretty much.. you have one controller instance.. and one+ workers...
+16:15 < tracker1> the controller can listen for a worker's exit, and re-create another.
+16:15 < gildean> flexd: on windows?
+16:15 < flexd> gildean: Linux
+16:15 < tracker1> if (cluster.isMaster) startMaster() else startWorker();
+16:15 < flexd> It sort of just worked once :p
+16:16 < flexd> tracker1: I am talking about a node process (running lots of stuff) starting another process and grabbing info from it
+16:16 < gildean> the child_process.spawn breaks on windows, the pid it returns is the pid of the shell starting the process, so you can't even kill the damn thing without force
+16:16 < flexd> I am running a python script that grabs some data from a access card
+16:16 < flexd> It just exists if there is no card scanner detected
+16:16 < flexd> which is something I would want to detect, warn the user and try to start again in case the scanner is back.
+16:17 < gildean> flexd: did you just try using child_process.exec() ?
+16:17 < tracker1> flexd, not sure I understand the problem..
+16:17 < gildean> and checking the stdout/err
+16:18 < niggler> what's the best nodejs way to parse xml?
+16:18 < flexd> gildean: The python script has a loop running
+16:18 < gildean> flexd: ok, so it's not a one-off thing
+16:18 < flexd> tracker1: I run a python process along side my node, permanently
+16:18 < drudge> niggler: i guess it really depends, i use xml2js for a lot of stuff
+16:18 < tracker1> niggler, for larger files... https://github.com/thejh/node-halfstreamxml
+16:18 < flexd> The python process has to run because that is what is supplying the card (rfid) info to the node system
+16:19 < tracker1> but for something smaller, agree with drudge
+16:19 < gildean> flexd: implement your card-reader with node, problem solved
+16:19 < flexd> so when the python script dies, the node script is useless until it starts again
+16:19 < flexd> gildean: Do you know of a pcsc reader library for node? :p
+16:19 < tracker1> flexd, you can't just listen for the exit event of a child_process.exec ??
+16:19 < flexd> I would write one but I do not have the time or experience
+16:20 < flexd> tracker1: I did that, but it only happened the first time the process exited
+16:20 < gildean> flexd: can you share the snippet of your code?
+16:20 < flexd> trying a new way now
+16:20 < flexd> gildean: yeah, just a sec.
+16:20 < gildean> tracker1: iirc the api docs recommend using spawn for long-running processes
+16:21 < tracker1> flexd, a given process only exits once... create a new one, and listen again.
+16:22 < flexd> tracker1: That's what I've been trying to do.
+16:23 < flexd> gildean: https://gist.github.com/ce270a23aaf655e98c73
+16:23 < flexd> also, sorry that is a huge mess
+16:23 < flexd> I need to extract that thing into like three separate modules
+16:23 < flexd> minimum :p
+16:23 < flexd> It's organized a bit like I feel my mind is at times.. ;)
+16:25 < niggler> omg tracker1 coffeescript
+16:27 < gildean> flexd: i'm not sure it's a good idea checking the errors in that way on the readers stderr
+16:28 < gildean> like inside the exit's callback
+16:28 < garciawe_> hi
+16:28 < garciawe_> I have a little Node app
+16:29 < thl0> is there a preferred way/library to run a job periodically in node (i.e. refreshing a cache kept in memory)?
+16:29 < garciawe_> it pulls some tweets from twitter, checks a database and sends some emails
+16:29 < gildean> flexd: try and move the error event on the reader from inside the callback right on the process scope
+16:29 < garciawe_> but when all ends, the app keeps running
+16:29 < garciawe_> it doesn't exits
+16:29 < thl0> setTimeout comes to mind, but may not be the best way to do it
+16:29 < gildean> flexd: as you're already defining the var on that scope
+16:30 < garciawe_> I think it has to do with the event loop and some event still being awaiting to be triggered
+16:30 < garciawe_> can it be that?
+16:30 < garciawe_> I'm not sure where to look at
+16:30 < gildean> thl0: not really beyonds setTimeout or setInterval, at least that i know of
+16:30 < _smf_> garciawe_: yes - I'd guess so.  Did you close all of your database/socket connections etc. ?
+16:30 < flexd> gildean: I get this in the console: 'uidgrabber process exited with code 1', then 'uidgrabber running pid: 2387'
+16:30 < flexd> and then nothing
+16:31 < garciawe_> _smf_ thanks, I do db.end(); on the database callback (I'm using node-mysql)
+16:31 < flexd> Which means it's dying, gets started again, and the second time it dies but nobody is there to catch it
+16:31 < gildean> flexd: did you move the binding to the error-events from inside the exit callback?
+16:31 < garciawe_> _smf_ on twitter, I'm using a lib that's supposed to handle that
+16:31 < flexd> on exit too?
+16:31 < flexd> I just moved them IN there before making the gist
+16:31 < sosnon> gildean: oh, the ServerInfo h1 title changes it's color, how neat ;)
+16:32 < garciawe_> _smf_ and I'm not sure if I have to close something on the email lib (nodemailer)
+16:32 < flexd> The problem is that the on('exit') is defined on the first reader
+16:32 < gildean> sosnon: hah, you tried it
+16:32 < flexd> then it dies and we create another
+16:32 < gildean> sosnon: so it does
+16:32 < flexd> and the on('exit') does not exist there.
+16:32 < flexd> How it looks now is me emulating the mysql handleDisconnect... which might be a bad idea because I remember that fails now too :/
+16:33 < thl0> gildean: thanks
+16:34 < gildean> flexd: ok, well then make a module out of the reader code, and always create a new instance of the reader
+16:34 < sosnon> gildean: for some reason it drains memory
+16:34 < gildean> sosnon: yeah, didn't have time to look into what leaks
+16:34 < sosnon> gildean: i like colorful charts, though ;)
+16:34 < gildean> sosnon: i'm guessing the canvas, as quick heap snapshots didn't show anything else growing
+16:34 < flexd> gildean: doing that at the moment
+16:35 < gildean> sosnon: yeah, i was pretty happy on how the design came out
+16:35 < gildean> sosnon: for such a quick little project it looks quite good imo
+16:36 < sosnon> gildean: your blog is down
+16:36 < gildean> oh i had a blog?
+16:36 < gildean> right, the demo
+16:37 < _smf_> gah - my damn IRC client crashed
+16:37 < gildean> let me fix it
+16:37 < _smf_> and I cant remember who I was talking to 
+16:37 < matbee> wasn't me :)
+16:37 < _smf_> lol
+16:37 < matbee> you didnt say anything in THIS channel specifically
+16:37 < matbee> :P
+16:38 < _smf_> Someone asked about the event loop not exiting once they'd finished their processing.
+16:39 < niggler> is there an analogue to python's -i mode?
+16:40 < niggler> i know there's .load but i can't seem to get the command line arguments to line up
+16:40 < matbee> was your name _smf_ then too?
+16:41 < _smf_> matbee: yup
+16:41 < matbee> I have nothing in my logs, haha
+16:41 < matbee> you must be crazy
+16:42 < garciawe_> _smf_ you were talking to me :P
+16:42  * _smf_ starts running around in circles screaming like a crazy person ;-)
+16:42 < flexd> gildean: Hm, this is quickly becoming way more complex than I wanted p
+16:42 < flexd> :p
+16:42 < garciawe_> hahah
+16:42 < matbee> :P
+16:42 < _smf_> gaeciawe_: ah - *nod* - Ok
+16:42 < matbee> oh my ctrl+f failedm e!
+16:43 < _smf_> garciawe_: what I was about to say before Adium crashed is that there must be someone still connected that's causing the event loop to continue running.   So you'll need to look at all the modules you call.   Alternatively just call process.exit() once you're finished ;-)
+16:44 < _smf_> matbee: no who's crazy?
+16:44 < _smf_> s/no/now/
+16:44 < garciawe_> _smf_ thanks, that could help
+16:44 < _smf_> np
+16:44 < garciawe_> _smf_ also, I notice that the process eventually exits after something like a minute, or two minutes
+16:45 < _smf_> garciawe_: hmmm - probably a connection timeout.
+16:45 < gildean> sosnon: fixed, at leas for now
+16:48 < garciawe_> _smf_ looks like that
+16:49 < eyda|mon> c
+16:49 < tracker1> looking back a bit (was pulled away for daily standup), nodemailer does need to be closed...
+16:49 < flexd> aaaaaaargh, vim is being retarded.. :(
+16:49 < garciawe_> _smf_ calling the close() method on my email transport as it's docs say doesn't fixes, so will try process.exit() or check the twitter lib
+16:49 < flexd> I use command-t.. which means shift+enter means to split horizontally when opening new files
+16:49 < flexd> at least it has for all of time i can remember
+16:49 < flexd> now it suddenly just.. doesnt
+16:49 < flexd> :/
+16:49 < flexd> it was working an hour ago :s
+16:50 < flexd> I wonder if it is this stupid keyboard thats the problem
+16:50 < tracker1> garciawe_, when you do process.exit(), not that all yoru console.log's etc may not be done...
+16:50 < tracker1> s/not/note
+16:51 < flexd> Haha, most definetively the keyboard.
+16:51 < tracker1> garciawe_, are you using any other network services, cluster or something else that could keep the process active?  even setTimeouts etc..
+16:52 < _smf_> garciawe_:  if you're on linux you could check /proc/<pid>/fd and then use lsof to find out if it's a socket that keeping everything open
+16:52 < tracker1> flexd, try a better keyboard... http://pckeyboard.com/page/UKBD/UB40P4A
+16:53 < tracker1> _smf_ guess if s/he is on windows, is boned.. ;)
+16:53 < flexd> tracker1: I would if I could :p
+16:54 < flexd> I work part time here, 
+16:54 < _smf_> tracker1: yeah - another good reason not to use Windows ;-)
+16:54 < flexd> Trying to find a US layout microsoft natural keyboard 4000 at home
+16:54 < flexd> but nobody ships them here
+16:54 < flexd> hm.. not that finding a second keyboard helped at alll.
+16:54 < flexd> damnit
+16:55 < gildean> flexd: i'm sporting a ms natural ergonomic kb 4000 atm, fi/se layout tho'
+16:55 < gildean> it's prolly the best kb i've had
+16:55 < tracker1> flexd: lol... I have like 3 of them now, one at work, one at home and a backup.
+16:55 < flexd> Yeah but I switched to using a us layout (in norway) because of coding
+16:55 < flexd> {[]} is a pain to write in norwegian
+16:56 < flexd> I plan on going colemak once I have a proper keyboard
+16:56 < flexd> I have a razer tarantula at home, which is fairly nice but massive and not very economic
+16:56 < gildean> in fi/se layout it's altgr + 7-0
+16:56 < tracker1> I tend to simply favor mechanical switch keyboards over mushy ones... including the recent "natural" keyboards
+16:57 < tracker1> colemak?
+16:59 < tracker1> okay, have to ask.. anyone in the phoenix, az, us area and looking for a new job?
+16:59 < tracker1> I know it's unlikely.
+17:03 < CoverSlide> they have computers in arizona?
+17:04 < tracker1> CoverSlide, half the redundant infrastructure for US based big accounting is in AZ
+17:05 < CoverSlide> oh you mean those big things with transistors and magnetic tape?
+17:05 < tracker1> Amex, BofA and others.. of course, I work for a relatively small web company.
+17:06 < tracker1> CoverSlide, lol... maybe not so much, but there is a lot of big unix, sas etc... 
+17:06 < tracker1> oh, and wells fargo too...
+17:07 < CoverSlide> actually arizona wouldn't be a bad climate for a datacenter, relatively dry.
+17:07 < CoverSlide> although cooling might be an issue
+17:07 < CoverSlide> nvm
+17:12 -!- mode/#node.js [+o ryah] by ChanServ
+17:14 < tracker1> CoverSlide, yeah.. there are lots of data centers in az... cooling is an issue, but slightly less so with thick concrete buildings...
+17:14 < tracker1> mainly it's the stability from natural disasters... no regular tornadoes, stow storms, hurricanes, earthquakes etc..
+17:15 < tracker1> also, if you like doing boring business logic work, it's really stable in terms of jobs for devs...
+17:15 < tracker1> that said, this is a small company, public facing site(s)
+17:16 < clever> tracker1: stow storms?
+17:16 < tracker1> clever, snow
+17:16 < clever> thats what i was thinking
+17:17 < tracker1> lol
+17:17 < gildean> we got some snow today
+17:17 < CoverSlide> i was thinking slow storms
+17:17 < gildean> like about 10cm or something
+17:17 < gildean> now it looks like winter out there
+17:17 < clever> gildean: just a light dusting here
+17:18 < gildean> the forecast said that we might get 40cm of snow this weekend
+17:18 < gildean> and something like -15C temperatures
+17:27 < flexd> gildean: Uh, kind of sidetracked with the whole vim-being-stupid-problem
+17:27 < flexd> Do you have any tips for making a module out of the card reader stuff?
+17:28 < flexd> I need to be able to handle events from the card reader itself (specifically when it reads a new card).
+17:30 < gildean> flexd: maybe create it as a constructor-function and give it the prototype of events.Eventemitter
+17:31 < gildean> flexd: then just call new Cardreader and make it emit the different events
+17:31 < flexd> I see kind of what you are telling me, but I have no idea how to execute that :p
+17:32 < gildean> flexd: hmm, here's a module i wrote a couple of months back, maybe something similar: https://github.com/gildean/node-udp-proxy/blob/master/index.js
+17:33 < flexd> gildean: thanks.. Looking at a few stackoverflows as well
+17:33 < flexd> Master.prototype.__proto__ = EventEmitter.prototype; <-- Like that
+17:33 < flexd> But that module gives me a decent idea of how to do it
+17:33 < gildean> i just used FunctionName.prototype = new events.Eventemitter;
+17:35 < flexd> Seems I should also have read more, they seem to conclude on using util.inherits(Master, EventEmitter);
+17:37 < flexd> gildean: thanks though, very helpful :)
+17:38 < gildean> flexd: np
+17:39 < flexd> Also, yay another node person to follow :=
+17:41 < piklu> hiii guys
+17:42 < piklu> I am working on a node project using Cloud9
+17:42 < piklu> and here comes this stupid error again and again
+17:42 < piklu> randomly.
+17:42 < piklu> Error: listen EADDRINUSE     at errnoException (net.js:675:11)     at Array.0 (net.js:776:26)     at EventEmitter._tickCallback (node.js:190:38)
+17:42 < piklu> Can someone tell me what exactly is happenin
+17:43 < piklu> happening*
+17:43 < gildean> piklu: the port you're trying to listen on is reserved by something else
+17:43 < gildean> so you can't bind to it
+17:43 < gildean> at least that's what eaddrinuse means iirc
+17:43 < piklu> gildean, Its my orphan node process I guess
+17:44 < piklu> gildean, its the same code that runs again and again
+17:44 < piklu> is there a way in node to print all the process running?
+17:44 < gildean> piklu: what are you trying to do exactly?
+17:45 < piklu> I am running a code that connects to google to get some data
+17:45 < piklu> I used cloud9
+17:45 < piklu> and its there problem
+17:45 < gildean> ok, and why is it binding a port?
+17:45 < gildean> i mean outgoing ports should always be random
+17:46 < gildean> so it shouldn't land on a used port
+17:46 < piklu> Dunno.
+17:47 < gildean> piklu: are you just connecting outwards, or are you creating a process that listens for connections also?
+17:47 < piklu> it creates a http.createserver
+17:47 < piklu> is that the problem?
+17:48 < flexd> gildean: alright, it's in a module now, but I still have the problem :p
+17:48 < gildean> piklu: ok, are you sure you're not creating a server more than once?
+17:48 < piklu> Yes sure
+17:48 < piklu> but yes,  I stop the code from their stop thing
+17:48 < gildean> flexd: are you killing the spawned process on error?
+17:48 < flexd> https://gist.github.com/ad3785b3db1c9516c035
+17:48 < piklu> and I believe that shd stop it
+17:48 < flexd> No
+17:49 < flexd> gildean: Right now the card reader is not connected (on purpose)
+17:49 < flexd> so it should really be saying the process quit, trying to restart it and so on
+17:49 < flexd> without stopping
+17:49 < flexd> Which is bad, but it should have a timeout or something :)
+17:50 < gildean> flexd: hmm, why are you creating the reader inside a function inside the prototypal function?
+17:50 < gildean> i mean you could just spawn it straight off and the it would be shallower
+17:50 < gildean> and handle the error events etc. in the same scope
+17:51 < piklu> I got a shell
+17:51 < piklu> killed it from there
+17:51 < piklu> I need to know how can we run a arbitrary command from node
+17:52 < piklu> so I ll kill other process before code starts\
+17:52 < gildean> piklu: child_process.exec() or child_process.spawn(), but in the case of just killing a process, you can call process.exit()
+17:53 < piklu> well, I ll search for orphan nodes
+17:53 < piklu> and than kill them all
+17:53 < flexd> gildean: I use a function because then i can call it again
+17:53 < flexd> Apparently (maybe it's something about spawn?) I can't just do it once
+17:53 < gildean> flexd: i wouldn't call it again within the prototype, but outside it
+17:53 < flexd> How do you mean?
+17:53 < piklu> Also suggest me a good book on NODE and Javascript
+17:54 < piklu> I still feel a bit on the JS Callbacks and all
+17:54 < gildean> flexd: so the prototypal function would only gibe you an instance of Cardreader, and then in the main code if that instance exits, call a function to create a new cardreadr.createCardReade();
+17:54 < flexd> gildean: I have spawnReader() so I can call spawnReader (again) inside the on('exit') to make it restart
+17:55 < flexd> oh
+17:55 < flexd> Hm
+17:55 < flexd> Wouldn't it be better to keep the "connection" up in the module?
+17:56 < gildean> flexd: i'd rather separate the module from that, the module imo should only give you the new instance and then you should be able to do something with it
+17:56 < gildean> in this case at least
+17:57 < gildean> so in the future if you'd need to change what happens when, you wouldn't need to change the cardreader-module
+17:57 < flexd> Hm
+17:57 < flexd> In any case it's not working :p
+17:58 < flexd> it would just be doing the same stuff
+17:58 < gildean> yes, but outside the instance
+17:58 < flexd> I think I would prefer the module doing the work so the main application can just rely on "always" having a card reader object, and the cardreader trying to reestablish hm
+17:58 < gildean> so for example now you could just call spawnedprocess.exit() on an error, and create a new instance
+17:59 < flexd> Yeah but why? That wouldn't make the cardreader module very "portable" per say
+18:00 < flexd> If you want to use it you have to also handle the event of a process error? It makes more sense to me, that the module handles that itself?
+18:00 < flexd> but either way the problem is that my way of error handling is not working :/
+18:02 < flexd> sorry, I'm not trying to argue against what you are saying, you are most likely right
+18:02 < flexd> It just feels odd to me
+18:04 < gildean> flexd: i'm not sure that i'm right, it's just how i feel
+18:05 < gildean> there's no set way of doing things
+18:05 < flexd> I could however perhaps do what you are saying inside the exports.createReader() function
+18:05 < gildean> imo you should do whatever feels good to you
+18:06 < flexd> To better explain my point of view: I feel that instead of giving the main program a new instance of CardReader, it would be better for CardReader to get a new instance of reader (which is the spawned process).
+18:06 < flexd> If that makes sense.
+18:07 < flexd> That way the main program/script is blissfully unaware that the reader has changed at all, until there is a critical problem (which it could be informed of through events)
+18:09 < flexd> Aha, got it to work
+18:09 < gildean> very good
+18:09 < gildean> how'd you handle it?
+18:10 < flexd> It was as I actually was thinking earlier
+18:10 < flexd> When you recreate the reader object all the previous .on('stuff') no longer exist
+18:12 < flexd> https://gist.github.com/5f7d6b2883e51744e1f1
+18:12 < flexd> Which is why I had the methods in the first place
+18:12 < flexd> But you have to "redo" everything
+18:13 < tnorris> bnoordhuis: a manual needs to be written for everything you know about tracing memory leaks. (and I thought I was cool using the --trace-* v8 options)
+18:13 < flexd> so now I get https://gist.github.com/d1a3f7dad89d5dad4121
+18:13 < flexd> based on the eents
+18:13 < flexd> events*
+18:14 < gildean> flexd: looks like it's working as supposed
+18:14 < flexd> Yeah :)
+18:14 < zane_> tnorris: g'mornin bud, you around?
+18:14 < tnorris> zane_: how's it be?
+18:15 < zane_> tnorris: still working on that fatal memory error. Best as I can tell, the file access is actually the kernel (its the /lib/modules/ directory). I tried upping ulimit to 10k, still no dice.
+18:16 < tracker1|work> gildean, flexd, like this.. abstract the underlying service... https://gist.github.com/4170876
+18:17 < tracker1|work> just a sec.. adjusting.
+18:18 < flexd> Oh shit, that reminds me.
+18:18 < flexd> again
+18:18 < flexd> I need to commit stuff more often :/
+18:18 < tracker1|work> gist updated.
+18:19 < tnorris> zane_: what we really need to know is the processes memory usage just before it dies. whether it dies or not w/o allocating the entire available heap would tell us a lot.
+18:19 < tracker1|work> sorry.. cardreader now has a better wrap...
+18:19 < zane_> torris: interesting. you linked me to a library yesterday that might help with that, but I lost the link.
+18:20 < tnorris> zane_: you mean node-heapdump?
+18:20 < zane_> tnorris: sounds right
+18:21 < tnorris> zane_: (https://github.com/bnoordhuis/node-heapdump) all the instructions are in the readme.
+18:22 < sosnon> when it comes to module.exports vs. exports is this http://www.hacksparrow.com/node-js-exports-vs-module-exports.html (rule of thumb: module.exports if the module should be a specific object type, else exports; whatever the heck this means in a concrete situation) still true?
+18:22 < flexd> tracker1|work: mine or yours?
+18:23 < tracker1|work> Okay, probably put more effort into that gist... https://gist.github.com/4170876
+18:23 < tracker1|work> flexd, are you the one wrapping the cardreader, or needing to?
+18:23 < gavri> I've been trying to get forever to deploy two different apps on the same machine with "forever stop app.js; forever start app.js" in each of their directories. 
+18:24 < gavri> but only one of them starts up. is this a restriction?
+18:24 < tracker1|work> think I got all the quirks out... as an example... loadExternalProc() just returns your external binder... the module exports of CardReader simply wraps, heals if external-proc exits, and will passhtrough event bindings..
+18:29 < zane_> tnorris: so  far, so good. Though, re the kill command to trigger the dump: does this happen automatically on a crash, too?
+18:29 < tnorris> zane_: here's an example of running out of memory w/o allocating the entire heap: https://gist.github.com/4170951
+18:30 < mscdex> sosnon: you can use it however you want. the only thing you have to remember is that `exports` is a variable with a reference to the object at `module.exports`
+18:30 < tnorris> zane_: nope. just when you trigger it.
+18:30 < flexd> tracker1|work: I am the one doing both?
+18:30 < mscdex> sosnon: so overwriting `exports` just changes the value of that local variable and thus does not modify `module.exports`
+18:30 < flexd> I made the module that runs the python script/cardreader
+18:30 < tracker1|work> felxd??
+18:30 < tnorris> zane_: so you can run out of memory w/o allocating the entire heap. Like if a string gets too long.
+18:30 < flexd> I might be misunderstanding your question :)
+18:32 < tracker1|work> flexd.. the idea is that you start with the module, I showed you.. and use that to wrap around childe_process.exec listinging for data events, and passing them as emit...
+18:32 < zane_> tnorris: makes sense... the problem is, I don't know how to trigger the heap dump in such a way that it'll catch this... I mean, my OOM error is clearly a very rare edge case, so trying to capture it is very difficult
+18:33 < tracker1|work> the example I put up will automagically re-start the child process.. but anything using require('../cardreader') won't need to know that the child exited, it self-heals...
+18:33 < tnorris> zane_: i'd say create a sh script that will run the command, then cleanup old heapdump files (so you only have the last 5 or so) then run it as a cron job every minute or so.
+18:34 < flexd> tracker1|work: right, but isn't that sort of what I ended up doing? [development][~/code/queue]$ node api.js                                                                                                                                                                                      rbenv:system 
+18:34 < flexd>    info  - socket.io started
+18:34 < flexd> static file server for index.html and assets listening on port 8080
+18:34 < flexd> { [Error: Cannot find module './DTraceProviderBindings'] code: 'MODULE_NOT_FOUND' }
+18:34 < flexd> This process has the pid: 3274
+18:34 < flexd> uidgrabber process exited with code 1
+18:34 < flexd> uidgrabber waiting 3 seconds before retrying
+18:34 < flexd> restify listening at http://0.0.0.0:3000
+18:34 < flexd> uidgrabber running pid: 3280
+18:34 < flexd> uidgrabber process exited with code 1
+18:34 < flexd> uidgrabber waiting 3 seconds before retrying
+18:34 < flexd> err
+18:34 < flexd> sorry :/
+18:34 < flexd> tracker1|work: https://gist.github.com/b86d3633bb551cc496e5 with that
+18:34 < tnorris> zane_: but I'm starting to think a heapdump won't help in your case. let me do a couple more tests.
+18:34 < zane_> tnorris: makes sense,  though, doesn't it seem likely that the memory that causes the crash is only alive for ~5 seconds or less? I mean, take for example JSON stringify -- the command should run in a matter ms....
+18:35 < zane_> tnorris: and JSON.stringify() is the best example of someone else having the same problem that I've found
+18:35 < sosnon> mscdex: 1) no convetions/consensus in the node community so far?  2. so the rule of thumb boils down to: when in doubt, moduel.exports will rule out exports (due to what you said)
+18:35 < zane_> tnorris: I use JSON.stringify myself a lot, and that could very well be it.... but again, I have no idea how to catch the input that's causing the problem
+18:35 < tracker1|work> flexd, that should work for what you are wanting...
+18:36 < tracker1|work> flexd, sorry, was looking higher up in the discussion.. working on other stuff as well.. lol
+18:36 < flexd> haha, no problem :)
+18:36 < tnorris> zane_: one sec.
+18:36 < flexd> It is working so I was wondering what was wrong with mine vs yours :p
+18:36 < mscdex> sosnon: most people use module.exports when they're exporting something like a single "class": `module.exports = MyFoo;`
+18:37 < nlf> right, and if you're exporting multiple things, exports.whatever is more common
+18:37 < tracker1|work> sosnon, mscdex, note you can do....  exports = module.exports = whateveryouwant
+18:37 < mscdex> sosnon: otherwise there really is no "consensus" about it, just do it however you like. some people tack on to `exports`, others may do `module.exports = { foo: ..., bar: .... };`
+18:37 < sosnon> mscdex: i'll stick to it then (though i've seen things like module.exports = exports = ...)
+18:38 < mscdex> tracker1|work: no point in doing `exports = module.exports` if you're just exporting a single thing
+18:38 < sosnon> tracker1|work: oh, too slow, sorry
+18:38 < tracker1|work> sosnon, lol
+18:38 < tracker1|work> okay, getting back to work.. vs compile is done.. lol
+18:39 < odin_> I have installed 'grunt' but how do I execute it ?  is there a way like using "npm exec grunt <grunt_args> ..." ?
+18:39 < sosnon> let me rephrase my question then: exports does not provide any advantages at all (i could create a local variable myself anyway); was it a bad language/design decision then? at least a confusing one
+18:44 < tracker1|work> sosnon, if you want to export multiple functions/classes it can be a style thing.. I tend to favor  module.exports = { SomeClass:SomeClass, someFunc:someFunc };  when doing multiple items... 
+18:44 < tracker1|work> I also keep my exports statement at the top for node modules, since the functions get hoisted anyways.
+18:45 < sosnon> sure, but still 'exports' can be considered to be superflous then (it's not even syntactical sugar)
+18:45 < sosnon> rather confusing/prone to causing confusion/malfunciton
+18:45 < sosnon> *malfunction
+18:46 < tracker1|work> well, it kind of is...  var exports = module.exports;  run at the top of your module.. if you re-assign exports, it doesn't reassign module.exports... though I think simply using/assigning module.exports is more implicit
+18:46 < tracker1|work> err explicit
+18:46 < odin_> ah it seems to have installed to node_modules/grunt/ and have directory $HOME/.npm/grunt/  thats ok
+18:48 < sosnon> tracker1|work: we should mention it on the mailing list and in the tracker, i have a feeling that people will find reasons which makes 'exports' undispensable ;)
+18:49 < tracker1|work> sosnon, all the existing code that would break would be a big one.
+18:50 < sosnon> tracker1|work: at least deprecating it couldn't hurt
+18:50 < sosnon> especially now that node is still young
+18:50 < tnorris> zane_: ok, so stringify is probably your best bet for memory problems. you could start by reporting the number of keys in an object before by Object.keys(<object>).length
+18:51 < tracker1|work> if exports could be a simple getter/setter so that it assigns module.exports in whole, that might be helpful...
+18:51 < tracker1|work> and more transparent as to intent, without necessarilly a need for module.exports = ...
+18:52 < __underscore> can anyone give me feedback on my first npm package? https://npmjs.org/package/envalid
+18:54 < sosnon> still don't see any advantage in the existence of 'exports'; rather contrary (as in module.exports.foo = foo; exports.foo = bar;)
+18:55 < nlf> module.exports = { foo: foo, bar: bar } is marginally more irritating than exports.foo = foo; exports.bar = bar
+18:55 < SuchetaG> Hi, I am having some problem with installing ep_wikiauth ,while cloning etherpad-lite. Could anyone help me?
+18:55 < asadpakistani> I have a quad core computer and I am able to scale node to 4 cores using cluster...But lets say I have 2 threads per core...providing 8 logical cores...So will forking 8 processes instead of 4 give me more bang for my buck?
+18:56 < sosnon> nlf: at least it does not cause trouble
+18:56 < odin_> Hmm when documentation says run "grunt" obviously that is no a exe (or a.out) there is grunt.js but it won't run on its own, and "node grunt.js" doesn't so anything useful, so how do you run "grunt" ?
+18:56 < nlf> they both work, do what makes you happy
+18:56 < asadpakistani> Also how will I find out if the computer has hyperthreading or not...using node...if that is possible
+18:56 < CoverSlide> asadpakistani: i don't think that's supported
+18:57 < CoverSlide> asadpakistani: i think it only looks for logic cores, not physical cores
+18:57 < tracker1|work> odin_, npm grunt?
+18:58 < odin_> "npm grunt -version" => 1.1.19, but "npm grunt" => is npm usage help text
+18:58 < tracker1|work> odin_, https://github.com/gruntjs/grunt/blob/master/docs/getting_started.md
+18:59 < SuchetaG> The problem is with the npm installation of ep_wikiauth
+18:59 < tracker1|work> npm -g install grunt   then  grunt ...
+18:59 < sosnon> nlf: sure, i'm not complaining about that, but in the case of 'module.exports.foo = foo; exports.foo = bar;' 'foo' will be foo, not bar and since some people set exports in the head of their files a second dev extending it and extending it in the bottom, may end up changing 0% of foo, but gets 100% confused since there is no error/warning, especially in larger projects
+18:59 < odin_> the docs for the package using grunt indicate that "grunt" on its own should work, ok I try with "-g"
+19:00 < nlf> that's typical collaborative coding issues, the person contributing needs to be aware of what's in place and how it works and follow convention
+19:00 < tracker1|work> -g will install global reference scripts... like  npm -g install less   will let you use the less command line compiler...
+19:00 < asadpakistani> CoverSlide: thanks...but if i run more than one worker per core for cpus with hyperthreading...wouldnt the kernel schedule 2 processes per kernel...and hyperthreading will be taken advantage of
+19:00 < asadpakistani> 2 processes per core*
+19:00 < CoverSlide> i think that depends on the kernel
+19:00 < CoverSlide> but sounds about right
+19:01 < sosnon> nlf: sure, there are no conventions etc., but even in a small file you may confuse it; the problem is not that you confuse it, but that it silently passes (just like various this/self/parent mixups in pure js, for instance)
+19:01 < asadpakistani> CoverSlide: cool...i guess it wont double the speed or anything...but i guess itll just let the other process execute while the first one waits for memory cycles...there will be memory overhead, which isnt a concern but a little but more milkin of the cpu i guess
+19:02 < nlf> code that references the wrong variables will sadly always silently pass
+19:03 < emilsedgh> is there any way of making ioctl calls from a node application? does that even make sense?
+19:03 < nlf> if i'm supposed to be using 'foo' and i use 'bar' instead, my code is still going to run, it's just not going to give expected results. the module.exports/exports issue is no different
+19:04 < sosnon> sure, at least i know about the caveats now... and http://nodejs.org/api/modules.html#modules_module_exports is fairly frank
+19:06 < tracker1|work> nlf, sosnon... I think that's why I always try to keep my exports at the top, right under the global vars/requires...
+19:06 < tracker1|work> though.. the problem with that, it it's hard when you are trying to support browser include, amd and commonjs/node
+19:06 < tracker1|work> is it's
+19:06 < nlf> yeah
+19:07 < tracker1|work> for browser + server js modules... usually want to have them at the bottom.
+19:08 < tracker1|work> I'll leave it to brighter people than me to figure out.
+19:10 < zane_> tnorris: well, the JSON objects are generally rather deep / nested. I've previously tried using a function to get the full size of the obj in Mb, and print any objects > 4Mb, but it proved unreliable and ultimately slow, though I did manage to reduce some sceraios where we had 4-8 Mb objects being stringifie
+19:11  * tracker1|work looks at zane_ with a confused expression on his face.
+19:11 < zane_> ?
+19:12 < tracker1|work> zane_, totally don't know the context of the message
+19:12 < zane_> Well, tnorris and I have a 12hr+ discussion going about this StackOverflow thread of mine: http://stackoverflow.com/questions/13616770/node-js-fatal-error-js-allocation-failed-process-out-of-memory-possible#comment18673986_13616770
+19:13 < zane_> I'm so desperate I'm about ready  to put a PayPal bounty on it (is that possible =P?)
+19:14 < tnorris> zane_: do you know what is causing object to be created that size? The max string size is about 1,073,740,000 characters. That is freakin massive.
+19:15 < tracker1|work> zane_ could it be a recursion issue on an object you are serializing?
+19:16 < sosnon> when i'm edigin a geddy .ejs template for the view the browser will automatically upen as soon as i save it; problem, however: the browser is pointed to the template file itself (file://path/to/soemthing.html.ejs) instead of the actual url (http://127.0.0.1:4000/something); why is that?
+19:16 < zane_> tnorris: Well, again, we're not sure that the JS object allocation IS a string / JSON.stringify, but assuming it is, yes I know what the objects are that are 4Mb or so in size... I've done my best to reduce them, they're the streams themselves though, and are implicitly large (eg, mulitple RSS feeds). Most of what I've done is to try piping them directly into express' res.write() function instead of putting them in memory
+19:17 < sosnon> *editing
+19:17 < zane_> tracker1|work: possibly... I'm frequently outputting objects from a mongoose query. I try to make sure to always use the toObject() command on the mongoose documents to remove any functions / circular references, but it's possible I missed one somewhere
+19:18 < tracker1|work> I came up with the following script to handle deep/recursive objects... http://stackoverflow.com/questions/11438444/converting-an-object-into-dynamic-with-json-net
+19:19 < zane_> I'm rather unclear how that applies to a Node.js/Mongoose/JSON.stringify scenario...
+19:19 < sosnon> having the browser open a new tab on each save is annoying (if it was at least pointed to the right url it would be less annoying); the confis don't indicate any switch for this behaviour
+19:19 < tnorris> if you're trying to stringify a recursive object you'll get the following: "TypeError: Converting circular structure to JSON"
+19:19 < tnorris> not an out of memory issue.
+19:19 < zane_> tnorris: thought so, yeah. Not seeing any error like that.
+19:20 < tnorris> zane_: well, if your process isn't allocating the entire heap before running error-ing, then it would seem a single object has increased beyond its limits.
+19:20 < tnorris>  /running //
+19:20 < sosnon> maybe it is EJS behavirour ans not geddy? can someone confirm that with the default npm package?
+19:21 < sosnon> *module
+19:21 < tracker1|work> tnorris, I know.. but it it's large it could hit a memory limit before excessive recursion error is triggered
+19:21 < zane_> tnorris: yes, that seems the most logical answer. But assuming that it is the JSON.stringify is just a stab in the dark; really I have no idea what object is growing beyond the limits.
+19:21 < tracker1|work> s/it/if/
+19:22 < tnorris> tracker1|work: hm, that is a freakish edge case. don't even know how to write a script to test that.
+19:22 < tracker1|work> tnorris, well, only thought of it, because zane_ mentioned the objects were large to begin with.
+19:23 < tnorris> tracker1|work: oh, sorry. i'm not discounting what you said. just saying that is something I've never thought about.
+19:24 < tracker1|work> var obj = fs.readFileSync("somebigfile",'binary'); obj.ref = obj; json.stringify(obj);
+19:24 < zane_> I'm really shocked there's no way to get a stack trace on a FATAL ERROR in node.js... aren't uncatchable / untraceable errors the spawn of satan?
+19:25 < tnorris> zane_: problem is that the kernel is probably killing the process, not node. so there might not be a way for node to intercept.
+19:25 < tracker1|work> zane_, have you tried running node itself in a debugger?
+19:25 < tracker1|work> though I'm not good enough with C to even start down that path myself.
+19:26 < zane_> tnorris: makes sense... but I mean, can't there at least be a way to find the last operation ran before the crash @.@?
+19:26 < zane_> tracker1|work: well, the other problem is that it only happens on a prod server, and only about once every few hours on avg. @.@
+19:26 < tracker1|work> zane_, oh, I hate issues like that...
+19:27 < marktraceur> Can anyone here help SuchetaG? She's having a problem with npm, apparently her version is rather out of date and won't upgrade itself.
+19:28 < tnorris> SuchetaG: catch me up.
+19:30 < SuchetaG_> tnorris: Hi, Thanks. It says I need to upgrade it from 0.2.19 to 1.x
+19:30 < SuchetaG_> How do I do that?
+19:31 < tnorris> SuchetaG: what's your OS?
+19:31 < SuchetaG_> ubuntu 11.10
+19:33 < tnorris> SuchetaG_: What displays in the following: `apt-cache show npm | grep Version`
+19:33 < tracker1|work> zane_, if you're setting ulimit -Sv to set the memory available to the process... if you're using cluster/fork not sure if these settings would carry forward.. just a thought.
+19:34 < SuchetaG_> tnorris: Version: 0.2.19-1
+19:34 < zane_> tracker1:work: I'm using posix to set the memory require('posix').setrlimit( ... ); and at the moment I'm not using cluster or fork, no.
+19:34 < Network> : tracker1:work: I'm using posix to set the memory require('posix').setrlimit( ... ); and at the moment I'm not using cluster or fork, no.
+19:34 < tnorris> SuchetaG_: ok, that's your problem. give me one sec.
+19:35 < tnorris> SuchetaG_: here you'll see the latest version of npm available for 11.10 is 0.2 (http://www.ubuntuupdates.org/package/core/oneiric/universe/base/npm)
+19:35 < CoverSlide> the 
+19:36 < CoverSlide> 'posix' module is still around?
+19:36  * Network !jurus menghilang tanpa arah
+19:36 < tnorris> SuchetaG_: so go here and click "APT INSTALL" http://www.ubuntuupdates.org/package/chris_lea_nodejs/oneiric/main/base/npm
+19:36 < tnorris> SuchetaG_: what is your node version `node -v`?
+19:38 < SuchetaG_> tnorris: v0.4.9
+19:38 < tnorris> yeah, that won't do.
+19:38 <@isaacs> CoverSlide: no
+19:38 <@isaacs> > require('posix')
+19:38 <@isaacs> Error: Cannot find module 'posix'
+19:38 < tracker1|work> http://www.ubuntuupdates.org/package/chris_lea_nodejs/oneiric/main/base/nodejs
+19:38 < tnorris> tracker1|work: awesome, thanks. SuchetaG_ ^
+19:39 < SuchetaG_> tnorris: Ok. Done that.
+19:39 < CoverSlide> wasn't there a posix module in like 0.2 or something?
+19:41 < SuchetaG_> tnorris: Now?
+19:41 < sosnon> nobody seems to use geddy, everyone is into express, is this true or just a wrong perception?
+19:41 < CoverSlide> i don't know anyone who uses geddy
+19:41 < tnorris> SuchetaG_: so you installed both the npm and nodejs packages?
+19:42 < dshaw_> —> /join #nodeup
+19:43 < cjm> and visit http://nodeup.com to listen
+19:43 < tracker1|work> sosnon, I think express is probably more popular.. don't know anyone using geddy, but know very few using node to begin with
+19:43 < SuchetaG_> tnorris: yes yes. nodejs package was already installed 
+19:43 < tnorris> SuchetaG: then you shouldn't be at v0.4.
+19:44 < CoverSlide> the main geddy guy works for yammer. i don't think yammer uses node or geddy
+19:44 < CoverSlide> except possibly internally
+19:44 < CoverSlide> i know they're mostly java
+19:44 < SuchetaG_> tnorris: It seemed so. Anyway now it is.
+19:45 < tnorris> SuchetaG_: ok, what's your current node `node -v` ?
+19:46 < SuchetaG_> tnorris: Still the same as before !
+19:46 < tnorris> SuchetaG_: ok, well we need to get node upgraded to v0.8+ before installing npm 1.
+19:46 < tnorris> or at least v0.6
+19:47 < tnorris> SuchetaG_: go ahead an uninstall node and npm completely, then we'll start from zero.
+19:48 < zane_> Ug. There has GOT to be a better way for finding / debugging fatal errors...
+19:50 < tracker1|work> SuchetaG_, run:  sudo add-apt-repository ppa:chris_lea_nodejs/oneiric
+19:50 < tracker1|work> SuchetaG_, sudo apt-get update
+19:51 < tracker1|work> SuchetaG_, sudp apt-get upgrade nodejs npm
+19:51 < SuchetaG_> tnorris: Done. tracker1|work : ok.
+19:51 < tracker1|work> SuchetaG_, now node -v ??
+19:52 < SuchetaG_> tracker1|work: You mean after running those commands or after removing npm and node?
+19:53 < tracker1|away> SuchetaG_, after running those commands..
+19:53 < tracker1|away> shouldn't need to uninstall
+19:53 < tracker1|away> add the ppa, then apt-get update, then should be able to install/upgrade node and npm
+19:54 < SuchetaG_> But the ppa shows 404 error at the first place tracker1|away
+19:56 < tracker1|away> SuchetaG_, open a command prompt, and enter:   sudo add-apt-repository ppa:chris_lea_nodejs/oneiric
+19:56 < tracker1|away> that shows a 404?
+19:58 < SuchetaG_> tracker1|away : Yes. Precisely :http://pastebin.com/p9maRSGN
+19:59 < tracker1|away> sorry.. my bad..
+19:59 < tracker1|away> sudo add-apt-repository ppa:chris-lea/node.js
+19:59 < tracker1|away> http://www.ubuntuupdates.org/ppa/chris_lea_nodejs?dist=oneiric
+20:05 < SuchetaG_> tracker1|away :  upgrading nodejs and npm the way you said
+20:06 < SuchetaG_> But I had removed it already.
+20:07 < SuchetaG_> Anyway its being processed.
+20:08 < Ang3> hey guys, JohnMcLear 
+20:08  * JohnMcLear tips his hat
+20:09 < Ang3> guys, i got a issue with NPM. Check out my logs  here --> http://pastebin.com/tje4xaG6
+20:09 < zane_> tnorris: I'm about to try something desperate: keeping a file that represents all active API endpoints (eg, request that have been made, but not yet responded to). That way, when the process crashes, I can examine what was "alive" at that time (as well as all input). I'm afraid about the File IO overhead, but can't think of a better idea. Sound logical?
+20:09 < JohnMcLear> what do you get if you do "npm -v" ?
+20:10 < JohnMcLear> Ang3 that is..
+20:10 < Ang3> JohnMcLear: 1.1.4
+20:10 < JohnMcLear> and node -v ?
+20:10 < Ang3> v0.6.12
+20:10 < JohnMcLear> Is your internet connection stable/reliable?
+20:11 < JohnMcLear> 6.12?!
+20:11 < tnorris> zane_: give me a few minutes. i'm recreating a fatal memory issue and seeing what I can do to trace it.
+20:11 < JohnMcLear> So what's it like i the 90s? ;)
+20:11 < niggler> Ang3 there's a new stable release
+20:11 < zane_> tnorris: oh, cool :)
+20:11 < niggler> the 0.8 series
+20:11 < Ang3> hum i just get from package, ubuntu 12.04
+20:11 < JohnMcLear> Yep, let's do step 1, upgrade node.  Ang3, do you want any help upgrading or are you familiar with the process?
+20:12 < JohnMcLear> I'm pretty sure the Etherpad docs say to use nodejs.org source
+20:12 < Ang3> node upgrade ?
+20:12 < Ang3> gotta check it out
+20:12 < JohnMcLear> hehe
+20:12 < JohnMcLear> wget http://nodejs.org/dist/v0.8.15/node-v0.8.15.tar.gz
+20:13 < JohnMcLear> extract, configure, make, make install
+20:13 < marktraceur> SuchetaG_: Are things starting to work for you?
+20:13 < JohnMcLear> Are you familiar with that process?
+20:13 < niggler> woah woah woah why wget?
+20:13 < niggler> wget isnt standard on osx
+20:13 < Ang3> JohnMcLear: yeah, i just prefer package stuff :)
+20:13 < niggler> curl is your friend :)
+20:14 < marktraceur> niggler: Ang3 is on Ubuntu 12.04, read backscroll :)
+20:14  * JohnMcLear pats niggler on the noggler
+20:14 < niggler> marktraceur curl -O does what you want and works in both places
+20:14 < marktraceur> niggler: Yes, but what if I don't *want* to knowingly support Mac OS X? :)
+20:15 < niggler> ah we've got an RMS in the room
+20:15 < JohnMcLear> That's pretty much how I roll.
+20:15 < Ang3> marktraceur: i also got wget on MacOsX, thx to homeBrew !
+20:15 < Ang3> :)
+20:15 < marktraceur> niggler: Actually I might characterize myself more as an Eben Moglen, but sure
+20:15 < marktraceur> (RMS has very limited views on web services)
+20:16 < niggler> ive seen moglen use a mac
+20:16 < JohnMcLear> just quickly guys, what is the authoritative source of knowing which node version is on ubuntu 12.04 ?
+20:16 < niggler> rms wouldn't dare touch one
+20:16 < niggler> JohnMcLear node != nodejs
+20:16 < niggler> on ubuntu iirc node is a different thing altogether
+20:16 < JohnMcLear> im in the nodejs channel, take it as given.
+20:17 < CoverSlide> i remember rms used to use a mips computer specifically because it will never run windows
+20:17 < niggler> yeeloong is what he uses now iirc
+20:18 < CoverSlide> richard stallman never showers, he does `make clean`
+20:18 < Ang3> lol
+20:18 < JohnMcLear> http://packages.ubuntu.com/search?keywords=nodejs&searchon=names&suite=quantal&section=all <-- hrm I think that's prolly the best place..
+20:18 < tnorris> anyone know how to pint the exit code when a node process dies?
+20:19 < JohnMcLear> Do we need to bump the ubuntu package managers to update node or is there a reason it's being held back?
+20:19 < JohnMcLear> when I say, "update node", I mean to ensure the latest node stable is available via apt..
+20:19 < CoverSlide> i wonder if he uses the chinese one or the debian one, since apparently debian isn't blessed by the eff
+20:20 < Ang3> Well JohnMcLear it's all about release no ? I mean ubuntu freeze the packages for every release
+20:20 < niggler> vrms apparently thinks that bison-doc isnt free
+20:20 < Ang3> I guess the 12.10 comes with a fresher node no?
+20:20 < niggler> nodejs
+20:21 < CoverSlide> don't use the package-released node, even if it's current as of their last release, it's still outdated since node releases every other week at a minimum
+20:21 < CoverSlide> use the PPA
+20:22 < JohnMcLear> Ang3: http://stackoverflow.com/questions/7214474/how-to-keep-up-with-the-latest-versions-of-nodejs-in-ubuntu-ppa-compiling
+20:22 < JohnMcLear> That will allow you to be lazy and use apt
+20:22 < drudge> i use nave
+20:22 < drudge> since they do binary releases now
+20:22 < Ang3> <3
+20:22  * Ang3 still into the 'make' :)
+20:23 < niggler> make stuff
+20:23 < niggler> in fact, just stick the command in a Makefile and run make
+20:23 < niggler> 'make npm' -> npm install
+20:24 < CoverSlide> besides, even if they package it with the latest version, they do a version freeze i think 2 months before release, and they don't update except for security features
+20:24 < CoverSlide> and it's not like upgrading to the next version is trivial
+20:24 < CoverSlide> just for one pacakge
+20:25 < tnorris> bnoordhuis: you know if it's possible to generate a heap dump (or the like) OnFatalError?
+20:27 < tracker1|away> zane_ would and sqlite db work?
+20:28 < zane_> tracker1|away: I just coded it into mongo, actually: insert a tiny record including start time, URL, etc. when the request is received; delete the record when it finishes
+20:28 < tnorris> zane_: i'm trying something a little out there, but we'll see if it works out. may take me a couple hours or so.
+20:29 < tracker1|away> JohnMcLear, I just mentioned getting a PPA for the latest node.js in ubuntu, relatively speaking...
+20:29 < tracker1|away> JohnMcLear, http://www.ubuntuupdates.org/ppa/chris_lea_nodejs?dist=oneiric
+20:29  * JohnMcLear quirks an eyebrow
+20:29 < Ang3> JohnMcLear: not really better : http://pastebin.com/F0MevPs5
+20:29 < tracker1|away> sorryll that was probably to Ang3 
+20:30 < JohnMcLear> Ang3: Are you doing rm -Rf src/node_modules ?
+20:30 < Ang3> yep
+20:30 < JohnMcLear> then bin/run.sh
+20:30 < zane_> tnorris: cool, well assuming this doesn't hurt performance too bad, it should at least give me an idea of what was running at the time of the crash
+20:30 < Ang3> on the etherpad folder right?
+20:30 < JohnMcLear> it should grab all the dependencies
+20:30 < JohnMcLear> in the etherpad folder..
+20:30 < JohnMcLear> cd etherpad-lite
+20:30 < Ang3> yeah yeah 
+20:30 < JohnMcLear> hrmph
+20:30 < Ang3> mm
+20:30 < JohnMcLear> something is wrong, ey.
+20:31 < tnorris> zane_: i'm attempting to write a patch for src/node.cc that generates a heapdump on fatal error
+20:31 < Ang3> i guess :)
+20:31 < JohnMcLear> let's go back to #etherpad-lite-dev -- save us flooding this chan
+20:31 < Ang3> k
+20:31 < zane_> tnorris: if you managed that... zomng
+20:32 < Cogito_Ergo_Sum> hi
+20:34 < gavri> require('child_process').exec("NODE_ENV=test node app.js") starts two node processes and a later kill() only kills one of them. what am I doing wrong here?
+20:35 <@mbalho> yo dog i herd u like node
+20:35 <@mbalho> so i put a node in your node so you can node while you node
+20:36 < CoverSlide> you kill once, and it kills the one
+20:36 < gavri> why have two been created though?
+20:38 < niggler> is node the new marklar?
+20:39 < gavri> oh wait
+20:39 < gavri> it's creating a shell which then executes the node process
+20:39 < gavri> and the kill() only kills the shell
+20:39 < gavri> not the node process
+20:39 < CoverSlide> yes
+20:40 < gavri> how do I I make sure the node process is killed too?
+20:40 < CoverSlide> https://github.com/joyent/node/blob/master/lib/child_process.js#L470-L493
+20:40 < gavri> or is there a way to not use the shell and yet pass the NODE_ENV environment variable in?
+20:41 < CoverSlide> gavri: use spawn
+20:41 < CoverSlide> there is an env: option
+20:41 < Ang3> hey guys, do you have a clue why i got this errors after a 'npm cache clean?' http://pastebin.com/6sMAGE3p
+20:42 < CoverSlide> Ang3: did you use npm as sudo?
+20:42 < gavri> CoverSlide: spawn doesn't create a shell process?
+20:42 < Ang3> not that time, maybe before yep 
+20:42 < Ang3> why?
+20:42 < CoverSlide> because if it created files in cache as root, then you need to be root to delete them
+20:43 < Ang3> then sudo npm cache clean ?
+20:44 < CoverSlide> gavri: spawn will start the executable directly, none of this shell stuff
+20:44 < CoverSlide> personally i think .exec should die
+20:44 < CoverSlide> gavri: also remember you don't have the end callback, you have to listen on an end event, and listen on stdout, stderr, and stdin streams directly
+20:45 < CoverSlide> .exec does that stuff for you, but the whole shell thing i'm not a fan of
+20:46 <@isaacs> CoverSlide: you can also use .execFile
+20:47 <@isaacs> CoverSlide: which is like spawn, but instead of returning the object, it runs a callback
+20:47 < Ang3> CoverSlide: it worx thx :)
+20:47 < CoverSlide> oh, ok
+20:47 <@isaacs> CoverSlide: execFile('/bin/sh', [ '-c', command ], function(err, stdout, stderr) { ... })
+20:48 < gavri> CoverSlide: I don't know if I need any of those. but there doesn't seem to be a way to kill the process created with spawn. is there?
+20:49 <@isaacs> gavri: why not just do this? var child = spawn(process.execPath, ['app.js'], { env: { NODE_ENV: test } }); // then later... child.kill()
+20:49 < CoverSlide> process.kill(child.pid)
+20:49 <@isaacs> gavri: gist.
+20:49 < CoverSlide> oh child.kill ... hmm i need to read through the docs again
+20:50 <@isaacs> CoverSlide: process.kill(pid) also works
+20:50 < gavri> isaacs: thanks a lot
+20:50 <@isaacs> CoverSlide: nice if you ahve the pid, but not the object
+21:04 < gavri> thanks a lot isaacs and CoverSlide, it works
+21:05 < gavri> is there a way to disable all 'console.logs' in a specific run of a node application?
+21:06 < der_On> hello. anyone here used formidable?
+21:07 < CoverSlide> der_On: what do you need help with?
+21:08 < der_On> CoverSlide: I use geddy.js as a web-framework and am trying to upload files with a multipart form however it does not fire the callback on the form.parse() function
+21:09 < der_On> only sometimes, but I don't get a pattern
+21:09 < der_On> CoverSlide: http://pastebin.com/paGAzeET
+21:09 < der_On> thats my code
+21:10 < der_On> however the callback is not firing
+21:10 < tnorris> mother freakin yeah! total hack but I injected bnoordhuis node-heapdump into OnFatalError so it writes a heapdump.
+21:10 < CoverSlide> hm no idea
+21:11 < tnorris> zane_: I'll write a patch for v0.8.15 that you can use with `git apply`
+21:14 < tnorris> zane_: here it is: https://gist.github.com/4171956. it's based on the v0.8.15 tag, so just use `git apply` to throw it on top of that. then rebuild.
+21:15 < AviMarcus> This might not be the best place to ask... I'm planning on making an API with restify (I have a smaller version already working) and then building a GUI that only uses that API for users. (e.g. Stripe.) Any recommendations for the gui side? I'm planning on using angular, but something that can automatically adapt to the API would be great during development.
+21:15 < tnorris> zane_: though just note, this is my first time touching c++ in years. and I have no idea what kind of repercussions this may have.
+21:17 < der_On> CoverSlide: okay. it only uploads after I go to the form page the second time. not the first. First time it does not fire the callback
+21:17 < CoverSlide> odd
+21:17 < tnorris> (oh, and bnoordhuis actually wrote all the code. I just inserted it into the on fatal callback ;-)
+21:21 < zane_> tnorris: very cool... though, I suck with git / etc. Any chance you could give step-by-step? Right now, my node servers just do a  wget of the .gz and make it during their boot sequence...
+21:21 < der_On> CoverSlide: ah I guess I know now. All examples show a redirect to another route like "/upload" and then redirect back. So I guess formidable needs a "two step" request somehow
+21:23 < AviMarcus> Wow, no answers at all?
+21:23 < CoverSlide> AviMarcus: if you want to use angular use angular
+21:24 < TehShrike|Work> AviMarcus: not sure how you imagine a front-end templating language to automatically change to match your API
+21:24 < CoverSlide> yeah
+21:25 < AviMarcus> HATEOAS seems to be something that describes links to what the options are
+21:26 < AviMarcus> I just figured there is likely some sort of framework that makes it easier to iterate things
+21:26 < tnorris> zane_: here you go: https://gist.github.com/4172009
+21:27 < tnorris> zane_: refresh. forgot to add an option to speed up the build process.
+21:28 < zane_> sweet. Attempting.
+21:29 < nphase> tnorris: just -j 3?
+21:29 < nphase> :)
+21:29 < tnorris> nphase: he's running on ec2 small
+21:29 < CoverSlide> http://latimesblogs.latimes.com/nationnow/2012/02/trinidad-moruga-scorpion-worlds-hottest-chili-pepper.html
+21:29 < nphase> tnorris: oh, makes sense
+21:30 < nphase> tnorris: wonder if that make -j is going to clobber his ram/swap
+21:30 < tnorris> nphase: yeah. on my i7, using clang and -j 9 I can build in 40 secs.
+21:30 < tnorris> hm. good point. gcc does use a lot of mem.
+21:30 < nphase> yeah
+21:30 < tnorris> zane_: um, take off the "-j 3" from make.
+21:30 < nphase> i once tried to make -j 4 on a 1gb slice and wondered why it took 45 minutes
+21:30 < nphase> "iostat" OHHHHHHH
+21:30 < nphase> :P
+21:30 < tnorris> lol
+21:31 < yesdog> nphase: this isnt about your sense of superioirt
+21:31 < yesdog> VIVA LA REVOLUTION!!!
+21:32 < nphase> ^ this is what happens when my coworkers get on IRC
+21:32 < aerolith> ...
+21:32 < yesdog> aerolith
+21:32 < yesdog> wont even get started
+21:32 < aerolith> nphase: i resemble that comment
+21:32 < yesdog> all i can see is
+21:32 < yesdog> WTF
+21:32 < yesdog> but seriously
+21:32 < nphase> resemble
+21:32 < yesdog> JS?
+21:32 < yesdog> FP?
+21:32 < yesdog> fuck it
+21:32 < nphase> right, resemble
+21:33 < nphase> AS2 4 lyfe
+21:33 < yesdog> its like
+21:33  * nphase leaves
+21:33 < yesdog> spaghetti 
+21:33 < yesdog> but shittier 
+21:36 < Jonny___> Just come across node recently, been using ruby, rails, javascript & html5 responsive web design for a while now, our company now wants an new internal intranet system, and website. I have been reading a few node blogs lately and starting to love the flexibility of what it can offer without "all the magic under the hood" that rails provides. Can anyone point me to learning resources, main coding patterns, frameworks to get started 
+21:37 < yesdog> google some Express tutorials
+21:37 < yesdog> express is a great frameowkr for node 
+21:40 < der_On> CoverSlide: wow. seems like all what was wrong was the missing action parameter on my form
+21:40 < CoverSlide> :o
+21:41 < tracker1|work> Jonny___, DailyJs Node Tutorials: this one lists the preceding tutorials... http://dailyjs.com/2011/05/02/node-tutorial-23/
+21:42 < zane_> tnorris: weird, getting an err in the configure script
+21:42 < jfroma> is there a way to change default port (5858) of the debugger?
+21:42 < tnorris> zane_: what's the error?
+21:42 < zane_> tnorris: line 355, if options.unsafe_optimizations else 0) (syntaix error) -- is that one of your changes?
+21:42 < jfroma> something like node debugger --port=whatever server.js
+21:43 < tnorris> zane_: no. I didn't touch that. one sec. let me check it out.
+21:43 < Jonny___> Yes i have been reading Express Framework for last week, love the flexibility of the middleware, connect etc.. Came across node with the "Meteor screencast" on railscast and love the realtime interaction... Just want to put all my energy into one framework at present and give it a go...(express, flatiron, meteor?!?!)
+21:43 < tnorris> zane_: yeah. my changes are only in src/node.cc. let me check the config file.
+21:44 < zane_> I could probably copy the config file over from the stable folder
+21:45 < der_On> CoverSlide: no. that wasn't the case. I dont get it
+21:45 < CoverSlide> hmm /me shrugs
+21:45 < tnorris> zane_: that is a strange error. is there any output for the following: `git diff v0.8.14 v0.8.15 -- configure`
+21:45 < zane_> weird... I copied it from the v0.8.15 .tar.gz into the new directory, and still get the same error
+21:46 < tnorris> zane_: what version of python are you using?
+21:46 < zane_> tnorris: pasted a bit of the console here: http://pastebin.com/GwQVwcQ0
+21:46 < zane_> 2.4 atm, iirc, I switch between 2.4 and 2.6 due to dependency issues >.<
+21:46 < tnorris> zane_: try running it with 2.6
+21:47 < zane_> tnorris: same deal with both :(
+21:47 < CoverSlide> i think it needs 2.5+
+21:48  * CoverSlide can't remember
+21:49 < Jonny___> Thanks  <tracker1|work> looks good
+21:49 < tnorris> zane_: sorry, can't test with 2.6. just to double check, your sure you ran configure using 2.6?
+21:50 < zane_> Should be the case... I use "ln -f /usr/bin/python2.6 /usr/bin/python" to change between versions, and it works elsewhere where I need 2.6
+21:50 < tnorris> CoverSlide: well, we're implementing a completely unofficial hack anyways. I wrote a patch that outputs a heapdump on a fatal error.
+21:50 < CoverSlide> regardless, the C++ wouldn't have any bearing on the python scripts
+21:51 < tnorris> zane_: open `configure` and type the exact path into the first line after `env`
+21:51 < tnorris> CoverSlide: true, true.
+21:51 < zane_> tnorris: nice one , that worked
+21:52 < tnorris> cool. let me know how the build process goes.
+21:52 < Yasumoto> you can also do make PYTHON=python2.7
+21:52 < Yasumoto> and something like python2.7 configure
+21:59 < yesdog> how many fucks does a fuckity fuck fuck ?
+22:02 < MI6> joyent/node: Kyle Robinson Young v0.8 * acad8d9 : website: typo fixes - http://git.io/-5kQYw
+22:03 < yesdog> so confused
+22:05 < zane_> tnorris: ug, having an apparently identical problem when doing make install, the tools/install.py file but hardcoding the 2.6 version @ the top of the script doesn't seem to work here...
+22:06 < tnorris> zane_: you don't technically have to install. you can run the process from out/Release/node
+22:06 < yesdog> you're not using enough chuck norris
+22:06 < yesdog> sudo apt-get install chuck_norris
+22:07 < tnorris> zane_: if that's not an option, paste me the error you're getting.
+22:08 < zane_> well, I usually use forever, but I guess I only need it to crash once... got it to startup from the out/ directory ;)
+22:08 < tnorris> awesome
+22:09 < mrtrop> Hi, is there any way I can check if a server is listening?
+22:10 < mrtrop> Using the net.createServer()
+22:10 < tnorris> mrtrop: are you listening on a port or a socket?
+22:10 < mrtrop> On a port.
+22:11 < tnorris> mrtrop: telnet to the port, if it's listening then you'll connect.
+22:11 < mrtrop> tnorris: I mean in my code
+22:11 < mrtrop> Is there like any property I can check? I didn't see any in the docs.
+22:11 < ProLoser> i'm on a new mac
+22:12 < ProLoser> do i need to add the package path to my $path for npm?
+22:12 < tnorris> mrtrop: you can use socket.connect to try to connect to the port. if it fails, then you know you aren't listening.
+22:12 < zane_> tnorris: just to be sure: this should drop a heap file in the same folder I started node from yes?
+22:13 < tnorris> zane_: yes.
+22:13 < tnorris> zane_: the code I injected is from github.com/bnoordhuis/node-heapdump
+22:14 < tnorris> you can open those in chrome. F12 -> Profiles -> right click -> Load Profile...
+22:14 < zane_> tnorris: nice. If this works, I motion that we push hard to get it into the official release.
+22:15 < tnorris> lol. don't think that will happen. but something like it would be good.
+22:16 < yesdog> oh
+22:16 < yesdog> fuck
+22:16 < yesdog> what the fuck
+22:16 < yesdog> GAAAAAAAAAA
+22:18 < tnorris> zane_: but I'll create a feature request and see how it goes.
+22:21 < lz> any good resources for someone completely new to RESTful API design?
+22:24 < carlo5> How do you remove text outside of html tags?
+22:25 < carlo5> hello?
+22:25 < lz> carlo5, example?
+22:27 < carlo5> (some head content HTTP/1.1 200 OK Date: Thu, 29 Nov 2012 22:24:14) <html> <body><div>hello</div></body></html>
+22:27 < carlo5> I just want to keep html
+22:27 < yesdog> you'll want to crawl the xml
+22:27 < yesdog> string.trim
+22:27 < yesdog> all textual content
+22:27 < yesdog> rebuild tree
+22:28 < carlo5> How would I get the contents on window to var
+22:29 < carlo5> $(window).text() ?
+22:29 < yesdog> crawl document.body 
+22:29 < yesdog> its a tree structure, that's youre DOM
+22:29 < yesdog> your*
+22:29 < carlo5> I am sorry I don't understand when you say crawl
+22:31 <@mbalho> carlo5: http://maxogden.com/scraping-with-node.html
+22:33 < yesdog> crawl as in walk
+22:33 < yesdog> like, iterate, but with trees
+22:33 < carlo5> ok, Thanks!
+22:33 < nphase> ...crawl as in walk
+22:33 < nphase> .....
+22:33 < aerolith> logical progression
+22:35 < CoverSlide> i like me some cheerios
+22:36 < yesdog> mmm
+22:39 < tnorris> zane_: so you running your process now and waiting for it to crash?
+22:39 < zane_> tnorris: yep, though I'm a bit afraid... without Forever running, I can't leave the computer lest it crash and not get restartted
+22:40 < MI6> joyent/libuv: Ben Noordhuis v0.8 * deb1c34 : sunos: fix uv_getaddrinfo() NULL pointer dereference - http://git.io/8UiN0w
+22:40 < MI6> joyent/libuv: Ben Noordhuis master * 44f0fcd : Merge branch 'v0.8'  Conflicts: 	src/unix/core.c (+3 more commits) - http://git.io/PE0YHA
+22:40 < CoverSlide> what if it never crashes? will you never leave your computer? even to poop?
+22:40 < yesdog> HER, oh, coo ?
+22:41 < tnorris> zane_: i'm checking forever settings. should be a way to let it know the path of node.
+22:41 < zane_> tnorris: sweet.
+22:42 < teko> hi all. ll
+22:42 < tnorris> zane_: ok, so it look like you can pass `-c "/path/to/node"`
+22:43 < teko> looking for production tips for node
+22:44 < CoverSlide> production?
+22:44 < tnorris> zane_: then you can double check that by `ps ax | grep node` and you should see the entire path running the script.
+22:44 < yesdog> #edmproduction 
+22:44 < teko> yes, running node on a machine for production. 
+22:44 < zane_> tnorris: I've never gotten that to work... eg, NODE_ENV=production forever start -c "/root/nodejs/node/out/Release/node index.js" -------> gives me a "usage" prompt
+22:45 < teko> how to make it run on startup, how to make sure it restarts if it fails. how to run it on port 80 securly (without running as root)
+22:45 < aerolith> heroku
+22:45 < CoverSlide> probably same tips as with any other framework
+22:45 < mmalecki> nodejitsu
+22:45 < flexd> mbalho: Are you the author of that scraping with node article/
+22:45 < tnorris> zane_: try not placing "index.js" in the quotes.
+22:45 < flexd> ?
+22:45 < CoverSlide> use monit/ upstart/ init.d / systemd whatever for your server
+22:46 < tnorris> upstart +1
+22:46 < mmalecki> teko: I did a talk on that yesterday, not sure if that's any helpful https://speakerdeck.com/mmalecki/fowa-2012-node-dot-js-in-production
+22:46 < CoverSlide> port 80 there's process.setuid, or you can use a proxy
+22:46 < yesdog> do upstart
+22:47 < mmalecki> or iptables
+22:47 < teko> thanks everyone. I'll look up your suggestions. anybody actually do that? apart from mmalecki, that is...
+22:47 < zane_> tnorris: hot damn, nice.
+22:47 < yesdog> http://howtonode.org/deploying-node-upstart-monit
+22:48 < tnorris> zane_: cool. it will automatically timestamp the heapdumps generated by FatalError, so you can see in what order they occur.
+22:48 < zane_> tnorris: I'm really excited, this is the first possible big step forward in a while
+22:48 < nphase> mmalecki: dtrace? you guys on joyent?
+22:48 < mmalecki> nphase: yup, and enjoying it :)
+22:48 < nphase> nice
+22:48 < CoverSlide> they are on joyent, rackspace, and aws
+22:49 < yesdog> rackspace = ewwww
+22:49 < nphase> mmalecki: are you guys on their smartos then
+22:49 < mmalecki> CoverSlide: we actually deleted most of our rackspace vms some time ago. but yes, we have the ability to run there
+22:49 < mmalecki> nphase: yup
+22:49 < mmalecki> and (mostly) enjoying it
+22:49 < CoverSlide> well the user always has the option though
+22:50 < CoverSlide> any hiccups with smartos?
+22:50 < mmalecki> if you run on 64bit version, compiled modules are kinda hard
+22:50 < mmalecki> but they work, mostly :)
+22:51 < tnorris> zane_: glad to hear it. hopefully the heapdump helps you figure out why the application is crashing.
+22:52 <@mbalho> flexd: yep why
+22:53 < flexd> Which node version are you using? I'm on 8.8.14 and it
+22:53 < flexd> it's just giving me an error :)
+22:53 <@mbalho> you should open an issue on the github repo associated with whatever module isnt working
+22:54 < flexd> Yeah, I'll investigate some more.
+22:54 < flexd> Looks like it's request doing something odd.
+22:58 < CoverSlide> 8.8.14? are you from the future?
+22:59 < flexd> CoverSlide: Yeees?
+23:00 < flexd> mbalho: also I solved the problem, 
+23:00 < flexd> It was me!
+23:00 < CoverSlide> PEBKAC?
+23:01 < flexd> Immediately requesting a URL from a empty array
+23:01 < flexd> Picking a random URL from a empty array oddly gives your nothing
+23:05 < flexd> Tada, https://www.evernote.com/shard/s156/sh/b1c7a598-d728-4c7f-8a8b-5b39401d7dcc/9db460f89f3b1623fb2dec269ab4f239 retarded motd.
+23:05 < flexd> also the new skitch sucks :/
+23:07 < tnorris> um, anyone else have a problem reaching w3.org?
+23:08 < flexd> not loading here
+23:08 < flexd> yet
+23:08 < SomeoneWeird> yeah
+23:08 < SomeoneWeird> down
+23:08 < flexd> http://downforeveryoneorjustme.com/w3.org
+23:08 < dz0ny> yep down (eu)
+23:09 < misterhat> weird
+23:10 < tnorris> seriously. anyone know of a mirror to the specs? makes it kind of a pain.
+23:12 < dz0ny> http://webcache.googleusercontent.com/search?q=cache:KRYuBQsIXv0J:www.w3.org&strip=1
+23:12 < dz0ny> just add strip to each page
+23:12 < tnorris> heh, interesting
+23:14 < garthk> Ok, time to refactor my silly EventEmitter into a fully operational Deat^Wevent stream.
+23:15 < flexd> DeathEvent?
+23:16 < tnorris> ‮‪‪‮freakin xkcd!
+23:16 < tnorris> ok, now I'm better.
+23:19 < flexd> also, eventemitter how I love thee.
+23:19 < nlf> frickin memory..
+23:19 < nlf> FATAL ERROR: CALL_AND_RETRY_0 Allocation failed - process out of memory
+23:20 < CoverSlide> you should probably download more memory
+23:20 < nlf> i totally should
+23:20 < flexd> How about more bits?
+23:21 < SomeoneWeird> you has a leak somewhere
+23:21 < nlf> apparently
+23:25 < nlf> oh super, fixed that and now i just get a segmentation fault
+23:26 < nlf> today is going well for me
+23:26 < tnorris> lol, some days are awesome.
+23:33 < zane_> tnorris: snapshot achieved!
+23:33 < tnorris> zane_: man, crashed already?
+23:33 < zane_> tnorris: (un)lucky? haha
+23:33 < tnorris> well, cool. load that sucker up and let me know how it looks.
+23:35 < eckoit> I am creating a pretty standard file converter. Are there any npm packages that help me with the boilerplate work of looping through dirs, writing to target dirs, etc.
+23:36 < zane_> tnorris: holy crap, this thing is 27Mb, and I have no idea how to read it haha
+23:36 < tnorris> zane_: the profile is 27MB? mother effing. that is huge.
+23:37 < zane_> tnorris: you're not kidding
+23:38 < tnorris> zane_: I'd might suggest taking a heapdump using node-heapdump soon after startup and just start by looking for differences.
+23:38 < zane_> ok... It's not until 85% of the way thru that I see anything other than numbers, etc... then it looks like somewhat reasonable memory contents
+23:39 < zane_> tnorris: any suggestions on an app / script to convert this into a more readable format than text edit?
+23:39 < tnorris> zane_: text edit? what? no, load that sucker into the Chrome Profiler.
+23:39 < tnorris> open google chrome, hit F12, click Profiles, right click and click "Load Profile..."
+23:42 < niallo> anyone getting SSL errors trying to install from npm ?
+23:43 < othiym23> niallo: hold on, will check
+23:43 < zane_> tnorris: holy hell. 114,062 strings comprising 33% of the overall object count.
+23:43 < tnorris> zane_: well, there you go.
+23:43 < othiym23> niallo: everything's working peachily for me
+23:43 < TehShrike|Work> You know what makes me sad/mad?  Modules that concatenate strings together to make file paths instead of using path.join
+23:43 < niallo> othiym23: must be my local net. on some random wifi. thx
+23:44 < othiym23> niallo: np
+23:44 < tnorris> zane_: also, at the bottom you can select Dominators to see what is using the most mem.
+23:47 < shama> eckoit: Yes, Grunt.
+23:48 < teko> \n
+23:48 < zane_> tnorris: sorry for my newbishness here... I'm having a hard time determining what is nested. Eg, dominators has 1 object @ root that is 97% of "retained size" yet the contents are each objects which don't give me much clue as to what the parent object (owner) is... eg, I can't tell what the retained object is
+23:49 < zane_> tnorris: if I click on that root object, and look @ the "retaining" tree, " just get a "grobal in @8647" object, not telling me much
+23:49 < teko> warning, newbie question... which IDE are you using on ubuntu to write node programs?
+23:50 < tnorris> zane_: see if this helps: https://developers.google.com/chrome-developer-tools/docs/heap-profiling
+23:50 < tnorris> teko: vim
+23:52 < TehShrike|Work> Oh wow.  Wrench assumes that directories in names will always be separated by forward-slashes.
+23:52  * TehShrike|Work gets stabbity
+23:53 < TehShrike|Work> Oh no - it assumes that directories in paths will always be separated by either forward-slashes or backslashes, but never both
+23:53  * TehShrike|Work keeps stabbing
+23:53 < Raynos> when using redis
+23:53 < Raynos> is it bad to create more then one client per process?
+23:54 < CoverSlide> not at all
+23:55 < CoverSlide> in fact, you'll need an extra client if you plan on using pub/sub mode
+23:58 < mdedetrich> hi everybody!
+23:58 < tnorris> how do I run a command? with ">"?
+23:58 < tnorris> >new Buffer(0xFFFFFFF).length
+--- Log closed Fri Nov 30 00:00:37 2012
