@@ -1,0 +1,1044 @@
+--- Log opened Sat Dec 22 00:00:03 2012
+00:16 < deoxxa> ljharb: scottcorgan: you probably want to throw that into a process.nextTick()
+00:17 < ljharb> deoxxa: i thought a setTimeout is better - i saw something about not using nextTick so liberally
+00:17 < ljharb> but yeah, true
+00:17 < scottcorgan> deoxxa: which part?
+00:17 < deoxxa> function (foo, callback) { process.nextTick(function() { var error = null, data; try { data = JSON.parse(foo); } catch (ex) { error = ex; } callback(error, data); }); }
+00:18 < windsurf_> is it bad to define a namespace like com.foo and then in a file (module) define a class in that namespace to circumvent using require ? What are the negative implications of doing this?
+00:18 < ljharb> "it looks like java" is pretty negative
+00:18 < deoxxa> ljharb: do you have any information on the nextTick vs setTimeout stuff?
+00:18 < ljharb> and trying to circumvent require means the negatives == the opposite of the benefits of require
+00:18 < windsurf_> memory concirns?
+00:19 < othiym23> no, but lots of software engineering concerns
+00:19 < ljharb> windsurf_: encapsulation concerns. your suggestion is a bad design.
+00:19 < ljharb> deoxxa: well, i saw something in node 0.10 that nextTick will behave differently
+00:19 < deoxxa> windsurf_: let's code like it's 1997! \o/
+00:19 < othiym23> it makes for poor factoring and overly large and complex modules
+00:19 < othiym23> require encourages loose coupling
+00:19 < othiym23> loose coupling makes it easier to adapt your modules to different loading styles, like AMD
+00:20 < windsurf_> so, best to do exports.MyClass then outside of that MyClass = require("foo/MyClass") then foobar = new MyClass() ?
+00:20 < othiym23> ljharb: 0.10 will have setImmediate(), which will be a good substitute for process.nextTick() in a subset of cases
+00:21 < ljharb> othiym23: ah, i shim that in anyways
+00:21 < othiym23> if you're spamming process.nextTick a whole bunch of times in a row to break a computation task down into pieces or whatever (the lazy dev's mapreduce), setImmediate() is a better solution, because it allows other handles to be processed by the event loop
+00:21 < ljharb> ah yes - it was something about nextTick's priority
+00:21 < othiym23> setImmediate != setTimeout(fn, 0) != process.nextTick
+00:22 < othiym23> yeah, the nextTick queue gets processed before libuv hands control back to the v8 event loop
+00:22 < ljharb> right
+00:22 < ljharb> also yeah, setTimeout has only a 4ms guarantee anyways
+00:22 < aandy> the opposite .previousTick never really caught on
+00:23 < ljharb> lol
+00:23 < othiym23> windsurf_: module.exports = MyClass -> var MyClass = require('myclass') ; var foobar = new MyClass();
+00:23 < othiym23> that's what I do
+00:23 < othiym23> one thing exported per module
+00:23 < othiym23> maybe if you have a module that does multiple things, attach them onto the main thing
+00:23 < ljharb> then you still break the small things into separate modules, and mesh them together in another module
+00:23 < windsurf_> othiym23: thx
+00:24 < othiym23> so function MyClass() {}; MyClass.HelperClass = HelperClass; yadda yadda
+00:24 < othiym23> aandy: I don't see why, I would have already used that alll the time
+00:24 < othiym23> I would love for my code to have negative overhead
+00:24 < Guest84416> hey guys
+00:24 < Guest84416> anyone here?
+00:24 < aandy> i know, right? people talking about db's to store history and old data. i just ask, why not use previousTick?
+00:25 < othiym23> aandy: http://en.wikipedia.org/wiki/COMEFROM
+00:25 < aandy> haha, nice
+00:26 < samholmes> Is it a good idea to design a pub-sub system on top of dnode?
+00:26 < othiym23> "computed COMEFROM"
+00:26 < othiym23> samholmes: why wouldn't it be?
+00:26 < othiym23> samholmes: although these days I'd probably just use Redis + node-redis instead
+00:26 < aandy> pubsub's just http requests, isn't it?
+00:27 < samholmes> othiym23: I'm actually talking about browser and server communication.
+00:27 < othiym23> aandy: pubsub works best over a websockets implementation so you get your events delivered when they happen
+00:27 < samholmes> aandy: It would be more in the area of real-time communication
+00:27 < samholmes> aandy: what he said ^
+00:27 < aandy> othiym23: i agree, but that's not the spec though?
+00:27 < db42> what is prevtick ?
+00:27 < othiym23> samholmes: socketstream might do what you want out of the box
+00:27 < othiym23> aandy: there's a pubsub spec? ;)
+00:27 < othiym23> db42: only in aandy's dreams
+00:28 < db42> ohh rofl
+00:28 < aandy>  http://pubsubhubbub.googlecode.com/svn/trunk/pubsubhubbub-core-0.3.html?
+00:28 < cxreg> i have some code that appears to be eating an exception.  there's no try {} block that i can find, and although there is an uncaughtException handler (domain actually), it's not being fired.  the process does not exist.  the exception simply disappears.  any idea how to determine what happened to it?  i'm trying to instument TryCatch and FatalException but no luck so far
+00:29 < cxreg> *does not exit
+00:29 < othiym23> cxreg: is there something else creating a domain?
+00:29 < othiym23> domains do not nest the way most people expect them to, it seems
+00:29 < cxreg> hm, i should check the domain stack length
+00:29 < othiym23> only one domain is active at a time
+00:29 < cxreg> yeah i know.  i actually wrote some nice sugar to rethrow to upper domains, when i want that to happen.. i should publish that
+00:29 < othiym23> so if something's nesting a domain inside the one you know about, it could be missing an error handler and just swallowing the error
+00:30 < cxreg> yeah
+00:30 < othiym23> cxreg: when you say TryCatch, are you talking about crabdude's module?
+00:30 < aandy> actually wished the rss pubsub catched on. stupid pulling
+00:32 < cxreg> othiym23: no, i mean node.cc
+00:33 < othiym23> ah
+00:33 < othiym23> this sounds like a quest born out of extreme frustration ;)
+00:33 < othiym23> so you've added your own uncaughtException handler to see if it's bubbling up to that level?
+00:34 < othiym23> if there's not a try/catch, not an error handler on a domain, and it's not bubbling up to the uncaughtException handler, there's probably something else interposing itself somewhere you haven't found it yet
+00:34 < othiym23> do you have a gist you can share?
+00:35 < JamesS227> Hi, does anyone know a way to have node.js restart itself, or do I need a wrapper?
+00:36 < othiym23> JamesS227: use a wrapper
+00:36 < JamesS227> Thanks
+00:36 < aandy> wrapper or take care of your exceptions (if that's what causing it)
+00:36 < othiym23> upstart / systemd / launchd if they're available, a shell script if they're not, and forever or nodemon if you absolutely have to
+00:36 < aandy> re-require is also an option if that's what you need to restart for
+00:36 < JamesS227> I need restart on a config file change
+00:36 < JamesS227> *change
+00:37 < aandy> you have a function to read/load the config? any reason you can't call it twice?
+00:37 < JamesS227> How do I re-require?
+00:37 < cxreg> othiym23: unfortunately i dont have a minimal case right now, just a huge pile of code
+00:37 < cxreg> ill try to boil it down
+00:37 < aandy> not saying "rehashing" is a good idea, just for the sake of an argument
+00:37 < aandy> yes, you'd be deleting the module from your cache, then require again
+00:38 < aandy> require.cache
+00:38 < JamesS227> Do you know how I can do that? And would it require downtime?
+00:38 < cxreg> it cant be done from out of process without code to make it happen
+00:39 < aandy> hypothetically your variable would be unavailable while assigning, but i'm not sure that'd be an issue unless the require itself changes other variables 
+00:39 < othiym23> if you rewrite your configuration module to use fs.readFile[Sync], you could bind it to process.on("USR2") and then just use ps to tell it to restart
+00:39 < JamesS227> So would it be via a wrapper or inside node.js itself 
+00:39 < othiym23> easy peasy
+00:39 < othiym23> or HUP, I guess
+00:39 < othiym23> sorry, kill, not ps
+00:39 < othiym23> that is a way you could do it entirely inside Node
+00:40 < JamesS227> Thanks. That's awesome
+00:40 < aandy> var http = require('http'); require.cache['http'] = undefined; http = require('http');
+00:40 < aandy> for instance
+00:40 < othiym23> directly messing with the module cache makes people like me who have to patch the module loader very sad
+00:41 < JamesS227> I can see why :P
+00:41 <@konobi> something somethings makes konobi something something
+00:41 < othiym23> thank you for your valuable insight, konobi 
+00:42 < Raynos> whats the easiest way to copy paste multiline text content from a terminal into a node repl as a string
+00:42 < Raynos> I keep doing "{{line}}\n" + manually
+00:42 < aandy> JamesS227: on the wrap part: not necessarily, depends how your app is ordered. but still, load balancing, having two instances, pushing new code to one, gracefully shutting down the other, update other, then 2x live again, is best
+00:43 < JamesS227> I currently have a config.js with 4 export variables, would it be better to have just an ini file or yaml file, for instance
+00:43 < aandy> i have a legacy eggdrop, which is rehashed constantly. i frequiently have to restart that bastard to fix bad scripts duping :p
+00:43 < aandy> JamesS227: json is fine
+00:44 < JamesS227> Would config files or javascript files be more reliable? And/or faster?
+00:44 < othiym23> JamesS227: if you can make it JSON, that means your config loading method becomes essentiall fs.readFile(path, function (err, contents) { return JSON.parse(contents) })
+00:44 < ljharb> JamesS227: use a json file
+00:44 < JamesS227> Okay, thanks. That's probably a better option.
+00:44 < aandy> i go as native as i can, but that's a just a personal preference
+00:44 < cxreg> othiym23: obviously /something/ is going wrong.  this produces no output: https://gist.github.com/4356821
+00:44 < othiym23> I'm a rebel, so I use JavaScript, so I can comment my config files
+00:45 < cxreg> othiym23: that is an isolated snippet, but even still...
+00:45 < aandy> gasp
+00:45 < aandy> othiym23: i bet you get all the g/*uys*/irls
+00:45 < ljharb> othiym23: you can comment them in json. just make an ignored property :-)
+00:45 < JamesS227> Sick
+00:46 < othiym23> ljharb: that is a twisted perversion I refuse to countenance
+00:46 < othiym23> fuckin' Crockford, man
+00:46 < ljharb> lol
+00:46 < ljharb> well, ideally, you don't need comments. comments are a code smell pointing to badly named vars and properties :-)
+00:46 < othiym23> cxreg: that should definitely work
+00:47 < substack> ljharb: agreed
+00:47 < substack> occasionally comments are appropriate
+00:47 < substack> but they are mostly overused
+00:47 < ljharb> rarely they are, but yeah, often not.
+00:47 < othiym23> ljharb: my config file is meant for consumption by people outside my organization, and the comments are documentation as to what the config variables mean
+00:47 < JamesS227> I know I comment all my node.js, easier to find bugs
+00:47 < aandy> comments telling me that _functionname is "private" (but not closure) and functionname is "public" are the best comments of all
+00:48 < othiym23> a magical elf space wizard in the intertubes generates it for our more newbish users when they first get their app up and running with my thingamabob
+00:48 < cxreg> othiym23: yeah i know... in a program with /just/ that code, it works fine.  something is going .... bad
+00:49 < cxreg> oh well ill have to figure it out later.  im worried that i triggered some bug i node itself, or in a C-based npm library i'm using
+00:50 < JamesS227> And also, is it possible to keep a local NPM repo?
+00:50 < cxreg> npm can install from any url or file path
+00:50 < othiym23> cxreg: the part the confuses me is that the error event on the domain isn't firing for me
+00:51 < samholmes> othiym23: How is socketstream different from sockjs, or socket.io?
+00:51 < cxreg> othiym23: wait, for my sample code you mean?
+00:52 < othiym23> cxreg: yeah, but that's probably because I'm running it in the REPL
+00:52 < cxreg> hm.
+00:52 < othiym23> samholmes: it's a higher-level abstraction
+00:52 < cxreg> anyway ill keep putting debug prints in the node vm and see if i can narrow it down
+00:52 < cxreg> ill let you know if i find anything
+00:52 < othiym23> heh cool
+00:53 < samholmes> What I'm doing right now, which seems bad, is exposing a event emitter to dnode clients which allows them to listen (sub) to events emitted (pub) by the server.
+00:53 < othiym23> I've put a lot of time into understanding domains and they're still pretty confusing
+00:53 < JamesS227> What would be the best OS for node.js if I start up an ec2 instance?
+00:53 < samholmes> othiym23: I kinda like low level stuff though.
+00:54 <@Nexxy> s5fs, fork it, why bother
+00:54 < samholmes> I'm only wondering, in a pubsub how do I only let a subset of the total messages published be recieved by subscribers?
+00:55 < othiym23> JamesS227: trick question; start up a SmartMachine on Joyent's cloud so you can use SmartOS / DTrace / mdb
+00:55 < othiym23> JamesS227: non-trick answer: probably Ubuntu, so you can use chrislea's PPA to install Node
+00:55 <@Nexxy> samholmes, channels
+00:55 < JamesS227> othiym23: Thanks
+00:55 < samholmes> Nexxy: in the design I have now, channels would be the event names on the emitter.
+00:56 <@Nexxy> sadtrombone.mp3
+00:56 < samholmes> Nexxy: But the filtering is content-based not channel based.
+00:57 < othiym23> samholmes: the way you're describing the problem, it's kinda like you're saying "I need to stop this hammer from hitting my arm, but I gotta keep hammering on my arm here"
+00:57 <@Nexxy> sounds liek you need something with moar logic than just a pubsub
+00:57 < othiym23> I mean, channels are how you restrict the set of information pushed down an event channel with socket.io
+00:57 <@Nexxy> e.g. make each filter a channel
+00:57 <@Nexxy> allow clients to subscribe to multiple channels
+00:57 <@Nexxy> to compose the filter you need
+00:58 < othiym23> what Nexxy said
+00:58 < othiym23> although I like my terrible analogy
+00:58 < samholmes> Am I going about this all wrong by using dnode and event emitters?
+00:58 <@Nexxy> stop hitting yourself, stop hitting yourself, stop hitting yourself
+00:58 < s5fs> Nexxy: hai
+00:59 <@Nexxy> s5fs, o hey
+00:59 < substack> samholmes: probably
+01:00 < s5fs> I'm having trouble getting socket.io to work over ssl. I'm running express on port 8443 and also binding socket to port 8443. Is this allowed, and do I need to pass the certs to socket like I do the https server?
+01:00 < samholmes> othiym23: You mentioned, socket.io, how does it restrict access to certain channels based on what a subscriber is authorized as?
+01:00 < substack> samholmes: just use mux-demux to create the channels over shoe
+01:00 <@Nexxy> make io listen to the server
+01:00 < substack> then use dnode for one of those channels
+01:00 < othiym23> it's not a matter of authorization, it's just that different listeners subscribe to different channels
+01:00 < othiym23> and you only push events on certain channels
+01:00 <@konobi> $9 for an ssl cert these days... not bad
+01:00 < s5fs> Nexxy: how? just pass the server in?
+01:01 < othiym23> also what substack said, I was just about to suggest mux-demux, which would let you create channels with a pure websockets setup
+01:01 < s5fs> konobi: yeah but if it doesn't turn my address bar green then it's not secure ;-)
+01:01 < samholmes> konobi: No way, where?
+01:01 <@konobi> samholmes: cheapssls.com
+01:02 < s5fs> Nexxy: i think i have it, hang tite for more silly questions!
+01:02 <@Nexxy> haha
+01:02 < samholmes> substack: I hear you always mention mux-demux, but I have no primer on the subject of multiplexing. So, I'm always a bit scared of this module. >.<
+01:02 < s5fs> Nexxy: this is a simulated network server, so i'm not super interested in making it right. this is just a hack so we can demo to the customer. i loathe demo hackery.
+01:02 < substack> samholmes: multiplexing is the easiest thing
+01:02 < substack> mux-demux just lets you fit multiple streams into a single stream
+01:03 < substack> and then on the other end you take the single stream and unpack it back out into multiple streams again
+01:04 < samholmes> substack: Can't you already do this with piping?
+01:05 < substack> samholmes: no
+01:05 < substack> pipes don't let you pack multiple streams into a single stream
+01:06 < samholmes> Can't you pipe multiple steams into one by doing: a.pipe(b); a.pipe(c); ... ?
+01:06 < samholmes> I never tried this, but I'm just guessing
+01:07 < substack> samholmes: that's multicast
+01:07 < substack> multiplexing is where you have multiple streams but only a single pipe to pack the streams into
+01:07 < substack> a and b need to both squeeze through c
+01:08 < substack> for if the number of websocket connections you can open is limited, which it is
+01:08 < samholmes> Woops, I'm sorry, I meant: b.pipe(a); c.pipe(a);
+01:08 < JamesS237> I have a master instance and several client instances running a node.js and mongo stack. How can I communicate between the master and the children
+01:08 < jcrew> not sure if it helps sam, but it is the same concept as AM radio
+01:09 < samholmes> I think.
+01:09 < samholmes> AM radio?
+01:09 < jcrew> you can stuff multiple sets of data into on frequency, or pipe, but encode it differently to extract which 'station' or stream it is really from
+01:10 < substack> samholmes: that doesn't work because the remote end of `a` won't be able to tell which messages came from `b` and which came from `c`
+01:10 < astropirate> Is anyone hiring? Feel free to PM me!
+01:10 < JamesS237> I have a master instance and several client instances running a node.js and mongo stack. How can I communicate between the master and the children
+01:10 < substack> so you need a library to add framing information
+01:10 < samholmes> substack: Oh I get it now. After jcrew's anology it hit me. It's all about demuxing
+01:11 < samholmes> The major distinction here is being able to demux a muxed stream
+01:11 < JamesS237> You'd need to get the info as its being piped and add a var to it, not sure how it'd work though 
+01:13 < JamesS237> > I have a master instance and several client instances running a node.js and mongo stack. How can I communicate between the master and the children
+01:15 < prismatictrail> anyone have `. <(npm completion)` working with npm 1.1.59
+01:15 < prismatictrail> ?
+01:15 < JamesS237> ??
+01:16  * samholmes doing bank stuff
+01:17 < s5fs> Nexxy: dammit it all! totally got it but wasted time b/c the stupid udp server wasn't running!
+01:17 < JamesS237> > I have a master instance and several client instances running a node.js and mongo stack. How can I communicate between the master and the children
+01:22 < JamesS237> > I have a master instance and several client instances running a node.js and mongo stack. How can I communicate between the master and the children? Would I use RabbitMQ?
+01:24 < JamesS237> Anyone?
+01:26 <@konobi> JamesS237: don't repeat questions, just wait
+01:26 < jcrew> JamesS237: what are you trying to get them communicating about?
+01:28 < JamesS237> Just a heartbeat, sorry for the repeat
+01:31 <@konobi> not much information to go on
+01:31 < JamesS237> I've looked at RabbitMQ but I don't think it's suitable
+01:33 < JamesS237> What do you need?
+01:33 <@konobi> same host? different hosts? are all the apps doing the same thing? why do you need a hearbeat?
+01:34 < JamesS237> Different hosts, all are doing the same thing, just different subdomain, to make sure they're functioning without errors
+01:34 <@konobi> hosts as in different servers?
+01:34 < jcrew> just trying to do monitoring?
+01:35 < jcrew> not mirroring or anything?
+01:35 < samholmes> substack: Even if I do mux-demux, I still have the problem of not being able to restrict access to certain streamed data. I want to restrict data to be string to only clients who are authorized to recieve that data.
+01:35 < JamesS237> Different serves completely
+01:35 <@konobi> JamesS237: how are you going to deal with apps that aren't working correctly?
+01:36 < JamesS237> Restart them, and if there is an error, alert me, the admin, what the error is.
+01:36 <@konobi> restart how?
+01:37 < JamesS237> I have them running in forever, so I have it ssh in and restart it 
+01:37 < JamesS237> I just mean
+01:38 < JamesS237> I just need a way to have two way communication (preferably in json) over the web
+01:40 <@konobi> mkay... how about monitoring from elsewhere (other monitoring infra)
+01:41 < juancho> hello every one :) i have a question on express... is there some one who can help me on this?
+01:42 < JamesS237> Yeah, what's the problem
+01:42 < jcrew> JamesS237: something like nagios would be ideal for it
+01:43 < juancho> thanks in advance jcrew... this is the situation, actually i have a page with express, but i want to write some code in it like in stack overflow .... 
+01:43 < JamesS237> Okay cool, is that a bit big?
+01:43 < juancho> i tried with this http://www.1stwebdesigner.com/css/16-free-javascript-code-syntax-highlighters-for-better-programming/
+01:43 < jcrew> it's full on monitoring software, it will help you make sure the macine is in a good state as well the server (it requires you configure it)
+01:44 < jcrew> if you don't need that or want to get heavy into config then it's going to be heavier than what you need
+01:44 < jcrew> juancho: what do you mean 'write some code into it'?
+01:44 <@konobi> replying to a hearbeat, does not a healthy process make
+01:44 < juancho> the problem is that i need to make a tag called pre ... and after that just write some code in any language
+01:45 < juancho> and the code in the page will be highlighted
+01:45 < juancho> like in stack overflow
+01:45 < juancho> or wordpress
+01:45 < jcrew> that really doesn't have much to do with express other than express serving up the page
+01:45 < juancho> yes thats right
+01:45 < juancho> iam using jade
+01:46 <@konobi> that's done with client-side JS
+01:46 < gildean> JamesS237: you could add a websocket-ping/json-messages to the app
+01:46 < gildean> and a simple server to send/recieve them
+01:46 < juancho> when i try to do this with jade my code is always rendered
+01:46 < juancho> i want a peace of my markup not to be rendered
+01:46 < juancho> with jade
+01:46 < JamesS237> juancho: http://shjs.sourceforge.net and then you can <pre class="ss_cpp"> </pre> for c++
+01:47 < JamesS237> Could I use a raw tcp connection
+01:48 < gildean> JamesS237: yeah, why not, leveraging websockets tends to be easier imo, as you can easily add things like http-basic-auth etc. to the mix
+01:48 <@konobi> JamesS237: your process could respond to hearbeats, but not actually be serving anything, or bloating, etc.
+01:49 < JamesS237> All I need to send is { "host": 1, "status": "
+01:49 < juancho> JamesS237>  my code inside pre is always rendered as a jade markup to the html in the page.... for example in jade will be pre function SomeFunction() {}; the render result would be <pre> <function> SomeFunction(){}</function> 
+01:50 < juancho> i need inside my pre peace of code not to be rendered as the rest of my jade
+01:50 < deoxxa> lol jade
+01:50 < deoxxa> the little templating language that couldn't
+01:50 < jcrew> deoxxa: what's wrong with jade?
+01:51 < gildean> juancho: did you check jade docs, they mention a couple of ways to include plain text
+01:51 < deoxxa> jcrew: all html, all the time! woooo!
+01:51 < jcrew> haha
+01:51 < juancho> gildean> i will check again i did not see how to do it
+01:51 < juancho> thanks :)
+01:51 < deoxxa> becuase nobody writes templates for anything else
+01:51 < deoxxa> ever
+01:51 < deoxxa> right?
+01:53 <@konobi> JamesS237: there's a bunch of ways you could do it, tcp, socketio, websockets, udp, etc... 
+01:54 < jcrew> udp for monitoring might be kind of bad
+01:54 < JamesS237_> Okay, I just need an opinion.
+01:54 <@konobi> don't do it in node
+01:54 <@konobi> use something else
+01:55 < niggler> what's with this udp hate?
+01:55 < jcrew> use fortran
+01:55  * niggler <3 fortran
+01:55 < jcrew> niggler: i like udp, but for monitoring i wouldn't go with udp
+01:55 < niggler> udp is perfectly acceptable for monitoring
+01:55 <@konobi> well, depending on frequency
+01:55 < jcrew> yea i guess if you want to get false 'not responding' messages once in a while
+01:55 < niggler> you attach your own sequence numbers, saving yourself from using a tcp stack
+01:56 <@konobi> i send one every 10 seconds... after 30 seconds of no response, investigate
+01:57 < niggler> then it really doesnt matter konobi
+01:57 <@konobi> JamesS237_: zabbix
+02:04 < juancho> gildean> thanks you where right i found a way out to write plain text with jade in my markup :)...
+02:04 < gildean> np
+02:42 < Raynos> isaacs: why is npm so slow for git repos?
+02:43 <@konobi> git cloning is slow
+02:46 < cainus> yo Raynos!
+02:46 < cainus> thanks for the feedback on the list
+02:48 < Raynos> cainus: list? what list
+02:48 < Raynos> cainus: who even are you.
+02:48 < cainus> ha.. the percolatorjs guy
+02:48 < cainus> mailing list I meant
+02:50 < Raynos> oh ok.
+02:52 < Raynos> konobi: it takes like 2 minutes to npm install one module from git
+02:52 <@konobi> Raynos: then download a tarball instead
+02:53 < Raynos> I see
+02:53 < Raynos> ill see if I can find the tarball uris
+02:56 < vrlogrs> hi guys
+02:56 < vrlogrs> would like to show some node.js skills: http://www.funnode.com/
+02:57 < vrlogrs> and, if anyone's looking for a node.js freelancer, let me know :)
+02:58 < vrlogrs> all the games are done with node.js
+03:05 < Raynos> can I tell npm my HTTPS credentials to install private github tarballs?
+03:12 < kanzure> Raynos: github rolled out a feature where you don't need to use https for that anymore
+03:12 < Raynos> oh
+03:12 < kanzure> Raynos: http://stackoverflow.com/questions/9400474/heroku-git-submodule-needs-authentication/10111002#10111002
+03:13 < kanzure> https://github.com/blog/1270-easier-builds-and-deployments-using-git-over-https-and-oauth
+03:15 < Raynos> that requires embedding auth details in the uri :(
+03:17 < kanzure> Raynos: then use "deploy keys" https://help.github.com/articles/managing-deploy-keys
+03:24 < samholmes> Lets say I had a pubsub channel called "message" how would I publish to this channel, but only let some subscribers recieve the message? It would need to secure the message so that a person with trivial hacking skill could by-pass the restriction.
+03:26 < cainus> don't let people subscribe to channels they shouldn't get messages for
+03:45 < Raynos> samholmes: you auth users before they subscribe
+03:46 < Raynos> or you encrypt every message
+03:48 < mistertwig> would it be a good idea to make a wrapper for socket in net or just make a wrapper
+03:50 < mistertwig> i mean
+03:50 < mistertwig> or extend it
+03:50 < mistertwig> :P
+04:25 < JamesS237> Does anyone working on node.js know an estimate release of a stable 0.9?
+04:26 < TehShrike> Probably depends on how many bugs there are :-)
+04:26 < TehShrike> Release cycles have seemed pretty reactive so far, though
+04:27 < niggler> 0.9 isnt stable
+04:27 < niggler> you mean 0.10 JamesS237
+04:27 < JamesS237> Yeah, thats what i mean
+04:28 < JamesS237> sorry
+04:29 < JamesS237> So when do you think 0.10 will be ready?
+04:30 < TehShrike> isaacs really seems to be plugging away at the streams thing.  I don't know if there are other major updates coming through the pipes, but I wouldn't be surprised if it was in a everyone-should-be-using-it-state within a month or two.
+04:30 <@Nexxy> JamesS237, you're going to ruin the surprise
+04:30 <@Nexxy> just let it happen
+04:30 < TehShrike> This concludes (temporarily) my completely uneducated guessing.
+04:31 < JamesS237> Thanks guys
+04:31 < deoxxa> i can't wait for the onslaught of bug reports when streams2 lands
+04:31 < deoxxa> it'll be popcorn.gif to watch
+04:32 < JamesS237> Yep, first releases always contain LOTS of bugs, 99% of the time
+04:34 < rphillips> does node cache tls conncetions? then attempt to renogitate TLS on these connections?
+04:39 <@konobi> rphillips: depends
+04:39 <@konobi> http://nodejs.org/api/tls.html#tls_client_initiated_renegotiation_attack_mitigation
+04:41 < rphillips> is this in 0.6.17 also?
+04:41 <@konobi> check the 0.6.17 docs
+04:41 < rphillips> k
+04:42 < rphillips> hmm. it is
+04:42 < JamesS237> rphillips: Why are you still using 0.6.17 though? 0.8.* is the stable release
+04:42 < rphillips> it's on a product in production
+04:42 < rphillips> and we haven't upgraded yet
+04:43 < JamesS237> oh, i see.
+04:43 < JamesS237> I would really recommend updating soon
+05:13 < FunnyLookinHat> Anyone have a good way to profile a JS game engine?  I'm getting random choppy lag when I try to use socket.io based updates to my sprites -but it seems to work fine when running only locally
+05:13 < FunnyLookinHat> I have a feeling that socket.io is somehow causing my game loop to get slowed down
+05:16 < andrew12> is there any simple way to do cp -r asynchronously in node, keeping file modes and subdirectories intact?
+05:16 < andrew12> maybe there's some sort of npm package that helps with these kind of things..
+05:20 <@konobi> FunnyLookinHat: webkit-dev-agent
+05:20 <@konobi> andrew12: you could always spawn cp
+05:21 < andrew12> but that's uglyyy
+05:21 < tnorris> running `make doc` is taking forever. anyone have a tip why or how I can speed it up?
+05:21 <@konobi> andrew12: ? how so?
+05:21 < andrew12> it's hacky
+05:21 < andrew12> but i guess it's a lot less ugly than tons of callbacks and async craziness >.<
+05:23 <@konobi> doesn't seem hacky to me... that's what it's designed for
+05:24 < TehShrike> So, explain to me the meaning of cp in this context
+05:24 < andrew12> I guess
+05:24 < andrew12> TehShrike: the cp command on linux, to copy files
+05:24 < TehShrike> aah, thanks
+05:40 < yarco> hi, do i need to always use underscore to test a variable when use mongodb with nodejs?
+05:40 < clusterprob> in REPL, yes
+05:40 < yarco> if (!_.isEmpty(err)) ...
+05:40 < yarco> :(
+05:40 < TehShrike> test a variable?
+05:40 < timeturner> wtf no
+05:41 < timeturner> if(!err)
+05:41 < yarco> but if err = {}
+05:41 < TehShrike> yarco: what do you want to test for?
+05:41 < TehShrike> An object with no properties?
+05:41 < timeturner> mongodb returns an error object or null
+05:41 < yarco> yes
+05:41 < timeturner> only two choices
+05:41 < andrew12> object.length == 0
+05:41 < timeturner> no other choices from mongodb
+05:42 < TehShrike> I dunno about mongodb, in JS you'd probably just do something like obj.getOwnPropertyNames().length === 0 or something
+05:42 < andrew12> you can just do obj.length === 0
+05:42 < andrew12> or not
+05:42 < timeturner> obj.length == 0 is sufficient
+05:42 < yarco> but collection.findOne(…, function(err, coll) { if (err)  <= this err == {}
+05:42 < andrew12> timeturner: i'm getting undefined in repl
+05:43 < timeturner> undefined and null are coerced to the boolean primitive: false
+05:43 < timeturner> that's a JS thing
+05:43 < andrew12> i'm getting null for {}.length
+05:43 < TehShrike> It's called coercion, but really those values are totally cool with it
+05:43 < TehShrike> Yeah, I don't see length anywhere here https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Object
+05:44 < yarco> i dont like {} to be evaluated as true
+05:44 < timeturner> I don't know about objects actually
+05:44 < TehShrike> Right
+05:44 < andrew12> yarco: why are you getting {} as an error anyways
+05:44 < TehShrike> length isn't an object property
+05:44 < timeturner> but arrays have the length property
+05:44 < TehShrike> You want .keys().length or .getOwnPropertyNames().length
+05:44 < andrew12> do you ever get anything that isn't {}? you could just check that it === {} rather than _.isEmpty
+05:45 < TehShrike> andrew12: that's not true
+05:45 < TehShrike> {} != {}
+05:45 < TehShrike> >> {} === {}
+05:45 < purr> TehShrike: SyntaxError: Unexpected token ===
+05:45 < SomeoneWeird> lol
+05:45 < TehShrike> *eyeroll*
+05:45 < SomeoneWeird> >> ({} == {})
+05:45 < purr> SomeoneWeird: (boolean) false
+05:45 < andrew12> TehShrike: wtf
+05:45 < timeturner> wtfjs.com
+05:45 < SomeoneWeird> yeah, doesn't work
+05:46 < andrew12> +1 timeturner
+05:46 < TehShrike> andrew12: yeah, comparing objects is more complicated than that, sadly
+05:50 < andrew12> > "3" -+-+-+ "1" + "1" / "3" * "6" + "2"
+05:50 < andrew12> '42'
+05:57 < SomeoneWeird> >> "3" -+-+-+ "1" + "1" / "3" * "6" + "2"
+05:57 < purr> SomeoneWeird: (string) '42'
+05:57 < SomeoneWeird> i think the bot died
+05:57 < SomeoneWeird> >> 1+1
+05:57 < purr> SomeoneWeird: (number) 2
+05:57 < TehShrike> >> "TehShrike is awesome"
+05:57 < purr> TehShrike: (string) 'TehShrike is awesome'
+05:57 < TehShrike> awwww yeah.
+05:59 < timeturner> >> "purr"
+05:59 < purr> timeturner: (string) 'purr'
+06:01 < FunnyLookinHat> So I have a game loop - and it runs really smoothly for a long while, but it eventually gets pretty laggy ( drops to like 10 fps from 60 ) - resizing the window fixes it though - any ideas?
+06:02 < clusterprob> reinitialize the loop
+06:02 < FunnyLookinHat> clusterprob, I guess I'm wondering what I could detect to stop and restart the loop
+06:02 < TehShrike> FunnyLookinHat: well, it depends on what you're doing in the loop :-x
+06:02 < FunnyLookinHat> I'm using requestAnimationFrame too - 
+06:02 < FunnyLookinHat> TehShrike, Update a bunch of positions based on dx/dy - and redraw the canvas
+06:03 < FunnyLookinHat> VERY simple at this point  :)
+06:03 < FunnyLookinHat> It's strange because I can fill the view with 500 sprites and it'll be smooth as butter for a long time - and after all of the sprites move off the screen after a bit - when it's just drawing my character - that's when it gets slow
+06:05 < clusterprob> how are you rendering your character
+06:05 < yarco> what's the paste site for this channel?
+06:05 < TehShrike> yarco: whatever you like.  gist is popular, hastebin is cool
+06:05 < FunnyLookinHat> clusterprob, drawImage from an image that's already in memory
+06:06 < SomeoneWeird> probably not the best channel to ask in, maybe #webgl or #threejs FunnyLookinHat ?
+06:06 < FunnyLookinHat> SomeoneWeird, good call - wasn't sure where to ask... I'll go there.
+06:06 < FunnyLookinHat> You guys are just so legit though...  ;)
+06:06 < SomeoneWeird> hehe
+06:06 < SomeoneWeird> er, and it's #three.js
+06:09 < yarco> HELP!!!  https://gist.github.com/bf7d6dfdf4ff5a459fe2   mongodb with async
+06:10 < yarco> it insert nothing
+06:11 < substack> the inserts! they do nothing!
+06:12 < yarco> why?
+06:14 < substack> yarco: you should put some console.log()s in so you can see if .insert() is even being called in the first place
+06:14 < yarco> substack, certainly it is called...
+06:14 < yarco> i've already did that
+06:15 < SomeoneWeird> lol
+06:15 < yarco> but both    coll.insert(o, {safe: true}, function(err, doc) { << err, and doc here are empty
+06:16 < yarco> they are :   insert err={} doc=undefined
+06:16 < yarco> really have no idea...
+06:16 < substack> yarco: how are you printing the error object?
+06:16 < yarco> well, i'm using debug
+06:16 < substack> >> JSON.stringify(new Error('beep'))
+06:16 < purr> substack: (string) '{}'
+06:16 < substack> >> new Error('beep').toString()
+06:16 < purr> substack: (string) 'Error: beep'
+06:17 < substack> not sure what debug is
+06:17 < yarco> i'm using  *debug* , i think that is not the point
+06:17 < substack> try console.dir()
+06:17 < substack> nobody uses debug
+06:17 < substack> it's probably crap
+06:17 < yarco> npm info debug
+06:18 < SomeoneWeird> lol.
+06:18 < substack> oh a module
+06:18 < SomeoneWeird> console.log(err);
+06:18 < substack> still
+06:18 < substack> yes
+06:18 < substack> you shouldn't need a module to console.log(err)
+06:18 < yarco> express use debug
+06:18 < SomeoneWeird> doesn't mean you have to?
+06:19 < substack> yarco: that doesn't mean much
+06:19 < yarco> if i use console.log, i need to remove it later after i finished debugging
+06:19 < substack> yes
+06:19 < yarco> but if i use debug, i can keep it there
+06:19 < substack> what
+06:19 < substack> don't do that
+06:20 < substack> anyways
+06:20 < substack> just do console.log(err)
+06:20 < substack> do this now
+06:20 < substack> it will probably show you the error
+06:20 < substack> instead of obviously doing a JSON.stringify on the error
+06:20 < yarco> but that is not the point in this script
+06:20 < SomeoneWeird> omfg
+06:20 < substack> yarco: do as you're told
+06:21 < substack> go on
+06:21 < yarco> console.log has the same result
+06:21 < substack> and don't use debug
+06:21 < SomeoneWeird> do you want to figure out why it's not working yarco ?
+06:21 < Raynos> why does npm docs union not give me a union function
+06:21 < yarco> SomeoneWeird: yes, certainly
+06:22 < TehShrike> Raynos: wat
+06:22 < Raynos> it gives me some silly framework
+06:22 < TehShrike> wut
+06:22 < Raynos> I want a function that does set union
+06:22 < TehShrike> waaaaaat
+06:23 < TehShrike> Could you say what you want, but with more words?
+06:23 < substack> Raynos: what about Object.keys(merge(set1, set2))
+06:23 < Raynos> i dont have a merge function!
+06:24 < substack> npm install merge
+06:24 < substack> looks legit
+06:24 < TehShrike> Raynos: so go get one 8-|
+06:24 < TehShrike> You want underscore's extend function?
+06:24 < Raynos> fuck no.
+06:24 < Raynos> I want array union
+06:24 < substack> arrays are less set-like than objects
+06:24 < Raynos> true because they can have duplicates
+06:26 < substack> just do uniq(xs.concat(ys))
+06:26 < substack> var uniq = require('nub')
+06:26 < substack> there you go :p
+06:27 < Raynos> no!
+06:27 < Raynos> I want union :P
+06:27 < Raynos> I want require("union")
+06:27 < substack> Raynos: go use component
+06:27 < Raynos> ;_;
+06:27 < substack> npm is beautiful chaos
+06:29 < substack> npm is first to publish which strikes a particular set of trade-offs
+06:29 < substack> Raynos: anyways just publish a module called 'set-union'
+06:29 < substack> that's less ambiguous anyways
+06:30 < substack> it's very unlikely that a web framework would ever be called 'set-union'
+06:30 < substack> or call it 'array-union', which is even more specific
+06:33 <@konobi> union of what? numbers, scalars, objects?
+06:35 < substack> exactly
+06:35 < substack> union of trade craftsman
+06:35 < substack> var union = require('trade-union'); union.strike()
+06:36 < TehShrike> union.butts()?
+06:45 < yarco> yeah! i can make it work!
+06:46 < yarco> it is `async.map` not `async.forEach`
+06:51 < d4tech> I am just new to node.js
+06:51 < d4tech> in fact new to the entire web development scheme
+06:51 < d4tech> i need some help
+06:51 < d4tech> can't fix this error
+06:52 < d4tech> don't know what's wrong..
+06:52 < SomeoneWeird> d4tech, whats the error?
+06:52 < jergason> just ask, don't ask to ask
+06:52 < d4tech> node_test/authentication/node_modules/mongoose/lib/utils.js:413         throw err;
+06:52 < d4tech> Im using express
+06:53 < jergason> d4tech:  you need to post a little more of the error
+06:53 < jergason> that is an uncaught exception inside mongoose, which suggests you are passing it bad data somehow
+06:54 < d4tech> this is an example from the PDF "Jump Start node.js"  
+06:55 < d4tech> k.. so where do i look
+06:56 < jergason> d4tech: you still need to post more of the error, and more of your code
+06:56 < jergason> i assume you are running some code
+06:56 < d4tech> s..
+06:56 < d4tech> it's basically in three diff moules
+06:56 < d4tech> modules
+06:57 < d4tech> one is for db connection
+06:57 < d4tech> another to define a model
+06:57 < d4tech> another the main app
+06:58 < d4tech> var mongoose = require('mongoose'); var Schema = mongoose.Schema;  module.exports.mongoose = mongoose; module.exports.Schema = Schema;  // Connect to cloud database var username = "d4tech"; var password = "********"; var address = '@dbh42.mongolab.com:27427/nockmarket'; connect();  // Connect to mongo function connect() {   var url = 'mongodb://' + username + ':' + password + address;   mongoose.connect(url); }  function disconnect
+06:58 < d4tech> this is the db.js
+06:58 < jergason> d4tech: please post code in a pastie or something
+06:58 < jergason> not in chat
+06:58 < jergason> and post a link to it
+06:58 < jergason> that is good irc etiquette
+06:58 < d4tech> Im a n00b
+06:59 < jergason> we all were sometime
+07:00 < d4tech> @jergason can u suggest me a good pastie
+07:00 < d4tech> ?
+07:01 < jergason> pastie.com?
+07:03 < d4tech> http://pastie.org/5564306
+07:04 < d4tech> @jergason this is the db.js in /lib
+07:04 < jergason> pastie the error too
+07:04 < jergason> the whole error
+07:05 < d4tech> on it..
+07:06 < d4tech> http://pastie.org/5564313 The User.js in /module
+07:07 < SomeoneWeird> error
+07:07 < d4tech> http://pastie.org/5564316 the app.js
+07:08 < d4tech> finally the error http://pastie.org/5564322
+07:11 < jergason> d4tech: does the error happen when you make a request or just when you start the app?
+07:12 < d4tech> while starting the app
+07:12 < d4tech> after a few seconds
+07:14 < jergason> is mongodb running?
+07:14 < d4tech> im connecting it to mongolab
+07:15 < d4tech> but yes i do have a local mongodb service up
+07:21 < samholmes> Raynos: Can you give me an example of what you mean?
+07:22 < samholmes> cainus: If I prevent them from subscribing to the "message" channel then they wont recieve pushes of messages they are suppose to be recieving.
+07:22 < d4tech> @jergason: should i try connecting to the local instance of mongodb
+07:23 < jergason> d4tech: i can run that just fine with express 3 and mongoose 3 hitting a local mongodb instance
+07:23 < jergason> not suer where our problem is
+07:23 < jergason> *your
+07:23 < d4tech> k..
+07:23 < d4tech> can you just gimme the code to connect to the local mongodb 
+07:24 < d4tech> or do u want me to give you access to my mongolab db 
+07:24 < wookiehangover> d4tech: it's probably when you create the mongo connection
+07:24 < wookiehangover> just change it to localhost and whatever port mongo runs on
+07:25 < wookiehangover> and are you using the right password and shit for mongo?
+07:25 < wookiehangover> nvm
+07:25 < d4tech> @wookiehangover: yes..
+07:25 < d4tech> checked it with mongolab
+07:26 < jergason> d4tech:  just change the connection url to whereever your mongodb is running
+07:26 < jergason> mine was 'mongodb://localhost:27017/hurp' or whatever
+07:27 < jergason> if you can do that then there is something weird with connecting to mongolab
+07:27 < d4tech> k.. wait
+07:27 < d4tech> on it
+07:27 < d4tech> thanx a lot guys..^_^
+07:27 < wookiehangover> d4tech: from your earlier paste, don't you have to instantiate the model after you've created the connection
+07:28 < wookiehangover> or is that already happening in '../lib/db'
+07:28 < wookiehangover> in regards to http://pastie.org/5564313
+07:30 < d4tech> @wookiehangover: no idea what u r referring too..:(
+07:30 < wookiehangover> well then its probably immaterial
+07:30 < wookiehangover> http://gif.ly/r.gif
+07:34 < d4tech> Guys it's working when Im trying to connect to the local mongodb..!!!!!
+07:34 < d4tech> it's even entering the data..!!!!
+07:35 < SomeoneWeird> lol.
+07:36 < d4tech> @wookiehangover: Really sums it up..:)
+07:36 < d4tech> well anyways thanks guys ^_^ i'll go on with the local mongodb
+07:37 < d4tech> You've been of great help
+07:39 < d4tech> @jergason, @someoneweird, @wookiehangover: Thanks a lot & I'll be back to bug u guys, hope its fine ^_^...
+07:40 < d4tech> @jergason: this is the 1st time i've been on an IRC..
+07:46 < Raynos> samholmes: Raynos/auth-stream
+07:52 < wookiehangover> the fun thing is that I have no idea what gif d4tech got, but I'm sure it's appropriate
+07:53 < deoxxa> wookiehangover: i just got http://i.gif.ly/de864dc8.gif and i'm not disappointed
+07:54 < wookiehangover> r.gif is an alias for random.gif.. http://gif.ly/r if you want it in a browser w/o the redirect
+08:04 < _numbers> just made this forbidden union https://github.com/mikesmullin/coffee-stylesheets
+08:29 < pyro_> evening comrades
+08:30 < pyro_> since the world didn't end i'm celebrating by starting a blog
+08:30 < pyro_> are there any badass engines on node or should i just roll my own?
+09:28 <@konobi> docpad seems to be the one i hear most folk taling about
+09:58 < yawnt> anyone from NZ here?
+09:58 < SomeoneWeird> damn nz's
+09:59 < yawnt> just wondering how's skiing down there
+09:59 < yawnt> so like, i open up the website "ski slopes closed"
+09:59 < yawnt> "wut why?"
+09:59 < yawnt> "oh souther emisphere"
+10:07 < tnorris> >> var b = Buffer(4); b.writeFloatLE(0.2, 0); b.readFloatLE(0);
+10:07 < purr> tnorris: ReferenceError: Buffer is not defined
+10:08 < yawnt> >> console.log("i'm off, later fella");
+10:08 < purr> yawnt: undefined; Console: "i'm off, later fella"
+10:08 < yawnt> :<
+10:08 < yawnt> >> "i'm off, later fella"
+10:08 < purr> yawnt: (string) "i'm off, later fella"
+10:09 < SomeoneWeird> it's not a node bot, it's just js 
+10:09 < yawnt> USELESS
+10:09 < yawnt> how am i suppose to own it if it doesn't even have i/o api?
+10:09 < SomeoneWeird> lol
+10:09 < SomeoneWeird> >> eval('lol')
+10:09 < purr> SomeoneWeird: ReferenceError: lol is not defined
+10:10 < SomeoneWeird> >> eval('"lol"')
+10:10 < purr> SomeoneWeird: (string) 'lol'
+10:10 < yawnt> SomeoneWeird: that's not owning it
+10:10 < SomeoneWeird> no shit
+10:10 < SomeoneWeird> -.-
+10:10 < yawnt> i mean own as in r00t th3 b0x
+10:10 < SomeoneWeird> i know, lol
+10:10 < yawnt> seriously though.. i'm off
+10:10 < yawnt> ttyl
+10:14 < samholmes> http://howtonode.org/promises
+10:14 < samholmes> why were promises removed by ryan?
+10:27 < RabidFire> samholmes: maybe he couldn't keep them
+10:37 < wao> :D
+10:49 < koik> http://www.carolinaherrera.com/212/es/areyouonthelist?share=0CbnTEMfRdeEb9-orgZc_QWP_Zpkv7RXC2Bew8EDAYD6NhsiZHZljdhDD9Mf-1hc7pjaAJr6smTN-dB2s8Qqsw#episodio-1
+11:48 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+12:10 < juboba> I'm having trouble defining an associative array of objects. Can this be done in javascript?
+12:10 < juboba> sorry to ask this here
+12:11 < SomeoneWeird> probably better to use just an object 
+12:14 < juboba> SomeoneWeird, that's what I thought. But how can I loop over it? (I'm using it for storing my sockets)
+12:15 < juboba> SomeoneWeird, I have an object called users[user_id] = { name: username, socket: socket}
+12:15 <@konobi> for x in obj
+12:16 < SomeoneWeird> for(var user in users) { console.log(user); }
+12:16 < juboba> konobi, I'm getting an error
+12:16 < juboba> data = JSON.stringify(ev);
+12:16 < juboba>                   ^
+12:16 < juboba> TypeError: Converting circular structure to JSON
+12:16 < SomeoneWeird> what's ev?
+12:16 < juboba> dunno
+12:16 < SomeoneWeird> 0.o
+12:16 < juboba> part of socket.io parser
+12:17 < SomeoneWeird> weird
+12:17 < juboba> yup
+12:17 < gildean> Object.keys(users).forEach(function (id) { console.log(users[id]); });
+12:17 < SomeoneWeird> or that
+12:17 < juboba> ok
+12:19 < juboba> damn
+12:19 < juboba> same thing happens
+12:19 < juboba> maybe not the problem there then
+12:19 < juboba> ohh got it
+12:19 < juboba> trying to send huge object as response ^^
+12:33 < Sri19> I've used MongoJS in the past .. not sure if its the best choice for my next project
+12:33 < Sri19> which mongodb libraries  do you recommend?
+12:34 < Sri19> mongoosejs feels ORMish .. :-/
+12:36 < Nuck> Sri19: There's Mongodb?
+12:36 < Nuck> Which is just raw, plain Mongo, with async
+12:43 < JamesS237> do we have a basic aim for a stable 0.10 release date yet?
+12:48 < JamesS237> or is it just as soon as we can get it done :P
+12:54 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+13:15 < terietor> hello
+13:16 < terietor> I am trying to read the contents of a web page with http.get
+13:16 < terietor> this is my code
+13:16 < terietor> http://paste.kde.org/629840/
+13:16 < terietor> the issue is that the data from the web page are strainge
+13:18 < vmfedor> Hello everyone.  I've fallen in love with node.js's simple model and I'd like to try out some web development with it.  The problem is that I'm not much of a Linux sysadmin and I'm receiving some errors while I'm trying to build it.  I'm using CentOS 5.8.  I've downloaded node.js v0.8.16 source, unzipped it, and tried ./configure but it gives me the error " 1 if options.unsafe_optimizations else 0)".  Any ideas?
+13:18 < qwebirc79667> Hi, there is any french people ?
+13:22 < bnoordhuis> terietor: define 'strange'?
+13:22 < Virunga> terietor: it's binary
+13:22 < bnoordhuis> vmfedor: you need to have python 2.6 or 2.7 installed
+13:23 < dz0ny> vmfedor: https://github.com/joyent/node/wiki/Installation
+13:23 < vmfedor> bnoordhuis: Thanks, let me try that.
+13:26 < terietor> bnoordhuis ty, I see
+13:27 < Virunga> terietor: i don't anything about node.js but yesterday i read the doc of buffer, you have to encode the buffer content
+13:27 < Virunga> But don't trust me, read the doc :)
+13:42 < nb-ben> using setTimeout for processing each array element in order to prevent blocking seem expensive and a broken way to achieve such thing, but is recommended through a few people on the internet
+13:42 < nb-ben> that's a bad solution to the problem right
+13:43 < SomeoneWeird> nb-ben, use https://github.com/caolan/async
+13:43 < SomeoneWeird> async.forEach
+13:43 < Guest38180> what's the most common library for accessing property files? nconf?
+13:43 < db42> how big is the array element ?
+13:45 < nb-ben> SomeoneWeird, thank you kind sir
+13:46 < nb-ben> looks like linus likes unicorns on github today
+13:46 < SomeoneWeird> heh yeah, just noticed that too
+13:46 < nb-ben> github is by linus right?
+13:46 < SomeoneWeird> no
+13:46 < SomeoneWeird> linus created git, not github
+13:47 < nb-ben> ah i c, I thought he was also behind github for some reason
+13:47 < SomeoneWeird> :)
+13:47 < SomeoneWeird> anyway, you can npm install async and it should have a readme
+13:48 < nb-ben> thanks :)
+13:48 < SomeoneWeird> but its async.forEach(<array>, function(item, cb) { /* process item then call cb() */ }, function() { /* this is called when finished processing */ });
+13:49 < gildean> you can also read the readme from npmjs.org: https://npmjs.org/package/async
+13:49 < nb-ben> hmm looks weird
+13:49 < nb-ben> why the callback on second function?
+13:49 < nb-ben> oh
+13:50 < nb-ben> it's a callback from async :P oops
+13:50 < SomeoneWeird> yeah
+13:50 < SomeoneWeird> https://npmjs.org/package/async#forEach
+13:51 < nb-ben> async = require('async'); right?
+13:52 < gildean> nb-ben: add a 'var' in front
+14:02 < stongo1> What is the status of geddy? Is it still actively maintained and popular?
+14:02 < db42> how much overhead does passing an array via async.forEach occour ?
+14:03 < stongo1> I got the impression from some articles it wasn't used much anymore
+14:03 < SomeoneWeird> do you need to use it?
+14:05 < stongo1> I am trying to figure out what framework to use
+14:06 < stongo1> I am somewhat new to node
+14:06 < db42> stongo1, i think the wiki has a list of mvc frameworks
+14:06 < db42> (if that is what you are looking for)
+14:07 < SomeoneWeird> I would recommend express :)
+14:07 < stongo1> Looking for some personal perspective... wiki pages only help so much
+14:08 < db42> express isn't an MVC framework
+14:08 < db42> but indeed i'm using express to learn nodejs from a mid-level perspective
+14:08 < SomeoneWeird> I know it isn't
+14:08 < stongo1> db42 yah, i was looking for mvc
+14:09 < db42> so, any ideas how much overhead does array.forEach and async.forEach incour (if this is the only thing running) ?
+14:09 < db42> stongo1, i'm still trying to do things more low-level so i can't help you there
+14:09 < mmalecki> db42: not enough to have actual effect on overall application performance
+14:09 < db42> mmalecki, i love answers like that :)
+14:10 < db42> guess i'll have to time it with a large array and see
+14:10 < SomeoneWeird> console.time ftw
+14:10 < db42> how do i generate an large N items array ?
+14:11 < db42> db.users.find({ friends: { $ne: {50d2246725ee153370000003}}}) <-- why is this a syntax error ?
+14:11 < stongo1> I heard node can use a lot of ram. Anyone had this experience. I cannot imagine it would be worst then apache or nginx
+14:11 < SomeoneWeird> var a = []; for(var i = 0; i < N; i++) { a.push(1); }
+14:11 < SomeoneWeird> stongo1, shitload less than both, in my experience
+14:11 < SomeoneWeird> <db42> db.users.find({ friends: { $ne: {50d2246725ee153370000003}}}) < needs to be a string
+14:11 < SomeoneWeird> (?)
+14:12 < SomeoneWeird> (i don't use mongoose)
+14:13 < stongo1> Someoneweird:  i heard a 1gb server can easily handle 2000 concurrent requests, which seems pretty damn good to me
+14:13 < db42> SomeoneWeird, nop, not the issue 
+14:13 < db42> (this is mongo shell)
+14:13 < db42> stongo1, i guess it depends what the rqeuests are doing ?
+14:13 < db42> console.time() = undefined ?
+14:14 < stongo1> I want to use node as primarily a rest service and simple cms
+14:14 < SomeoneWeird> console.time('uniqueIdentifier'); doexpensivefunction(); console.timeEnd('uniqueIdentifier')
+14:14 < SomeoneWeird> >> console.time('a'); console.log('lol'); console.timeEnd('a')
+14:14 < purr> SomeoneWeird: undefined; Console: 'lol', 'a: 2ms'
+14:15 < db42> >> require('async');
+14:15 < purr> db42: ReferenceError: require is not defined
+14:16 < db42> nice stuff
+14:16 < SomeoneWeird> it's not a node bot
+14:16 < SomeoneWeird> its js
+14:16 < db42> can it stack overflow ?
+14:16 < SomeoneWeird> wat
+14:16 < db42> purr: while(true) { }
+14:16 < mmalecki> db42: that's not stack overflow
+14:16 < db42> yeah i thought of something better :)
+14:16 < SomeoneWeird> yeah, it'll just timeout too
+14:16 < SomeoneWeird> it has an execution limit of like 5s
+14:17 < db42> purr: console.log('still alive');
+14:17 < db42> now it ignores me :)
+14:17 < SomeoneWeird> >>
+14:17 < db42> or is dead
+14:17 < SomeoneWeird> >> console.log('lol')
+14:17 < purr> SomeoneWeird: undefined; Console: 'lol'
+14:17 < SomeoneWeird> commands start with >>
+14:17 < db42> >> console.log('rofl');
+14:17 < purr> db42: undefined; Console: 'rofl'
+14:17 < db42> so nobody here knows mongodb ? :( their channel is dead
+14:18 < db42> and i cna't figure this out
+14:18 < zomg> >> var s = function() { setInterval(s, 1); }; setInterval(s, 1);
+14:18 < purr> zomg: ReferenceError: setInterval is not defined
+14:18 < zomg> darn
+14:18 < zomg> =)
+14:18 < SomeoneWeird> lmao
+14:18 < db42> >> setTimeout
+14:18 < purr> db42: ReferenceError: setTimeout is not defined
+14:18 < db42> >> exec
+14:18 < purr> db42: ReferenceError: exec is not defined
+14:18 < SomeoneWeird> wtf is exec
+14:18 < SomeoneWeird> lol
+14:18 < zomg> >> console.dir(window)
+14:18 < purr> zomg: ReferenceError: window is not defined
+14:18 < zomg> >> console.dir(this)
+14:18 < purr> zomg: TypeError: Object [object Object] has no method 'dir'
+14:19 < mmalecki> >> Object.getOwnPropertyNames(this)
+14:19 < purr> mmalecki: (object) ['undefined', 'parseFloat', 'escape', 'Infinity', 'numbers_that_add_and_subtract_to', 'obfuscate', 'decodeURIComponent', 'JSON', 'print', 'Date', 'TypeError', 'decodeURI', 'URIError', 'Sol', 'braille', 'encodeURI', 'strip_color', 'Math', 'Number', 'Array', 'parseInt', 'RangeError', 'String', 'console', 'Error', 'RegExp', 'EvalError', 'SyntaxError', 'numbers_th…
+14:19 < vmfedor> bnoordhuis: Thanks for your advice, after I installed python 2.7 I was able to install node.  Just one last question:  Node was installed in the same directory as the source files.  What is the best way to move it a more appropriate directory?
+14:20 < mmalecki> ...wat?
+14:20 < SomeoneWeird> it shouldn't have been
+14:20 < mmalecki> >> braille('aaa')
+14:20 < purr> mmalecki: (string) '⠁⠁⠁'
+14:20 < SomeoneWeird> did you run make install?
+14:20 < mmalecki> >> braille('foo bar')
+14:20 < purr> mmalecki: (string) '⠋⠕⠕ ⠃⠁⠗'
+14:20 < mmalecki> this is fucking awesome
+14:20 < SomeoneWeird> >> obfuscate
+14:20 < purr> SomeoneWeird: (function) obfuscate
+14:20 < SomeoneWeird> >> obfuscate("LOL")
+14:20 < purr> SomeoneWeird: (string) 'LOL'
+14:20 < SomeoneWeird> >> obfuscate("var hello; hello = 5; hello = 1;")
+14:20 < purr> SomeoneWeird: (string) 'var hlleo; hlleo = 5; hlleo = 1;'
+14:20 < SomeoneWeird> lawl
+14:21 < mmalecki> >> Object.getOwnPropertyNames(this).slice(20)
+14:21 < purr> mmalecki: (object) ['parseInt', 'RangeError', 'String', 'console', 'Error', 'RegExp', 'EvalError', 'SyntaxError', 'numbers_that_add_and_multiply_to', 'isFinite', 'constant_multiply', 'ReferenceError', 'Function', 'NaN', 'Boolean', 'isNaN', 'unescape', 'Object', 'constant_divide', 'eval', 'encodeURIComponent', 'alert', 'version']
+14:21 < SomeoneWeird> i should write a node bot for this
+14:21 < SomeoneWeird> so we can test shit in the channel
+14:21 < mmalecki> SomeoneWeird: don't
+14:21 < mmalecki> it's very easy to hack one
+14:21 < SomeoneWeird> lmao yeah, spam heaven
+14:21 < mmalecki> I tried, actually
+14:21 < db42> node.sendmailto
+14:21 < dawra> my web app is ready, now i need to combine, minifiy, ufligy all my JS and CSS assets how?
+14:21 < SomeoneWeird> and you ran it in a limited context?
+14:21 < db42> >> [1,2,3,4,4,5]
+14:21 < purr> db42: (object) [1, 2, 3, 4, 4, 5]
+14:22 < db42> >> [1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,1,2,3,4,4,5,]
+14:22 < purr> db42: (object) [1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2, 3, 4, 4, 5, 1, 2,…
+14:22 < Sly> The hell? braille? O_o
+14:22 < SomeoneWeird> ikr lol
+14:23 < dawra> HELLO
+14:23 < SomeoneWeird> HELLO
+14:23 < dawra> my web app is ready, now i need to combine, minifiy, ufligy all my JS and CSS assets how?
+14:23 < shanse> to the google machine!
+14:38 < Kakera> is there any good IRC module in active development?
+14:38 < Kakera> node-irc seems dead
+14:39 < SomeoneWeird> still works fine afaik, Kakera 
+14:40 < db42> is there a module for IM protocols ? like libpidgin wrapper ?
+14:40 < Kakera> https://github.com/martynsmith/node-irc/issues/122
+14:40 < Kakera> still no response to this, SomeoneWeird 
+14:40 < Kakera> also, it emits unspecified 'error' events
+14:41 < db42> is there a module for IM protocols ? like libpidgin wrapper ?
+14:42 < SomeoneWeird> db42, only need to ask once
+14:42 < db42> sorry, my bad
+14:42 < SomeoneWeird> there are jabber modules etc
+14:42 < SomeoneWeird> Kakera, i havn't had that issue 0.o
+14:44 < exit2> Are there any recommendations on Node hosting with mongodb?
+14:51 < gabriel__> eu sou gabriel
+14:52 < db42> how should i do an error handler so my app wont crash on exceptions ?
+14:53 < SomeoneWeird> process.on('unhandledException', function(err) { console.log(err); }); iirc
+14:54 < db42> hmm
+14:54 < db42> nop, still crashes
+14:54 < Guest43234> Fala Gabriel!!!
+14:54 < Guest43234> Teste
+14:55 < gabriel__> eaee    brunoo
+14:55 < SomeoneWeird> what's it crashing on?
+14:55 < db42> uncaughtException
+14:56 < db42> thats it
+14:56 < SomeoneWeird> then change the ^ line above to uncaught
+14:56 < db42> i did :)
+14:56 < db42> i googled after it didn't work
+14:57 < SomeoneWeird> TRY CATCH ALL THE THINGS
+14:58 < db42> yeah, later on :)
+15:18 < Kakera> so, I went to the Eclipse download page http://www.eclipse.org/downloads/
+15:18 < Kakera> what am I supposed to download if I want to develop node.js on Windows?
+15:20 < SomeoneWeird> not eclipse
+15:20 < SomeoneWeird> Kakera, www.sublimetext.com
+15:21 < Kakera> SomeoneWeird, does it support remote development using SSH?
+15:21 < SomeoneWeird> uhh
+15:23 < SomeoneWeird> if you mount the fs over ssh, sure :)
+15:23 < SomeoneWeird> but >> windows
+15:24 < juboba> I'm displaying users online and everytime the user changes the page the number goes -1 and then +1
+15:24 < juboba> how can I work around this?
+15:25 < SomeoneWeird> what?
+15:25 < juboba> how can I use a persistent connection without using frames?
+15:25 < SomeoneWeird> sessions?
+15:25 < SomeoneWeird> socketio?
+15:25 < juboba> socketio
+15:25 < juboba> 'cause when I unload the page the socket dies
+15:26 < Kakera> never unload the page
+15:26 < SomeoneWeird> ajax ftw
+15:26 < juboba> oh
+15:26 < juboba> haha
+15:26 < juboba> like gmail?
+15:26 < medice> or the session approach
+15:26 < juboba> npm install session?
+15:27 < medice> dont be so hasty to drop the counter, only after some X minutes of inactivity from particular session
+15:27 < SomeoneWeird> no, just http sessions
+15:29 < juboba> so having a session to my servlet?
+15:39 < prawnsalad> hey guys. when adding listeners to an eventemitter, whats the best way to also set the scope of the function when its called?
+15:40 < matt444> What is the proper approach for writing command line programs with many commands (like git). Commander.js doesn't handle commands, as far as I can tell. Is the proper approach to split each command into separate programs?
+16:17 < db42> how can i aggreage a few async calls into one ?
+16:17 < rounce^work> as in??
+16:17 < rounce^work> single handler?
+16:17 < db42> i have function blah which i want to run on an array, and i want to send back the result in one shot, but the function is async
+16:18 < db42> something like [1,2,3].asyncMap(function (e) { return e+1;}.function(err, result) { })
+16:18 < db42> something like that +-
+16:18 < Iszak> How do people deploy node.js applications? So that when/if it falls over you have a log and it starts back up.
+16:18 < rounce^work> Iszak: Monit
+16:18 < Iszak> I tried that but I couldn't get it to log at all.
+16:18 < db42> forever ?
+16:19 < Iszak> rounce^work got a source?
+16:23 < rounce> yeah
+16:23 < rounce> forever may be easier
+16:23 < rounce> or even up
+16:23 < rounce> https://github.com/nodejitsu/forever
+16:24 < rounce> https://github.com/LearnBoost/up
+16:26 < rounce> ypu could use a service like pingdom for logs
+16:31 < db42> something like [1,2,3].asyncMap(function (e) { return e+1;}.function(err, result) { })
+16:31 < db42> ?
+16:58 < aandy> nodemon users, is there a way to put it in background (short of using screen)?
+17:05 < vmfedor> Hi everyone.  When I built node.js, it installed it in the same directory as the source, but now I'd like to move it somewhere more appropriate.  Is it possible to just copy the appropriate files to another location?  If so, what files should I copy?
+17:05 < fwg> aandy: bash background jobs?
+17:07 < Steve^> Can I publish a module under the same name more than once? Wondering if I can use 0.1.0-beta or would need 0.1.0-beta1, 0.1.0-beta2, etc
+17:08 < RLa> vmfedor, you used --prefix in configure?
+17:09 < aandy> fwg: yeah but i'll be closing the terminal. nevermind, i'll just use `forever` for now 
+17:09 < vmfedor> RLa: Nope, I was a fool and didn't.  That's why I was hoping to just move it.
+17:10 < RLa> vmfedor, then, did you ran make install at all?
+17:10 < RLa> default prefix should be /usr/local
+17:12 < vmfedor> RLa: I don't see it in there with ls /usr/local | grep node.  Yes, I did run make install and everything and it placed it in the same directory as the source ([/usr/src/redhat/SOURCES/node-v0.8.16).
+17:12 < bnoordhuis> vmfedor: `which node`
+17:12 < bnoordhuis> vmfedor: to answer your question, the node binary doesn't really care about its path, you can copy it around just fine
+17:13 < bnoordhuis> vmfedor: the same may or may not be true for npm and modules
+17:13 < vmfedor> Ahh yes, I forgot about the which command.  Yup, there it is in /usr/local/bin.  Sorry, I'm a Windows developer making the switch to Linux so naturally I'm an idiot. ^_^
+17:13 < RLa> looks like that was some kind of a rpm package?
+17:13 < vmfedor> Thanks to you both for your help.
+17:13 < bnoordhuis> vmfedor: no worries, in six months time you can't imagine using anything else anymore :)
+17:34 < nathan7> isaacs: so how's streams2 with object streams?
+17:51 < yaymukund> very 
+17:52 < yaymukund> oops, please ignore my previous message.
+18:10 < Kakera> does anyone have any experience with VJET?
+18:11 < Kakera> https://www.ebayopensource.org/index.php/VJET/NodeJS <-- this is how it's supposed to work
+18:11 < Kakera> http://puu.sh/1DYWC <-- this is what I get
+18:14 < dz0ny> Kakera: http://wiki.eclipse.org/VJET/Importing_VJET_JavaScript_Type_Libraries
+18:17 < Kakera> dz0ny, it links me here: http://eclipse.org/vjet/download/
+18:17 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+18:17 < Kakera> not much to see there
+18:21 < Kakera> I'll just use nodeclipse instead
+18:21 < dz0ny> Kakera: looks like they removed packages for pretty much everthing, I've tried that in the past and it jsut worked
+18:21 < Kakera> since apparently neither of them support autocomplete for variables
+18:21  * dz0ny not a fan of eclipse
+18:23 < Kakera> VJET's autocomplete is pretty garbage
+18:26 < Kakera> dz0ny, I'd rather not use eclipse either, but I'm not aware of any other IDE that supports working with a remote server via SSH
+18:27 < dz0ny> Kakera: why don't you mount remote server as sftp drive?
+18:27 < Kakera> dz0ny, I'm on Windows
+18:30 < dz0ny> Kakera: http://code.google.com/p/win-sshfs/ another alternative http://dokan-dev.net/en/
+18:41 < eduardo> Hello all
+18:43 < eduardo> What are the best practices,if any, around what data structures get passed around. ie: since i can just store anyobject into mongo - do i pass around that object? or is it prefered to keep DB objects and app objects different?
+18:46 < lamefun> Is JavaScript fast enough to make an online game like this: http://soldat.thd.vg/gallery/soldat/home/34 fully in JS?
+18:46 < lamefun> Or I'll have to write some custom C++ plugins?
+18:50 < inolen> lamefun: It's plenty fast enough
+18:51 < inolen> http://i.imgur.com/7n821.jpg all native JS
+18:51 < Cronoh> rly
+18:52 < Cronoh> thats using html5 canvas or no ?
+18:52 < inolen> well, yes.
+18:52 < Cronoh> looks good
+18:53 < zomg> Isn't that WebGL and not canvas
+18:53 < lamefun> how fast?
+18:53 < zomg> WebGL has pretty decent performance I think
+18:53 < inolen> zomg: you need a canvas object to init a webgl context still.
+18:54 < inolen> lamefun: that's a pretty vague question, heh.
+18:54 < zomg> True :)
+18:54 < zomg> I'm so used to WebGL abstractions I already forgot that
+18:54 < inolen> hence the "well, " :)
+18:54 < zomg> hehe
+18:54 < lamefun> how many FPS does it give without speed limiters?
+18:55 < inolen> I'm using the requestAnimationFrame() API which is locking it at ~60
+18:55 < inolen> there you can see four browsers at the same time running roughly at that
+18:56 < inolen> for the screenshot you posted - I wouldn't be worried, if you run into problems it's probably your code, not any limitations of JS / WebGL
+18:57 < shihan> theres quite a few webgl examples out there that would give you a good idea of how fast (or not) webgl is
+19:29 < medice> please support standards as well
+19:29 < medice> requestanimationframe is not
+19:30 < medice> nevermind actually, w3 has it nowadays apparently
+19:31 < medice> working draft but anyway
+19:33 < inolen> :)
+19:48 < kramutils> Hi, anybody do know how to tell npm - don't care about OS?
+19:52 < cxreg> othiym23: it was node_redis squashing my error
+19:52 < cxreg> that module is soooo buggy
+19:53 < cxreg> i now have 4 patches i have to run with to make my app work
+19:57 < astropirate> kramutils, what do you mean?
+19:57 < astropirate> Not caring is its default behavior
+19:58 < kramutils> astropirate: well riak-js package has in package.json key "os" where is list of valid OS.. but —force resolved that.
+19:58 < clusterprob> exit
+20:20 < eduard1> hey guys quick question
+20:20 < eduard1> what's the right paradigm for this: I want to have a class that's serialized in and out of mongodb. this class has both data and methods. When I read a class out of the DB, how to i instantiate a class directly from this data such that methods also exist?
+20:21 < flatline> eduard1: a = eval(b); should work I guess but it's not really a nice way to do things
+20:21 < _numbers> just rolled this https://github.com/mikesmullin/coffee-sprites
+20:22 < TehShrike> Oh no, not eval
+20:22 < eduard1> flatline: that makes sense but how I I indicate that a is an instance of SomeClass ?
+20:22 < eduard1> i supoose this is a JS question not specifically Node
+20:23 < TehShrike> eduard1: a bunch of getters and setters would be normal in other places, but in this case I imagine your class probably just wants a serialize function that dumps out a plain object for storage, and another function that loads data from that object into an existing instantiated object (or makes a new one)
+20:23 < TehShrike> (and by "other places" I mean "other languages")
+20:23 < eduard1> TehShrike: fair enough, just wanted to see if I was missing anything. Thanks!
+20:23 < flatline> that depends on your framework, there is no native class structure in js AFAIK
+20:23 < TehShrike> The native class structure is the constructor function
+20:23 < eduard1> yea of course
+20:57 < fe234324> i'm new to node; what's the simplest way to render an ejs file (without using express, etc.)
+20:59 < zomg> fe234324: var ejs = require('ejs'); var result = ejs.render('template string here', { templateVariable: 'foobar' });
+21:00 < codingstream> fe234324: take a look at https://github.com/visionmedia/ejs if you want to directly interface with ejs. you can read ejs files in using fs.readFile or just pass in strings 
+21:00 < fe234324> thx zomg & codingstream 
+21:13 < diamonds> how to require nodejs version in package.json?
+21:13 < diamonds> reading here https://npmjs.org/doc/json.html
+21:14 < diamonds> engines looks promising
+21:18 < codingstream> diamonds: you are right, you require node version using engines
+21:19 < diamonds> ty
+22:26 -!- mode/#Node.js [+o Nexxy] by ChanServ
+22:45 < jcoglan> anyone know about the tls module in 0.9?
+22:47 < jcoglan> I'm having a couple of problems: first, how to connect to a server with self-signed certs
+23:20 < timeturner> anyone have experience with setting up node within a vmware box
+23:23 < gildean> timeturner: why should it be any different?
+23:25 < timeturner> actually not really a node thing
+23:26 < timeturner> just having trouble setting up the NAT configuration for the ubuntu box
+23:26 < timeturner> I set up the ip, subnet, and gateway correctly and within the virtual network editor but it still doesn't let me ping from within ubuntu
+23:30 < bin> use bridge not NAT
+23:37 < jcrew> are you testing some type of clustered configuration?
+23:40 < niggler> any good scripts for generating a very slim virtual appliance for a node app?
+23:40 < jcrew> also, does vmware's network editor do the settings for the OS?
+--- Log closed Sun Dec 23 00:00:10 2012

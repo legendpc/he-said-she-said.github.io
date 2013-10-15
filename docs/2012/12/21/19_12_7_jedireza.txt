@@ -1,0 +1,1 @@
+http://addyosmani.github.com/backbone-fundamentals/

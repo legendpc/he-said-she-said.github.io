@@ -60,16 +60,18 @@ module.exports = function() {
   var options = this.options();
 
   shell.ls(options.logdir).forEach(function(fname) {
-    console.log('parsing', fname);
-
-    var data = fs.readFileSync(options.logdir + '/' + fname);
     var state = new State(fname.split('.')[0], options);
-    var parsed;
 
     // as an optimization, assume that we've already parsed the logs if the
     // directory already exists
-    if (shell.test('-e', state.dir()))
+    if (shell.test('-e', state.dir())) {
+        console.log('not parsing', fname);
         return;
+    }
+
+    console.log('parsing', fname);
+    var data = fs.readFileSync(options.logdir + '/' + fname);
+    var parsed;
 
     shell.mkdir('-p', state.dir());
 
