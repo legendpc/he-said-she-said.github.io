@@ -1,0 +1,2155 @@
+--- Log opened Sun Mar 10 00:00:47 2013
+00:02 < sshaginyan> Can someone please verify if jsonselect works. It seems broken this doesn't work for me https://gist.github.com/dhruvbird/987196
+00:03 < sorensen> sorry
+00:03 < sorensen> do you get errors?
+00:04 < sorensen> lol its not browser compatible
+00:04 < sorensen> loks like it should be
+00:04 < sorensen> but no
+00:04 < sorensen> sad face
+00:07 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+00:16 < JamesMGreene> isaacs TooTallNate et al: If an `install` script hook fails, will the install of that package fail? I'd assume so. But doing so in `postinstall` would still have "successfully" installed the package even if the `postinstall` script failed therafter.
+00:16 < shesek> http://www.indiegogo.com/projects/tern-intelligent-javascript-editing
+00:16 < shesek> we're 46 euros away from getting nodejs require() support :)
+00:16 < JamesMGreene> w00t
+00:18 < Havvy> 46 euros?
+00:18 < shesek> if you haven't heard of tern yet, check out the video
+00:18 < shesek> is pretty cool
+00:19 < shesek> one of the stretch goals is nodejs support at 12K
+00:20 < Havvy> 11.995K doesn't allow for the stretch goal?
+00:20 < shesek> I guess he would still do it, but that's the set goal
+00:21 < aMoniker> No. The support would be dropped and the money would be burned.
+00:24 < naomi> isaacs: does readable._read no longer get a callback? http://nodejs.org/docs/v0.9.12/api/stream.html#stream_readable_read_size
+00:24 < naomi> also, stream.Readable no long has lowWaterMark? 
+00:34 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+00:34 < gluxon> Hm.. shameless advertising, but if anyone could help with this, that would be great :D -> stackoverflow.com/questions/15317444/best-possible-solution-to-this-reference-changing-inside-callbacks
+00:34 < gluxon> Whoops.
+00:34 < gluxon> http://stackoverflow.com/questions/15317444/best-possible-solution-to-this-reference-changing-inside-callbacks
+00:44 < eighty4> is there really no stream solution that would save the data if "connection" is missing and then write all data from the database once a connection is establiced. Like socket.io would handle "connection" but with a database buffer
+00:47 < deoxxa> can someone explain to me the rationale behind the changes between http://nodejs.org/docs/v0.9.10/api/all.html#all_readable_read_size_callback and http://nodejs.org/docs/v0.9.12/api/all.html#all_readable_read_size ?
+00:47 < mscdex> eighty4: huh?
+00:47 < eighty4> mscdex: I'd like to save everything emited in socket.io if no client is connected and then send everything once a client is connected.
+00:48 < eighty4> deoxxa: lol, you and naomi working on the something togheter atm?
+00:48 < mscdex> eighty4: can't you do the simple conditional yourself?
+00:49 < eighty4> mscdex: I guess I could. Just prefered someone knowing what they're doing to solve it :)
+00:49 < deoxxa> eighty4: couple of things, but i'm coming up hard against this api in a few places right now
+00:49 < eighty4> deoxxa: she joined earlier asking about basicly the same api parts
+00:50 < mscdex> eighty4: i mean, it's just like a `if (clients[id]) { sendMsg(data); } else { sendToDB(data);  }`
+00:50 < deoxxa> yeah, we were talking about it just before
+00:50 < mscdex> :S
+00:51 < eighty4> mscdex: not really, once the client connects I'd want to send all the data stored in db. That should happend before any more data is sent from sendMsg()
+00:52 < eighty4> but I guess I'm overanalyzing this. Could probably just have a queue that I add things to and send it from that… when the client connects dump the database to it
+00:54 < mscdex> deoxxa: there's no notes in the commits *shrug*
+00:55 < deoxxa> mscdex: this, i am painfully aware of :(
+00:55 < deoxxa> mscdex: seems like it's heading straight back to "the read api is horribly complicated" territory
+00:55 < mscdex> heh
+00:55 < mscdex> i think that's the first "private" method i've seen publicly documented like that
+00:56 < deoxxa> "hey guys, i have an idea"
+00:56 < deoxxa> "yeah, what's up?"
+00:56 < deoxxa> "you know how the readable stream api is really complicated, but everyone's kind of used to it?"
+00:56 < deoxxa> "yep!"
+00:56 < deoxxa> "let's replace it with a new api!"
+00:56 < deoxxa> "oh, you want to make it less complicated?"
+00:56 < deoxxa> "hahahahahahaha"
+00:56 < deoxxa> then the streams2 camp members clink their glasses together
+00:56 < deoxxa> laughing at the plebs who are forced to work with this abomination of an idea
+00:57 < eighty4> deoxxa: that's what we have very late Saturday nights for
+00:57 < mscdex> well, at least it's backwards compatible
+00:57 < eighty4> _after_ some beer
+00:57 < mscdex> and having a `read(n)` method is handy in a lot of cases
+00:57 < deoxxa> mscdex: unless you were already working around the deficiencies in the old api
+00:57 < deoxxa> mscdex: and those workarounds are now broken :>
+00:57 < deoxxa> mscdex: so yes, as far as teh documentation goes, it's backwards-compatible
+00:57 < mscdex> what workarounds?
+00:58 < deoxxa> multiple pipe() destinations for the most part
+00:59 < mscdex> well, if you were messing with internal stuff then that's why :S
+00:59 < deoxxa> oh, i whole-heartedly agree
+00:59 < deoxxa> i just don't think "new broken-ass api" is much better than "old broken-ass api"
+01:00  * deoxxa annoyed, clearly
+01:00 < mscdex> i think it is for some things, like parsing protocols to certain structures
+01:00 < mscdex> instead of buffering yourself
+01:00 < mscdex> and sorting it all out
+01:02 < mscdex> and doing buffer concatenations
+01:03 < mscdex> it's a pain in the ass many times
+01:04 < deoxxa> oh yeah, again, i agree
+01:04 < deoxxa> there are definitely improvements
+01:04 < deoxxa> but the main arguments, which were that the api was too complex, are very quickly becoming a damn joke
+01:04 < deoxxa> i mean whatever braindead api ends up being final will be used
+01:05 < deoxxa> so i'm not looking for it to be changed back
+01:05 < deoxxa> but i'd love to know *why* it was changed from what was in 0.9.10
+01:05 < deoxxa> there's *no* explanataion
+01:05 < deoxxa> *explanation
+01:20 <@isaacs> ircretary: tell naomi Yes, that is correct.
+01:20 < ircretary> isaacs: I'll be sure to tell naomi
+01:21 <@isaacs> ircretary: thanks
+01:21 < ircretary> isaacs: You're welcome :)
+01:21 <@isaacs> deoxxa: hey
+01:21 < deoxxa> isaacs: HELLO FRIEND
+01:21 <@isaacs> deoxxa: what's broken-ass about it?
+01:22 < deoxxa> what's up with read() not getting a callback now? how does this differ from checking for the result of .write() as was required before?
+01:22 <@isaacs> deoxxa: the explanations are in the commit log and issues, but i can also answer any questions.
+01:22 <@isaacs> deoxxa: it doesn't get a callback because there's rarely actually a strict 1:1 correspondence between _read() calls and chunks becoming available.
+01:23 <@isaacs> deoxxa: at least, in tcp, tls, http, zlib, and crypto, that's the case.
+01:23 <@isaacs> deoxxa: which is like, every string in core except fds
+01:23 <@isaacs> *fs
+01:23 < deoxxa> ok, that's fair enough
+01:23  * deoxxa opens docs again, finds the point he didn't like
+01:23 <@isaacs> and it's oddball bonkers to take a cb, and not have a contract of "you must call this exactly once"
+01:24 <@isaacs> and working around that contract in these non-fs cases was really complicated and weird.
+01:24 <@isaacs> also!  for _write(chunk,encoding,cb)
+01:24 <@isaacs> that was the ohter big change.
+01:24 < deoxxa> yeah, that broke a bunch of stuff for me but it was easy to fix
+01:24 <@isaacs> and lastly, which you mentioned anyway, was getting rid of chunkSize, pipeOpts.chunkSize, and lowWaterMark
+01:24 <@isaacs> deoxxa: welcome to the wonderful world of targetting node unstable releases :)
+01:25 < deoxxa> oh i'm aware, i'm walking on a tightrope here :P
+01:25 <@isaacs> but, yes, it's not like there was a lot of adjustment period, i will certainly grant you that.
+01:25 <@isaacs> we had a set of problems that needed to be solved prior to 0.10.  those problems are solved in 0.9.13.  so, time to release 0.10
+01:26 <@isaacs> seemed foolish ot wait longer
+01:26 < deoxxa> that's perfectly reasonable, 0.8.x isn't going to just disappear from the internet the moment 0.10 is out
+01:26 <@isaacs> eah
+01:27 <@isaacs> that's also why i bumped the major on readable-stream
+01:27 <@isaacs> breaking change and all that
+01:27 < deoxxa> hrm, how do i consume that version number if i'm just using it via node?
+01:27 <@isaacs> oh, well.. you don't :)
+01:28 < deoxxa> lol
+01:28 <@isaacs> if you're on unstable, you just stay on the latest, and update a lot
+01:28 <@isaacs> but you can use the 'readable-stream' module as a dep, and suport 0.8
+01:28 < deoxxa> yeah
+01:28 <@isaacs> adn only load it optionally if you're not in 0.10-land
+01:28 < deoxxa> ok so if i have this straight
+01:28 < deoxxa> it's basically
+01:28 < deoxxa> "instead of calling a callback, call this.push"
+01:29 < deoxxa> with pretty much the exact same semantics
+01:29 < deoxxa> aside from the EOF bit
+01:29 < deoxxa> oh, nope, that's valid still as well
+01:29 < pringlescan1> How can I report an error in the documentation?
+01:29 <@isaacs> deoxxa: yeah, this.push(null) to EOF
+01:30 < deoxxa> ok, ok, i'm getting it
+01:30  * deoxxa brain cranking over
+01:30 <@isaacs> deoxxa: the lowWaterMark is just because that's stupid.
+01:30 <@isaacs> deoxxa: you never want to get data in, and NOT be alerted about it
+01:30 <@isaacs> deoxxa: or write data out, and NOT push it out asap
+01:31 <@isaacs> so, in practice, every lowWaterMark is actually 0 always, so just remove it and skip the checks.
+01:31 < deoxxa> i kind of understood that to be some kind of latency mitigation thing
+01:31 <@isaacs> highWaterMark is actually what you care about
+01:31 < deoxxa> hrm, ok, devil's advocate here
+01:31 < deoxxa> let's say you end up in lockstep with a specific source
+01:32 < deoxxa> so it puts out data every 1000ms, and you just happen to be reading at exactly the right (wrong?) times so as to have to wait ~900ms pretty often
+01:33 < deoxxa> i figured the lowWaterMark thing would make it so the source was read from in the background and the buffer would be populated before you actually started asking for data
+01:33 < deoxxa> i know that the highWaterMark bit helps to make sure everything stays peachy once things are running
+01:34 < deoxxa> like after the first _read call, you just keep pushing data every 1000ms or whatever and the consumer won't hit that problem
+01:35 < deoxxa> but before that first _read call, you might end up in the middle of a "can be read" cycle the first time you want to read from it
+01:35 < deoxxa> it's a pretty marginal edge case, but it's a case for lowWaterMark none the less
+01:35 < deoxxa> and it's just what popped into my head now, so there are probably other places where lowWaterMark can be of utility
+01:39 < deoxxa> isaacs: another question - what does highWaterMark mean in the context of {objectMode: true}?
+01:41 <@isaacs> deoxxa: the highWaterMark does what you thought lowWaterMark did.
+01:41 <@isaacs> deoxxa: it'll read up to the highWaterMark.
+01:41 <@isaacs> that's basically "Please buffer up to this point"
+01:41 <@isaacs> but at that point, stop reading
+01:41 < deoxxa> it... does?
+01:41 <@isaacs> yeah
+01:41 < deoxxa> what did lowWaterMark do then?
+01:41 <@isaacs> "fill the water up to the mark that is this high"
+01:42 <@isaacs> lowWaterMark did "don't emit 'readable' until it's at least this level"
+01:42 < deoxxa> oh
+01:42 <@isaacs> ie, "this is the lowest amount of data i would like to be informed of"
+01:42 <@isaacs> but that's stupid.
+01:42 < deoxxa> i see
+01:42 <@isaacs> you never want that
+01:42 < deoxxa> yeah, agreed
+01:42 <@isaacs> or rather, that level is always === 0
+01:42 <@isaacs> so... just use 0
+01:42 <@isaacs> :)
+01:42 < deoxxa> i was under the impression it was like
+01:43 < deoxxa> highWaterMark affects when you get told to stop writing to the stream
+01:43 < deoxxa> lowWaterMark affects how much data the stream will try to buffer internally at a minimum
+01:43 <@isaacs> (btw, this confusion affected everyone.  no one could agree on what it did.  so we removed the other flag)
+01:43 < deoxxa> ah, ha
+01:43 <@isaacs> oh, so, you're confusing writable and readable
+01:43 <@isaacs> i'm talking about readable only (so far)
+01:43 < deoxxa> somewhat!
+01:43 < deoxxa> well, most of the streams i deal with are duplex streams, so they kind of meld into one for me
+01:44 <@isaacs> writable was: lwm = "don't start writing stuff to the underlying system until you have at least this much"
+01:44 <@isaacs> and writable hwm = "start returning 'false' from drain if you have this much buffered"
+01:44 < deoxxa> ah. that makes sense
+01:44 <@isaacs> but, the lwm for writable would only make sense if you were smartly joining chunks into single syscalls, like a writev or something
+01:44 < deoxxa> yep
+01:44 <@isaacs> if you're concatenating buffers, it's crazy slow, because yoer' introducing a copy
+01:45 < AdamMagaluk> Whats the best way to find the full path of a loaded module?
+01:45 <@isaacs> and cutting out write(2) calls is less beneficial than cutting out copying
+01:45 <@isaacs> so it would just cause stupid sporadic bursty performance.
+01:45 < deoxxa> unless you're running node from a 5.25" floppy drive, that is
+01:45 <@isaacs> AdamMagaluk: require.resolve('teh-modulez')
+01:45 <@isaacs> deoxxa: sure :)
+01:45 < AdamMagaluk> Ah, thanks
+01:46 <@isaacs> defunctzombie: but at that point, just set your hwm to the size of the disk, and let it all happen in the background :)
+01:46 < defunctzombie> isaacs: you lost me
+01:46 <@isaacs> defunctzombie: what were those things, like 1.44 MEGA bytes?
+01:46 <@isaacs> oh... whoops
+01:46 <@isaacs> that was supposed to be to deoxxa 
+01:46 < defunctzombie> hahah
+01:46 <@isaacs> A NEW DE<TAB> APPEARS!
+01:46 < defunctzombie> \o/
+01:46 < deoxxa> isaacs: 720kb, yo! 
+01:47 < deoxxa> isaacs: or 360 for single-side
+01:47 <@isaacs> deoxxa: ah, yeah, the 5.25"
+01:47 <@isaacs> defunctzombie: 1.44 was the 3.5"
+01:47 < deoxxa> if you were hardcore though, you could low-level format them and mess with the track widths
+01:47 < deoxxa> squeeze out a couple more kb
+01:47 < deoxxa> had to have a good drive for that though!
+01:48 < defunctzombie> isaacs: deoxxa: are you guys seriously talking about floppies?
+01:48 < korilo> lol
+01:48 < deoxxa> perhaps
+01:48 < deoxxa> >_>
+01:49 < deoxxa> i'm kind of sad that i don't have anything with a floppy drive anymore
+01:49 < deoxxa> the noise they made on boot-up was kind of soothing
+01:49 < defunctzombie> you should be happy
+01:49 < deoxxa> GZZZZSSSHGZZZZSHCHNK
+01:49 < defunctzombie> I don't even have a cd drive anymore
+01:49 < deoxxa> ha
+01:50 < deoxxa> http://www.youtube.com/watch?v=uJSjaDxBgBI << this noise! this!
+01:54 <@isaacs> deoxxa: so... while i've got you, and you're all in a passion about streams..
+01:54 < brokenjames> agile agile agile
+01:54 <@isaacs> deoxxa: https://gist.github.com/isaacs/5126710
+01:54 <@isaacs> deoxxa: read that test.  do you think it passes?  do you think it SHOULD pass?
+01:54  * deoxxa constantly passionate about streams
+01:56 < jrajav> brokenjames: Stabby stabby stab
+01:56 < deoxxa> isaacs: i would think the readable stream would go "hey what the hell man, like, seriously don't"
+01:56 < brokenjames> i think that throws an error in bash
+01:56 <@isaacs> deoxxa: but it's kind of weird that r has already ended, isn't it?
+01:57 <@isaacs> deoxxa: the whole point of streams2 is that you don't HAVE to set your shit up rightnow
+01:57 <@isaacs> deoxxa: r might be an HTTP req.  if it's a GET or HEAD, then the pipe fails.  if it's a POST or something, then the pipe works
+01:57 <@isaacs> odd, no?
+01:58  * deoxxa looks closer
+01:58 < deoxxa> jeez yeah that's tough
+01:59 <@isaacs> deoxxa: so, either:
+01:59 <@isaacs> r.pipe() emits an error if r is ended already
+01:59 <@isaacs> OR
+01:59 < deoxxa> piping from an ended stream should call end on the writable stream? (?)
+01:59 < deoxxa> that's a bit weird though
+01:59 <@isaacs> r.on('end') says "ok, I know i ended, but since you asked, here's an end event on nextTick"
+01:59 < deoxxa> yeah
+01:59 <@isaacs> deoxxa: well, that's what would happen if you piped in that tick
+02:00 <@isaacs> and now 'end' can be emitted multiple times maybe
+02:00 < deoxxa> is there any reason someone would want to consume "end" on anything other than the tick where it happens? or is this isolated to weird ended.pipe(writable) uses?
+02:01 < deoxxa> like, calling read() on an ended stream, what's the result of that? null?
+02:02 < deoxxa> i think emitting "end" more than once would be problematic, when you think about how much code is out there that looks like s.on("end", function() { this.clients.splice(this.clients.indexOf(s), 1); }.bind(this)) or similar
+02:02 <@isaacs> deoxxa: afaict, it's related to getRequest.pipe(upstreamRequestLater)
+02:02 <@isaacs> right
+02:02 <@isaacs> as opposed to s.once('end'...)
+02:02 < deoxxa> yep
+02:02 < deoxxa> exactly
+02:03 < deoxxa> maybe put .once() above .on() in the docs :P
+02:03 < deoxxa> alias it to .overandover()
+02:03 < deoxxa> lel
+02:03 <@isaacs> deoxxa: well, what i could do is say, in pipe() if (!src.readable) dest.end()
+02:03 <@isaacs> or something
+02:04 < deoxxa> well yeah, that's what i was saying before
+02:04 <@isaacs> deoxxa: if (src._readableState.endEmitted) dest.end()
+02:04 < deoxxa> does a readable stream emit "end" before all data has been read? or before even one read()?
+02:04 <@isaacs> deoxxa: only if there was never any data.
+02:04 <@isaacs> deoxxa: it emits when: EOF has been seen, and length === 0
+02:04 <@isaacs> but that might be on the first push(null)
+02:05 < deoxxa> yeah
+02:05 < deoxxa> i wonder how many uses there are of .on("end") without .read()
+02:05 < deoxxa> or .pipe() for that matter
+02:06 <@isaacs> yeah, this should be in pipe()
+02:06 <@isaacs> not in .on('end')
+02:06 < brokenjames> XD
+02:07 < deoxxa> well, a related problem is if someone does something like: s.on("end", function() { /* do something */ }); // never call .read()
+02:08 < deoxxa> sometimes it'll fire, sometimes it won't
+02:08 < deoxxa> or will it?
+02:08 < deoxxa> edge cases suck
+02:09 < deoxxa> trying to think of how these things work in the atoms-and-germs world
+02:09 < deoxxa> that's a big source of inspiration for me
+02:12 < deoxxa> isaacs: i think the destination stream should be told about the ended state (via the same mechanisms as when a stream really ends), but i don't think there should be a side-effect of telling everyone "hey i ended just now" again
+02:15 < JamesMGreene> BOOM! Tern will now have built-in Node.js support =)
+02:16 <@isaacs> deoxxa: yeah, i think that's right
+02:17 <@isaacs> deoxxa: yes, adding an end handler without ever causing read() to happen will hang paused forever.
+02:17 < deoxxa> i think that actually makes sense
+02:20 < JamesMGreene> isaacs: If an NPM `preinstall` and/or `install` script hook fails, the install of that package fails. True or false?
+02:22 <@isaacs> deoxxa: https://github.com/isaacs/node/compare/joyent:v0.10...isaacs:stream-pipe-after-end
+02:22 <@isaacs> deoxxa: there are two approaches here...
+02:22 <@isaacs> deoxxa: either just do it in pipe(), and say, whatever, pipe() is magic
+02:23 < deoxxa> it *is* magic
+02:23 <@isaacs> deoxxa: or option b, calling on('end',fn) after end emission --> process.nextTick(fn)
+02:23 < jesusabdullah> garann: You do home diy stuff right? Have you seen this "renovation realities" show? These people are clueless right? It's not just me? >_<
+02:23 <@isaacs> we already magic up on('data') and on('readable')
+02:23 < JamesMGreene> I am uncertain as the docs say that the script process will be "aborted" but it also says that the script runs in a different child process
+02:23 < jesusabdullah> garann: My dad's a master carpenter so sometimes I lose perspective on these things
+02:24 < brokenjames> that settles it im going back to bash ::sold::
+02:24 < jnpetersen> I have a mongo result of "{ _id: 5138ead3beb7b50cb13eed97, eventID: '524', userID: '001', guestID: 1, name: 'James', choice: 1 }"
+02:24 < jnpetersen> but I can only seem to access the "name"
+02:24 < jnpetersen> if I try to access guestID or choice, I get undefined
+02:24 < brokenjames> redis can come
+02:24 < jesusabdullah> brokenjames: One time I did find a server written with netcat
+02:24 < jnpetersen> anyone have any suggestions?
+02:25 < deoxxa> isaacs: i guess both of them make sense - this keeps some complexity out of .pipe() which is always good
+02:26 < deoxxa> jnpetersen: 1) paste code 2) ??? 3) profit
+02:27 < jnpetersen> guests = eventGuests.map(function(guest) {
+02:27 < jnpetersen>         console.log("guest data:" + guest);
+02:27 < jnpetersen>         return {name: guest.name, guestNumber: guest.choiceID, choice: guest.choice};
+02:27 < jnpetersen>       })
+02:27 < deoxxa> is .choice undefined?
+02:28 < jnpetersen> and choiceID
+02:28 < deoxxa> i can see why .guestNumber would be - it's not in the source object
+02:28 < deoxxa> i.e. guest.choiceID would be undefined, according to your source object you pasted
+02:28 < jnpetersen> sorry, I made some changes
+02:28 < JamesMGreene> isaacs: Never mind, just spotted the "Best Practices" section that talks about the non-zero codes
+02:28 < deoxxa> oh, i forgot to read your mind
+02:29  * deoxxa slaps forehead
+02:29 < jnpetersen> deoxxa: no I made the change, but forgot to copy it
+02:29 < jnpetersen> I copied, made change, didn't copy again and pasted
+02:30 < jnpetersen> return {name: guest.name, guestNumber: guest.guestID, choice: guest.choice};
+02:30 < deoxxa> ok, that makes more sense
+02:30 < deoxxa> that's certainly strange
+02:30 < deoxxa> tried just logging the individual values?
+02:31 < jnpetersen> yep, still undefined
+02:31 < jnpetersen> { name: 'James', guestNumber: undefined, choice: undefined }
+02:31 < JamesMGreene> Why is everybody using "James" in their messages tonight? :-P  My IRC highlighter is very *beep*y
+02:31 < jnpetersen> cause my name is james :)
+02:32 < JamesMGreene> oic :)
+02:32 < jesusabdullah> Bond.
+02:32 < jesusabdullah> JAMES bond.
+02:34 < JamesMGreene> Jesus!
+02:34 < deoxxa> jesus bond?
+02:35 < jnpetersen> deoxxa: guest data:undefined
+02:35 < deoxxa> now that's a religious icon i could get behind
+02:35 < jnpetersen>  when I do individual
+02:35 < JamesMGreene> Jesus "Buddy" Christ (^-^)b
+02:35 < deoxxa> eyyyyyy
+02:36 < deoxxa> jnpetersen: hrm, that's *really* weird then
+02:36 < deoxxa> jnpetersen: JSON.stringify() sledgehammer time - see what you get when you stringify one of those bastards
+02:36 < andrew12> i heard node.js is web scale
+02:37 < deoxxa> andrew12: it's actually web 2.0 scale
+02:37 < jnpetersen> deoxxa: figured it out... my schema wasn't set right, when i made a change the data is coming through now
+02:37 < deoxxa> jnpetersen: mongodb? schema? what is this devilry?
+02:37 < jnpetersen> mongoose
+02:38 < deoxxa> blasphemer!
+02:38 < deoxxa> the one true way is the object!
+02:38 < deoxxa> the greatest trick the devil ever played was making everyone believe ORM is a good idea!
+02:38 < MI6> joyent/node: isaacs v0.10 * 21a9966 : uv: Upgrade to 5462dab - http://git.io/mGnwEw
+03:18 < ningu> the ermahgerd girl would use nerd.js
+03:19 < mscdex> Erma H. Gerd
+03:36 < vicapow> i thought of an idea...
+03:36 < vicapow> food for javascript
+03:37 < vicapow> people who can provide food exchange it for help with javascript
+03:38 < ningu> I have a better idea -- charging $ by the hour
+03:38 < ningu> of course then you have tax issues...
+03:38 < vicapow> ningu: well, yeah, i do that already
+03:38 < vicapow> ningu: but i also want to eat food for free and meet new people!
+03:47 < inolen> If anyone would like to play some WebGL quake3 I'm trying to round up a few people to have a larger group tonight.
+03:48 < webdesserts> I'm trying to learn how to use events in node.js
+03:48 < webdesserts> are there any good articles out there that explain it well?
+03:54 < webdesserts> if you wanted to download two files asynchronously that depend on eachother
+03:55 < webdesserts> and want to wait till both files are finished reading before you use them
+03:55 < webdesserts> how would you approach that?
+03:59 < deoxxa> webdesserts: practical answer? i'd use caolan's async module (caolan/async on github). pure-javascript education answer? have a callback that keeps a counter, and on that counter reaching a specific value, call another callback that reacts to the completion of both operations.
+04:07 < Stephen> Evening all
+04:11 < webdesserts> deoxxa: thank you
+04:11 < webdesserts> I'll probably just end up using async
+04:12 < deoxxa> it's pretty neat, so long as you take the time to understand what it's doing under the hood
+04:12 < webdesserts> but I would still like to learn how events work.
+04:12 < deoxxa> reading the source will give you a lot more knowledge of which method to use, etc
+04:12 < deoxxa> since a lot of them look like they do the same thing
+04:25  * ningu didn't know node had a hood
+04:27 < deoxxa> ningu: sure it does - portland
+04:27 < deoxxa> LOLOL
+04:27 < MikeSulivan> Guys in general we want to get out of callbacks as soon as possible right?
+04:27 < MikeSulivan> In order to prevent memory leaks that is
+04:32 < ningu> MikeSulivan: well, in general you want to not block, ever
+04:32 < ningu> but as long as you aren't doing that, things in callbacks take as long as they take, I suppose
+04:32 < vicapow> MikeSulivan: well you shouldn't experience memory leaks using callbacks, anway
+04:32 < ningu> if you aren't blocking I can't imagine there would be anything to worry about
+04:33 < ningu> well, not a memory leak but maybe he means keep things in scope for some closure as little as possible so they can be gc'd
+04:33 < MikeSulivan> ningu: yes
+04:33 < MikeSulivan> that's exactly what I mean
+04:34 < vicapow> MikeSulivan: well, are you running into memory issues?
+04:34 < ningu> MikeSulivan: it really depends on the logic of your app, what needs to stay in scope and what doesn't
+04:34 < ningu> it shouldn't really be a callback issue
+04:35 < vicapow> because it not, i wouldn't start worrying about it yet
+04:35 < MikeSulivan> ningu: https://github.com/jedp/node-memwatch-demo in here they say " If these callbacks are not handled as fast as they are created, memory allocations will build up and code that doesn't look leaky will act leaky."
+04:36 < MikeSulivan> ningu: What do they mean?
+04:36 < MikeSulivan> and what are the best tools for diagnosing memory leaks?
+04:36 < MikeSulivan> I've googled but most stuff seem to be broken or incomplete
+04:36 < vicapow> MikeSulivan: yeah. if you're firing off callbacks faster then your application is responding to them, you're gonna have a bad time
+04:38 < MikeSulivan> vicapow: lol how can you tell.....
+04:38 < MikeSulivan> wow there is so much to consider
+04:39 < ningu> hmmm
+04:39 < vicapow> MikeSulivan: run it and see if it brakes :P
+04:39 < ningu> I'm not sure how to monitor node's memory usage in real time other than the normal methods (top and whatnot)
+04:39 < MikeSulivan> vicapow: It might brake days later though
+04:39 < MikeSulivan> break
+04:39 < standoo> ningu: why u need to monitor it?
+04:39 < ningu> standoo: I don't, MikeSulivan is asking about it
+04:40 < ningu> MikeSulivan: anyway, aside from doing a realistic stress test that's true of any app, period
+04:40 < vicapow> MikeSulivan: then look at the logs and have the process restart
+04:40 < MikeSulivan> Cause people are telling me that my server hangs
+04:40 < MikeSulivan> what logs?
+04:40 < vicapow> MikeSulivan: make them :P
+04:40 < standoo> MikeSulivan: i think asking in the linux channel would be helpful?
+04:41 < ningu> there are various logger modules for node, e.g. winston
+04:42 < MikeSulivan> If I null an object or delete a property the garbage collector will pick it up right?
+04:42 < vicapow> ningu: i've used winston in the past and liked it a lot
+04:43 < vicapow> MikeSulivan: it's all about references
+04:43 < vicapow> MikeSulivan: if your application never references that data, then yes, the gc will remove it eventually
+04:43 < deoxxa> var log = function(level, summary, info) { console.log(JSON.stringify([(new Date()).toISOString(), level.toUpperCase(), summary, info])); };
+04:43 < deoxxa> ["debug", "info", "warn", "error"].forEach(function(level) { log[level] = log.bind(null, level); });
+04:43 < deoxxa> that's my logging infrastructure
+04:44 < SomeoneWeird> mine is console[log,error]
+04:44 < deoxxa> i used winston for a long time
+04:44 < vicapow> MikeSulivan: you should consider writing your application in a way that it can handle being restarted
+04:45 < deoxxa> but like, i just don't find the coloured output and crazy transports that useful
+04:45 < vicapow> MikeSulivan: if a memory error pops up, you can see it in your logs if you've setup ubuntu to log your applications stdout
+04:45 < MikeSulivan> vicapow: I'm on os x
+04:46 < vicapow> MikeSulivan: you're running this in production on OS X?
+04:46 < MikeSulivan> no
+04:46 < MikeSulivan> developing it
+04:46 < vicapow> MikeSulivan: well, when your developing your application, you'll notice issues as its running on your dev machine
+04:47 < vicapow> MikeSulivan: and check the logs in production
+04:48 < vicapow> MikeSulivan: you should build your application in a way that can be restarted on it's own. you can't anticipate every possible issue with an application, regardless if it's written in Node or otherwise.
+04:48 < MikeSulivan> vicapow: I'm using express
+04:49 < vicapow> MikeSulivan: cool
+04:49 < MikeSulivan> Guys can you look at this and tel me if it's a good idea http://pastie.org/6437408
+04:50 < MikeSulivan> I have this send function 
+04:51 < MikeSulivan> If I'm sending an object as a literal to the send function I don't have to do any clean up on it right/
+04:52 < vicapow> MikeSulivan: you should almost never have to worry about cleanup
+04:52 < ningu> MikeSulivan: I don't see anything obviously wrong with it although you seem overly paranoid e.g. line 8 seems useless
+04:53 < ningu> similarly line 15
+04:53 < vicapow> similarly line 9
+04:53 < ningu> and I'm not sure about line 4 either
+04:53 < deoxxa> delete all the lines
+04:53 < ningu> given that it's just a string
+04:53 < vicapow> when is information defined? why don't you use the `var` keyword?
+04:53 < ningu> not sure what JSON.stringify will do, but maybe it will do something
+04:53 < ningu> vicapow: arg to send()
+04:54 < vicapow> ningu: oh whoops
+04:54 < MikeSulivan> Guys can you take a look at the whole code?
+04:54 < MikeSulivan> It's not a lot believe me
+04:54 < MikeSulivan> just eye ball it
+04:54 < ningu> MikeSulivan: it might be even shorter once we've removed all these lines
+04:54 < vicapow> MikeSulivan: nope
+04:55 < MikeSulivan> vicapow: How about yes?
+04:55 < vicapow> MikeSulivan: nope
+04:55 < MikeSulivan> yes? okay sure
+04:55 < MikeSulivan> jk
+04:55 < andrew12> guys i need to handle 10 million requests at once what do
+04:56 < vicapow> andrew12: wait a few years and buy a new computer
+04:56 < vicapow> andrew12: jk :P
+04:57 < MikeSulivan> andrew12: Hire 10 million programmers with 10 million computers and have them click a response button when a request comes in.
+05:00 < MikeSulivan> vicapow: Okay can you please look a this http://pastie.org/6437555
+05:01 < MikeSulivan> vicapow: Anything weird?
+05:08 < vicapow> MikeSulivan: I'm happy to try to answer specific questions but I'm not going to debug/review your application specific code
+05:08 < vicapow> MikeSulivan: unless you pay me $)
+05:09 < MikeSulivan> Why not?
+05:09 < ddod> hey guys, anyone want to try this node/socket space-based mmo-MUD game I'm working on? http://deepship.com
+05:09 < MikeSulivan> How much?
+05:10 < Stephen> Anyone here really familiar with spidering?
+05:10 < Text> oh wow, alot of wonderful people!
+05:10 < Stephen> I'd like to find a feasible method of getting a path of links between 2 web pages
+05:11 < MikeSulivan> Stephen: Look into Phantom.js
+05:11 < humblesound> You can share your urls to have people join your crew!
+05:12 < MikeSulivan> vicapow: Are you in SF?
+05:12 < SomeoneWeird> ddod, neat
+05:12 < Stephen> MikeSulivan: Phantom.js? I thought that was a headless testing tool
+05:12 < ddod> thanks, you're the only one playing right now
+05:13 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+05:13 < Stephen> To be clear, I'm talking about between any 2 domains, not just same domain.
+05:13 < ddod> i'd love to have some people come in and try to break it
+05:13 < Stephen> I heard break
+05:13 < Stephen> Link me
+05:13 < MikeSulivan> wow I remember it use to be for crawling pages
+05:14 < MikeSulivan> nm
+05:14 < ddod> http://deepship.com
+05:14 < ddod> stephen
+05:14 < SomeoneWeird> http://deepship.com/
+05:14 < SomeoneWeird> ddod, how are you authenticating ws streams?
+05:14 < ddod> in what way?
+05:14 < Stephen> I was thinking maybe common crawl, but the processing time isn't in my budget
+05:14 < Stephen> Looking at deepship now
+05:15 < ddod> there's no concept of user accounts
+05:15 < Stephen> lol
+05:15 < ddod> just ship accounts right now
+05:15 < ddod> which are authed with a semi private string
+05:15 < Stephen> That's a game, not a crawl :-)
+05:15 < SomeoneWeird> yeah..?
+05:15 < Stephen> But, seeing that I'm a game developer, why not
+05:15 < ddod> so it sends the semi private string
+05:15 < ddod> with each message
+05:16 < ddod> so anyone can join any ship as long as they know the string
+05:16 < Stephen> Opulence... I has it.
+05:16 < ddod> minimum viable security
+05:17 < ningu> Stephen: try cheerio
+05:18 < ningu> cheerio injects jquery into any html and lets you manipulate it in node
+05:18 < ningu> it should be easy to find links that way.
+05:18 < ddod> nice: /name ;)DROp table users;--
+05:19 < ningu> little bobby tables?
+05:19 < ddod> the person trying to drop my tables
+05:19 < ddod> hint, there's no db 
+05:19 < ningu> MikeSulivan: I'm in SF. and someone who shall not be named actually paid me to debug their code recently. :P
+05:20 < MikeSulivan> ningu: How do you charge ?
+05:20 < standoo> SF?
+05:21 < deoxxa> ddod: lol
+05:22 < deoxxa> MikeSulivan: mountain dew and pizza
+05:22 < ningu> haha
+05:22 < MikeSulivan> k
+05:22 < ningu> I've always hated mountain dew for some reason
+05:23 < deoxxa> ningu: because you're not a real hacker!
+05:24 < ningu> deoxxa: excuse me. I always wear a proper english hacking jacket.
+05:24 < deoxxa> oh
+05:24 < deoxxa> my mistake
+05:24 < deoxxa> carry on, good 51r
+05:24 < ningu> I want to make that a trend.
+05:24 < ningu> 51r?
+05:24 < ningu> oh.
+05:24 < ningu> took me a sec :)
+05:24 < deoxxa> lol
+05:25 < deoxxa> someone doesn't speak leet
+05:25 < ningu> http://www.countrysports.se/sports-and-style/facts-and-stories/hacking-jacket
+05:25 < deoxxa> how are you supposed to catch hackers on irc without speaking leet
+05:26 < ddod> so nobody has been able to break my game yet?
+05:26 < Stephen> Gimme a sec
+05:26 < Stephen> I can't seem to create a new ship
+05:27 < ddod> refreshing
+05:27 < ddod> once you die, you're dead
+05:27 < ningu> I thought you were trying to spider
+05:27 < ddod> no commands are accepted
+05:27 < Stephen> Ok, so how do you start a new game?
+05:27 < ddod> well it's all the same persistent game
+05:27 < Stephen> ningu: I am
+05:27 < ddod> just refresh to access it
+05:27 < Stephen> refreshing doesn't help
+05:27 < Stephen> "Ship not found"
+05:27 < ddod> refresh and then type /createship
+05:28 < ddod> try just the base hostname
+05:28 < Stephen> Ah, it's leaving the key in the url
+05:28 < Stephen> yeah
+05:28 < ddod> i thought i handled it so it would act as the same either way
+05:28 < ddod> but i'll need to fix that
+05:28 < Stephen> Broke it :-)
+05:28 < SomeoneWeird> ddod, reminds me of eve
+05:29 < ningu> Stephen: anyway, take a look at cheerio
+05:29 < ningu> possibly in combination with nom
+05:29 < Stephen> Ok, I'll look it up now
+05:29 < ningu> nom('http://google.com', function(err, $) {}) // where $ is a jQuery object for the page.
+05:30 < ningu> or just use cheerio directly.
+05:30 < Stephen> Cheerio a node lib?
+05:30 < ningu> yeah
+05:30 < ningu> it's its own module
+05:31 < SomeoneWeird> ddod, where are stations
+05:31 < SomeoneWeird> lmfao
+05:31 < Stephen> ningu: I'm trying to build a link pat between any 2 web pages
+05:31 < Stephen> Not so muchj spider
+05:31 < ddod> stations are at 0, 0 — 5000, 5000 — and 10000, 10000
+05:31 < Stephen> Spider will be part of it for sure
+05:32 < ningu> what's a link pat?
+05:32 < ningu> you said spider so I gave you something to spider :)
+05:33 < lamarus> If I have built a webapp using backbone, is it easy to convert it to node? or will it be a full rewrite?
+05:33 < ningu> isn't backbone client side?
+05:33 < ningu> you're mixing apples and oranges
+05:34 < lamarus> yes... but using the views and the backbone routes.... do they blend in well with node.js
+05:34 < Stephen> Link path
+05:34 < Stephen> Think Degrees of Kevin bacon, Web Page style
+05:34 < ningu> ok
+05:34 < ningu> well, the stuff I mentioned will help you extract all the links from a page
+05:35 < Stephen> Thank you
+05:35 < Stephen> I am looking into it
+05:35 < ddod> someone weird, is that you trying the xss?
+05:36 < SomeoneWeird> nope
+05:36 < SomeoneWeird> im attacking the whining wale
+05:36 < SomeoneWeird> whale
+05:36 < SomeoneWeird> lmfao
+05:37 < ddod> ha
+05:37 < SomeoneWeird> is that
+05:37 < SomeoneWeird> you
+05:37 < SomeoneWeird> lol
+05:38 < ddod> no
+05:38 < ddod> there's very basic AI
+05:38 < ddod> to make it not look so dead
+05:39 < SomeoneWeird> ">>>Your ship has been destroyed and you have died."
+05:39 < ddod> the ai will probably kill you if you attack them
+05:39 < SomeoneWeird> lol
+05:39 < ddod> ha
+05:39 < SomeoneWeird> yep
+05:39 < SomeoneWeird> sadface
+05:39 < Stephen> Chrome keeps causing my computer to come to a crawl
+05:40 < Stephen> So rediculous
+05:43 < ningu> I guess you could say you're.... crawling the web
+05:43 < deoxxa> oh my
+05:43 < deoxxa> sick burn
+05:44 < Havvy> s/burn/pun/
+05:49 < rpcesar> hello, i am looking for some sort of (preferably npm) module that features an in memory "geodatabase" of sorts. Something that offers in memory spacial queries, preferably similar to mongo.
+05:49 < rpcesar> is there anything like this available?
+05:49 < ningu> well, mongo can load the whole db into memory
+05:50 < ningu> if it fits
+05:50  * JamesMGreene sighs and gives up on a NPM name dispute
+05:50 < Stephen> Where are the stations?
+05:50 < ddod> 0, 0 — 5000 5000 — and 10000 10000
+05:50 < rpcesar> yea, not quite what I am looking for, maybe I should explain my intent a bit better. I am experimenting with building a form of distributed game server using nodejs. deploying individual zones as forked isolated processes, with a small in memory store of "objects" which it fetches from a persistant database during specific points in time
+05:51 < Text> ^ I think im in the wrong channel i didn't understand any of that 
+05:52 < deoxxa> rpcesar: funny you should mention that, i just made a (very primitive) thing like that for work today
+05:53 < rpcesar> ive already done some test runs and its working great., the reason im looking for some in-memory store is part of the scaling pattern im using
+05:53 < deoxxa> rpcesar: but mine's very targeted towards a specific purpose, so probably not entirely useful for you. short version of this is that i didn't find anything like what you're talking about, and i spent an hour or so looking today.
+05:53 < rpcesar> yea, ive done a few queries in the past , even wrote something primitive myself
+05:53 < rpcesar> however, i really got stuck when it came to creating a good indexing alogorithm for geospatial queries
+05:54 < deoxxa> r-trees, my man
+05:54 < deoxxa> http://en.wikipedia.org/wiki/R-tree
+05:54 < rpcesar> now i feel really stupid.
+05:55 < deoxxa> there there
+05:55 < rpcesar> in that case, if i can get indexes for that working, think there is any community interest in what would essentially be a primitive version of mongo in-process?>
+05:56 < rpcesar> i know the need is small, but obviously im not the only one
+05:56 < deoxxa> i'd gladly use it
+05:56 < deoxxa> turns out spatial indexing in mongodb is really, really bad anyway
+05:57 < deoxxa> (no find-shapes-containing-this-point searches)
+05:57 < rpcesar> eh... that can be achieved with some tricks and polys IIRC
+05:57 < deoxxa> in mongo?
+05:57 < rpcesar> ive built a few mapping engines for a few real estate MLS companies that I am pretty sure hit that requirement
+05:57 < rpcesar> yes
+05:58 < deoxxa> hrm, interesting
+05:58 < rpcesar> however, bare in mind i did quite a few client side reductions
+05:58 < rpcesar> so it might have been hacked in there, its been about a year
+05:58 < deoxxa> i've resorted to just pulling down the entire collection every few minutes
+05:58 < deoxxa> and doing all processing in code
+05:58 < deoxxa> haha
+05:58 < rpcesar> oh I love map reductions
+05:58 < deoxxa> turns out to be a lot quicker, anyway
+05:59 < rpcesar> ive managed to make some really complex searches blazing fast
+05:59 < rpcesar> yea, just stay away from the ORM's
+05:59 < rpcesar> they block everything-that-is-mongo
+05:59 < deoxxa> amen
+06:00 < deoxxa> i've pretty much settled on mongoskin as my go-to for working with mongo in node
+06:00 < deoxxa> just enough sugar to make it super easy to use
+06:00 < rpcesar> to be honest, my favorite way to work with mongo is java
+06:01 < deoxxa> well i'll try not to hold it against you
+06:01 < rpcesar> nodes second, python 3rd, and php is horrible (any decent ORM's to make it better make it slow as crud)
+06:01 < zomg> How can java be good at working with anything that isn't rigidly structured? :P
+06:03 < ningu> deoxxa: how do you handle things like methods to automatically run on .save()?
+06:04 < deoxxa> ningu: i don't - i don't use mongo as a database with advanced functions as much as i use it as like a persistence thing
+06:04 < ningu> I see
+06:04 < rpcesar> lol, i disagree. java can be good. but for the most part its horrid. for instance, nothing compares to to javas webmail when it comes to reading and processing imap/pop3. nothing. not even close. perfect level of abstraction, and intellegently designed "Authenticator" system (which I ported the design pattern to node and its just as beautiful
+06:05 < deoxxa> most of the data i use with it doesn't fit into a model or definition, ningu
+06:05 < deoxxa> at work we do "stream processing" (which pretty much is what it sounds like)
+06:06 < deoxxa> which reminds me, i should turn on our website sometime soon!
+06:06  * deoxxa finishes the rest of the deployment first
+06:06 < rpcesar> deoxxa : I aggeragate CORS responses from houndreds of MLS organizations :/
+06:06 < rpcesar> (multiple listing services (real estate))
+06:07 < deoxxa> neat!
+06:07 < rpcesar> not, obviously, what im using the in-memory store for (personal project)
+06:07 < deoxxa> hehe
+06:07 < rpcesar> so sounds a bit similar
+06:07 < rpcesar> have you done much with incremental map reduce?
+06:08 < adamramadhan> hello
+06:08 < deoxxa> rpcesar: not really - most of the stuff we do to data coming through actually involves creating *more* records rather than less, haha
+06:09 < rpcesar> we have MR's in the shop that create more records then source inputs :)
+06:09 < deoxxa> oh, ha
+06:09 < adamramadhan> i want to ask about save file, why does my code return empty file? im trying to save an dynamic array, see on('end') im trying to save it. but it write [] into the data. still cant figure it out. :(
+06:09 < adamramadhan> http://pastebin.com/tQAxQ9Zw
+06:10 < deoxxa> well, yeah, i suppose you could call our entire system a *very* incremental map/reduce operation then rpcesar
+06:10 < SomeoneWeird> adamramadhan, show us code
+06:10 < ningu> he did
+06:10 < deoxxa> SomeoneWeird: reply faster
+06:10 < rpcesar> you should honestly consider running it in an actual map reduce
+06:10 < SomeoneWeird> deoxxa, wat
+06:10 < ningu> the old fashioned map reduce is just to fold up the map
+06:10 < adamramadhan> rpcaesar, map reduce?
+06:10 < rpcesar> deoxxa: you just pass it a function to emit, and a function to reduce. both javascript. works with node wonderfully (same dang language)
+06:11 < adamramadhan> can u give me an example ? it would be awesome
+06:11 < rpcesar> sorry i wasnt talking to you
+06:11 < adamramadhan> :|
+06:11 < rpcesar> but i can assure you a map reduction is not what you want to save your file
+06:11 < deoxxa> rpcesar: oh yeah, there's definitely a place for it in our system, but it's such a small place that i feel like it'd just make things more complicated
+06:12 < deoxxa> most of the fun bits are in decoding random binary protocols
+06:12 < deoxxa> we work with a lot of device vendors and such, collecting data from all sorts of weird little electronic dealies
+06:12 < ningu> adamramadhan: does your console.log() output what you'd expect?
+06:12 < rpcesar> deoxxa: have you benchmarked it yet? I mean, we were doing the same thing, a lot of client side stuff. Since you can bundle it all together in a function that passes to mongo (like a stored proceedure)( you can get it REALLY fast.
+06:12 < deoxxa> oh, there's no "client" per say
+06:12 < deoxxa> *se
+06:12 < deoxxa> this is all backend stuff
+06:12 < rpcesar> when I say client in that situation im refering to node
+06:13 < rpcesar> node would be the client to mongo
+06:13  * deoxxa is constantly misunderstanding, must be coming off as silly
+06:13 < rpcesar> the browser the client to node
+06:13 < deoxxa> yeah, i get you
+06:14 < ningu> adamramadhan: the problem is the dns lookup
+06:14 < ningu> the callback is called in the future
+06:14 < ningu> long after return ip;
+06:14 < adamramadhan> ningu: my console.log output an array like ['123.123.123' : ['test.com','etc']]
+06:15 < rpcesar> anyways, thanks for your input deoxxa, ill shoot a message to the room when its up on npm. have a good evening.
+06:15 < deoxxa> rpcesar: hang on, github?
+06:15 < deoxxa> i might miss that message, but i'll see it there :>
+06:15 < adamramadhan> nungu: the return ip is just a test to write to file by csv(), but it doesnt  work. heres a better one, http://pastebin.com/g21br9aj
+06:15 < rpcesar> yea, dont you HAVE to use github?
+06:16 < deoxxa> haha, only if you want to be one of the cool kids
+06:16 < adamramadhan> ningu: what do you mean long after return ip?
+06:16 < ningu> adamramadhan: callbacks are async. they are not invoked at the time you call the function that you pass them to.
+06:17 < ningu> they are invoked when the data is received.
+06:17 < rpcesar> i use bitbucket for my personal stuff, and the library technically is already set up, just need to disconnect some propiatary code from it first
+06:17 < deoxxa> oh, fair enough
+06:17 < rpcesar> so ill probably just fork it onto github sometime this weekend
+06:17 < deoxxa> neat!
+06:18 < ningu> adamramadhan: I assume the 'end' event is being triggered before the callbacks have all completedd.
+06:18 < rpcesar> propiatary code deals with special data types used for communicating with certain 3rd party CORS (MLS) systems. wouldent be usefull for anyone but competitors anwyays
+06:18 < Stephen> so power to engines increases speed, yes?
+06:18 < adamramadhan> ningu: becouse of the dns lookup?
+06:18 < ddod> yeah
+06:18 < ningu> adamramadhan: yes, that's the async method you're calling
+06:19 < SomeoneWeird> count_domain = count_domain + 1;
+06:19 < SomeoneWeird> 0_o
+06:19 < ddod> there's a few idiosyncrasies that aren't apparent
+06:19 < ddod> for each power modifier
+06:19 < ddod> the missile and laser ones simply add the power level to their damage dealt
+06:19 < ddod> the repair should always be in multiples of 5 to be effective
+06:19 < adamramadhan> ningu: is there a better way to do this kinda job? 
+06:19 < ddod> so 0, 5, 10, 15, or 20
+06:19 < ningu> adamramadhan: what i would do is, in on('record'), push row[1] onto a global array. then in on('end'), use one of the methods from caolan's async module to do the dns lookup.
+06:20 < ningu> adamramadhan: for example, use an async.each(). and when that each is finished -- there's a callback for that -- *then* write the file.
+06:20 < Stephen> So what is cargo?
+06:20 < ningu> I think node needs a new marketing campaign. "there's a callback for that"
+06:20 < Stephen> I know the ore is part of it
+06:20 < ningu> Stephen: async.cargo?
+06:20 < ningu> cargo cults?
+06:20 < Stephen> no
+06:20 < Stephen> ddod
+06:20 < ddod> cargo is what you can sell to space stations
+06:21 < Stephen> Why do I start with 450?
+06:21 < ddod> that's the space left
+06:21 < ddod> in your ship's cargo
+06:21 < ddod> the rest is for components
+06:21 < ddod> like your engine, reactor, etc
+06:21 < adamramadhan> ningu: ahh i see, let me try
+06:21 < Stephen> So in the end I only have space for 100 ore
+06:21 < ddod> right
+06:22 < ddod> sorry, it's a misnomer
+06:22 < Stephen> Ok, I'ma sell some ore right quick, see if I can reproduce the -10 bug
+06:22 < ddod> cargo is your ship's weight capacity
+06:22 < ningu> adamramadhan: also, are you sure you want ip to be an array, not an object?
+06:22 < ddod> stephen, you can, i fixed the bug
+06:22 < ddod> but it needs to be restarted
+06:22 < ddod> to take effect
+06:23 < ddod> it doesnt accurately check if you have enough credits
+06:23 < adamramadhan> ningu: its the same right?
+06:23 < ddod> to upgrade
+06:23 < ningu> adamramadhan: I don't think so... but that's a good question.
+06:23 < ningu> you certainly can't do .push() on an objec
+06:24 < ningu> but I guess you can use an array as an object, if you really want to
+06:24 < Stephen> Ok, sold, I have 10 credits
+06:24 < ningu> it just seems pointless for the normal case
+06:24 < adamramadhan> hmm yes thats why im using array, but can we push object into object?
+06:24 < Stephen> ddod: I do /upgrade reactor, and I'm now at -10
+06:24 < ddod> yeah
+06:24 < ddod> it doesnt check it correctly
+06:24 < ddod> just a typo in the code
+06:25 < ningu> adamramadhan: var ip = {}; ip[address] = new Array(); ip[address].push(...);
+06:25 < ningu> adamramadhan: anyway, this is a minor point, it's not why your code isn't working :)
+06:26 < adamramadhan> yeah im still learning, so minor really helps me too in the end
+06:26 < ningu> since an Array is an Object, you can use it like an object. but it doesn't make sense if the data is not indexed like an array.
+06:27 < ningu> that is: it doesn't make sense to use an Array.
+06:42 < adamramadhan> ningu: cant find the callback for done loop in caolan's async module, is it the same as the error callback?
+06:42 < SomeoneWeird> <ningu> adamramadhan: var ip = {}; ip[address] = new Array(); ip[address].push(...); < wat no, that'll erase old entries
+06:42 < ningu> for .each()?
+06:42 < SomeoneWeird> do if(!ip[address]) { ip[address] = [] }; 
+06:42 < ningu> SomeoneWeird: that was the use case for his code.
+06:43 < ningu> SomeoneWeird: that was *after* the test :)
+06:43 < SomeoneWeird> no it's not..
+06:43 < adamramadhan> yeah
+06:43 < adamramadhan> async.each(domains, dnsLookup, function(err){console.log('done')} right?
+06:43 < SomeoneWeird> async.forEach
+06:44 < ningu> SomeoneWeird: newer versions allow .each()
+06:44 < SomeoneWeird> heh
+06:44 < ningu> forEach is deprecated
+06:44 < ningu> not that it really matters
+06:44 < ningu> adamramadhan: anyway, yes, that's right
+06:44 < ningu> the final callback doesn't return anything
+06:44 < ningu> you can also use map(), that might be more like what you're looking for
+06:44 < ningu> but whatever
+06:44 < ningu> each() will work
+06:49 < adamramadhan> ningu: sorry, but still cant get console.log('done') working is this right http://pastebin.com/MEcjHMJm ?
+06:49 < jake562> hey guys
+06:50 < adamramadhan> the console.log(data) is working but the console.log('done') is not.
+06:51 < ningu> adamramadhan: dnsLookup takes two arguments
+06:51 < ningu> you have to call the callback when it's done
+06:52 < ningu> "The iterator is called with an item from the list and a callback for when it has finished. If the iterator passes an error to this callback, the main callback for the each function is immediately called with the error."
+06:52 < adamramadhan> ahhhh i see var dnsLookup = function(data, callback){console.log(data);callback();} is working
+06:52 < ningu> yep
+06:53 < ningu> so when you do that dns.lookup you will write your own callback like before and do callback() as its last line :)
+06:54 < ningu> also, you can start the inline callback with something like:
+06:54 < ningu> if (err) return callback(error);
+06:55 < ningu> that saves an indent, and it passes the error up
+06:57 < adamramadhan> wait but why does the console.log('done') is echoed before the console.log(data) is finised? do we have to count the array then like if count array = counted array then callback done ?
+06:58 < adamramadhan> i mean the loop is finished
+06:58 < ningu> huh?
+06:58 < ningu> are you calling the callback before the dns lookup is finished?
+07:01 < Stephen> ddod: Your audio files are a fierce pain
+07:01 < ddod> fierce pain?
+07:01 < ddod> just too big?
+07:02 < andrew12> or use domains
+07:02 < andrew12> domain all the things
+07:02 < ganzuul> All the things! \o/
+07:02 < adamramadhan> ah wait2
+07:06 < adamramadhan> ningu: please see http://pastebin.com/czeZtczN, maybe i still dont get it :(
+07:07 < ningu> you have to call callback() inside dns.lookup's callback
+07:09 < ningu> http://pastebin.com/f6A3jGZi
+07:09 < ningu> sorry for the messed up indenting (dunno what happened) but you get the idea hopefully
+07:11 < adamramadhan> ahh i see
+07:12 < Shini424> I am viewing a node project and see many lines starting with //= require(...). Can someone explain what the purpose of the //= is?
+07:12 < ningu> Shini424: //= or ||= ?
+07:13 < Shini424> ningu: //=
+07:13 < Havvy> Shini424: I think it's for a build tool that pastes the files altogether.
+07:13 < ningu> ah, could be
+07:13 < ningu>  //= is only an operator in perl6 iirc :)
+07:14 < Shini424> Havvy: Any idea what build tool it is?
+07:15 < Havvy> I do not.
+07:15 < Havvy> It might be SASS or SCSS
+07:16 < Shini424> Ok, thanks!
+07:16 < adamramadhan> OMGG IT WORK! thanks alot ninggu, im still figuring out why does the callback run when the loop is finish rather then runing on each loop.
+07:17 < ningu> huh?
+07:17 < kele> hi
+07:17 < kele> 1
+07:17 < ningu> there is one callback for each iteration of the loop, one for when everything is finished
+07:18 < kele> 没明白
+07:19 < ningu> kele: 我不会说中国话
+07:19 < deoxxa> ha, i can actually read some of that
+07:19 < kele> 哈哈
+07:19 < deoxxa> neat
+07:20 < ningu> I don't know if what i said made any sense
+07:20 < ningu> I used google translate to say "I don't speak chinese" (in simplified hanzi)
+07:20 < deoxxa> well i know it says something about the chinese language
+07:20 < adamramadhan> ningu: yes, please can you give me example where is the callback for the iteration, and one for everything is finished? something like log.console('each it') and log.console.log('all done') ? 
+07:20 < deoxxa> and ability
+07:20 < deoxxa> so yeah
+07:20 < adamramadhan> wew btw i know a little chinese
+07:20 < deoxxa> makes sense
+07:20 < kele> google is good
+07:20 < adamramadhan> ni che tau xiaophien ma
+07:20 < adamramadhan> :D
+07:21 < kele> i use Youdao dictionary
+07:21 < ningu> adamramadhan: pastebin your program again?
+07:24 < adamramadhan> ningu: please use my last one ningu
+07:28 < ningu> ok http://pastebin.com/SXWknhCx
+07:30 < adamramadhan> ningu: thanks again!, wait let me figure it out. :D
+07:33 < Stephen> ddod
+07:33 < ddod> hey stephen
+07:33 < Stephen> I think I killed it on missile upgradew
+07:34 < ddod> oh hrm let me look it up
+07:34 < ddod> it definitely crashed
+07:34 < Stephen> Aint that some shit
+07:35 < Stephen> That was a lot of work :-)
+07:35 < Stephen> Mined 3 asteriods
+07:35 < Stephen> Dealt with the - credits
+07:35 < Stephen> upgrade missiles
+07:35 < Stephen> BOOM, dead
+07:36 < SomeoneWeird> lol
+07:38 < ddod> this whole game has been about 5 days in development
+07:38 < ddod> there's bound to be a lot of bugs
+07:38 < Stephen> I know, just screwing with you
+07:38 < Stephen> It's addicting as hell
+07:39 < Stephen> Anything with a counter to watch 
+07:39 < ddod> if you have any suggestions, i'd love to hear them
+07:39 < Stephen> This is going to sounds silly, but, honestly?
+07:39 < ddod> sure
+07:39 < Stephen> Make the whole thing render inside of canvas
+07:39 < Stephen> lest you get a bunch of scripters
+07:40 < ddod> you mean send it as a canvas render straight from the server
+07:40 < ddod> no clientside code at all?
+07:40 < Stephen> I mean render it just like it looks now, but have it in canvas
+07:40 < ningu> how does canvas actually draw things? it's all js, no html5 right?
+07:40 < ddod> canvas is html5
+07:41 < Stephen> Canvas is all JS
+07:41 < ddod> to prevent scripters, you'd need to render it on the server
+07:41 < ningu> ok, two conflicting answers
+07:41 < ddod> and send it as an image, basically
+07:41 < Stephen> Basically you can load a ByteArray, PNG, all sorts of shit
+07:41 < ddod> well canvas is rendered by js in html5
+07:41 < Stephen> Canvas is part of the HTML5 spec, but is controlled via JS
+07:41 < ningu> I know what sort of facilities it provides, I was wondering how it gets to the browser
+07:41 < ningu> ok
+07:42 < Stephen> All the drawing and the like.
+07:42 < Stephen> I'm fairly certain there is already a lib out there to render a DOM to canvas server side
+07:42 < ddod> yeah i think ive seen that
+07:42 < Stephen> Your particular setup shouldn't be too heavy
+07:43 < ddod> it actually would be a lot more traffic
+07:43 < ddod> than what it currently is
+07:43 < Stephen> Main point: try to get rid of a parsable DOM
+07:43 < ddod> i think eventually i'll do some pattern matching
+07:43 < ddod> to determine who's a bot
+07:43 < Stephen> Modding is cool and all, and honestly, you've got a great setup that prevents cheating. But automation is the problem
+07:44 < ddod> i'm thinking actually it would be cool to have a separate server just for bots
+07:44 < humblesound> http://missedconnections.ericrieper.com/
+07:44 < ddod> i'd be interested to see what bots people can develop
+07:45 < Stephen> ddod: bots controlled via WebRTC :-) no need for servers anymore :-)
+07:45 < Stephen> I get your point though
+07:45 < Stephen> See what kind of algorithms they'd use
+07:45 < Stephen> It's be fun
+07:45 < ddod> ive wanted to do a voice thing
+07:46 < ddod> but i cant figure out a way to do it with anything outside of flash
+07:46 < ganzuul> ddod: HTML5?
+07:46 < Stephen> ddod: Synth voice, or team chat?
+07:47 < Stephen> WebRTC does p2p audio
+07:47 < ddod> tea chat
+07:47 < Stephen> Yeah, WebRTC is coming.
+07:47 < Stephen> As for now:
+07:47 < ddod> the webrtc implementations ive seen
+07:47 < ddod> have all been video
+07:47 < Stephen> look up rtmfp
+07:48 < ddod> and the p2p thing doesnt really make sense to me
+07:48 < Stephen> WebRTC will be both audio & video
+07:48 < Stephen> It's meant to be like a skype replacement
+07:48 < ningu> rtmfp sounds too much like rtfm
+07:48 < Stephen> though the data channel is what I'm looking forward too :-)
+07:49 < Stephen> rtmfp requires a small server to help get the initial connection going between clients, but after that it's p2p
+07:49 < Stephen> I'm fairly certain WebRTC will work the same
+07:50 < Stephen> ddlod
+07:50 < Stephen> ddod: How much are upgrades?
+07:50 < ddod> the upgrades should be 20 and 30 credits right now
+07:50 < ddod> unfortunately, i'm not a very strong coder so the webrtc implementations as they stand
+07:50 < ddod> are geared for doing other thigns
+07:50 < deoxxa> webrtc data channel ftw
+07:50 < ddod> so it's a bit too much work for me to figure them out
+07:51 < deoxxa> i can't wait for that to be a real thing
+07:51 < ddod> i just want something like teamspeak with programmatic control of who is in which channel
+07:51 < ddod> in the browser
+07:52 < Stephen> If you're talking audio, then it's plugins or WebRTC
+07:52 < Stephen> That's really it
+07:52 < Stephen> so Flash
+07:53 < ddod> i think i'll be waiting until someone makes a webrtc library for the stuff i want
+07:53 < humblesound> I love the web!
+07:53 < Stephen> I'm considering making a WebRTC with rtmfp fallback lib
+07:53 < ganzuul> http://blog.chromium.org/2012/04/chromes-webrtc-roadmap.html
+07:53 < Stephen> socket.io for p2p so to speak
+07:55 < ganzuul> ooh http://blog.chromium.org/2013/02/hello-firefox-this-is-chrome-calling.html
+07:56 < SomeoneWeird> welcome to last mognth
+07:56 < SomeoneWeird> month*
+07:56 < SomeoneWeird> :P
+07:56 < ganzuul> SomeoneWeird: Close enough. ;)
+08:00 < Stephen> ddod: Also, get ctrl+up working for command recall
+08:01 < ddod> up arrow
+08:01 < ddod> should do what you're asking about
+08:11 < Havvy> I shudder for the programmer who's going to have to maintain this.  [From ##javascript] http://jsfiddle.net/9Y3TN/
+08:12 < ganzuul> It looks like a matrix calculation.
+08:12 < Havvy> It's not.
+08:12 < ganzuul> Are you sure?
+08:12 < Havvy> Yes.
+08:13 < Havvy> It's for switching the language of a page.
+08:13 < ganzuul> Yeah, was being funneh. :)
+08:17 < Mikk36> Hey
+08:17 < ganzuul> Hi
+08:18 < Mikk36> Having a bit of a trouble here, trying to handle both ascii and utf8 input simultaneously
+08:18 < ganzuul> You're on your own.
+08:18 < Mikk36> Damn
+08:18 < Mikk36> In PHP, i could just do a is_utf8(), bot not here, it seems
+08:18 < genazt> what is the problem ?
+08:19 < genazt> so you need a encoding switcher ?
+08:19 < Mikk36> well, trying to convert my irc bot from php to node.js :)
+08:19 < genazt> which tells you what encoding a buffer is ?
+08:19 < Havvy> utf8 subsumes ascii, no?
+08:19 < Mikk36> and as it is, some clients send data in utf8, some in ascii
+08:19 < ningu> Mikk36: you mean 7bit ascii?
+08:20 < ningu> if so it's pretty easy to scan the string for anything >127
+08:20 < genazt> ascii is designed to have 128 chars
+08:20 < ningu> I can't remember if it starts at 1 or 0
+08:20 < genazt> if a buffer (charCodeAt()) is greater then 128 it is utf8
+08:21 < Havvy> The null byte is 0.
+08:21 < Havvy> It is part of ASCII.
+08:21 < Mikk36> well, the problem is with clients sending the ISO-8859-13 data or however it's defined
+08:21 < genazt> if a charCodeAt is bigger then 65535 it is binary data or utf16
+08:21 < ningu> Mikk36: you can test if something is valid utf-8. all ascii is valid utf-8. however, if it's not ascii and not valid utf-8 you're kind of stuck
+08:22 < ningu> you can use heuristics or just assume what it might be
+08:22 < ningu> but encoding detection is not simple
+08:22 < ganzuul> It's haaard!
+08:22 < Mikk36> oh, right, have to correct myself a bit
+08:22 < Mikk36> i had a custom function in php
+08:22 < ganzuul> For the web you have to use those &blah things for anything special.
+08:22 < Mikk36> just a sec
+08:23 < genazt> https://github.com/mooz/node-icu-charset-detector
+08:23 < Mikk36> if it were web, i would have just specified the required encoding for the client
+08:23 < ningu> genazt: good find
+08:23 < Havvy> ningu: What are you writing anyways?
+08:23 < ganzuul> genazt: Bookamrked.
+08:23 < ningu> I was reading about that charset detector the other day (non-node related)
+08:24 < ningu> Havvy: I'm not writing anything, at least, that we're talking about
+08:24 < Mikk36> http://pastebin.com/xaYzLbKd
+08:24 < Mikk36> this was my solution in PHP
+08:24 < Havvy> Oh, right Mikk36 was the one writing it.
+08:24 < Mikk36> err, damn, have to captcha the link :P
+08:25 < Mikk36> right, it's up now
+08:25 < ningu> well if that's what you want why not just use that regex in node?
+08:25 < Mikk36> is there an equivalent for utf8_encode?
+08:26 < genazt> yes
+08:26 < genazt> stringdecoder
+08:26 < ningu> not knowing php I don't know
+08:26 < ningu> but there are ways to go from string to buffer of bytes and vice versa
+08:26 < genazt> http://nodejs.org/api/string_decoder.html
+08:27 < ningu> ah, it's just a thin interface over Buffer, but yeah
+08:28 < Mikk36> so after getting back data from a socket in a buffer form, i send it to the decoder to decode?
+08:28 < ningu> yes, or you can set the socket's encoding
+08:28 < genazt> yes
+08:28 < ningu> but you might not want to if you don't know what it will be
+08:29 < Mikk36> ie, send it for decoding only if it doesn't contain utf8 already?
+08:29 < ningu> no, you'd have to do that for whatever the encoding is
+08:29 < Mikk36> um
+08:30 < ningu> sockets by default return a Buffer, which is not a string
+08:30 < Mikk36> understood that
+08:30 < Mikk36> and that Buffer also has a toString([encoding]) method
+08:30 < ningu> if you do sock.setEncoding('utf8') then it will auto-return a decoded string
+08:30 < ningu> yes, that too
+08:31 < ningu> if you have a Buffer already you might want to just use toString rather than dealing with the string decoder
+08:31 < ningu> but as for applying your regex to the buffer... I'm not sure :)
+08:32 < genazt> why not use the module ?
+08:32 < genazt> https://github.com/mooz/node-icu-charset-detector
+08:33 < Mikk36> i'll take a look at it, genazt
+08:33 < [jasper]> morning people
+08:33 < genazt> morning
+08:34 < Mikk36> ningu, the issue with that toString so far is that it doesn't do any real converting, meaning that the Latin-7 extra characters still come out as ? marks
+08:34 < ningu> Mikk36: eh? that doesn't sound right
+08:34 < ningu> but I haven't used it in a while
+08:35 < ningu> for anything other than utf8 that is
+08:35 < Mikk36> I have 2 IRC clients here, one sends data in utf8, the other in Latin-7
+08:35 < Mikk36> when i set the socket encoding to utf8, it reads characters nicely from the utf8-sending client
+08:36 < [jasper]> genazt :) I still have one function not working after I split it all  up
+08:36 < [jasper]> btw guys, what do you think is a nicer form of coding? http://www.hastebin.com/viyapurapo.avrasm
+08:38 < Mikk36> setting the socket to plain ascii, it's still just ? marks
+08:38 < Mikk36> so i'll try that module thingie out
+08:38 < ganzuul> [jasper]: http://en.wikipedia.org/wiki/Indent_style#Allman_style
+08:39 < ningu> Mikk36: ascii is NOT latin-7.
+08:39 < Mikk36> well, yeah, latin-7 is based on ascii
+08:39 < Havvy> [jasper]: The latter.
+08:41 < ningu> Mikk36: you can either use the icu thing or an encoding module like node-iconv
+08:42 < ningu> latin-7 support is not in core
+08:44 < [jasper]> ganzuul what should I do with that url? I looked into it..but it's just different styles?
+08:44 < ganzuul> Yeah, I misread.
+08:45 < ganzuul> But do it anyway. =D
+08:45 < [jasper]> yeah..but it doesn't answer my question :P
+08:47 < ganzuul> True.
+08:49 < [jasper]> genazt what do you think?
+08:49 < ganzuul> Personally I like default behavior over explicit in security cases.
+08:49 < [jasper]> ganzuul default behaviour?
+08:50 < [jasper]> so you like the return style betteR?
+08:50 < Mikk36> i prefer the return style, keeps it more readable in my eyes
+08:50 < Mikk36> if-else mess isn't an easy thing to read
+08:51 < ganzuul> [jasper]: Yes.
+08:53 < [jasper]> ok thx guys
+08:53 < ningu> I generally do: if (error) return callback(error);
+08:53 < ningu> even shorter that way.
+08:53 < ningu> let v8 deal with the fact that the return value isn't ever used :)
+08:57 < genazt> so jasper what is the problem with your function ?
+08:57 < [jasper]> haven't figured it out yet genazt
+08:57 < [jasper]> looks to be the same error as before genazt
+08:58 < Havvy> If only there was a good name for a function that generates a function that throws away the error.
+08:58 < genazt> but you cant figure it out where ?
+08:58 < [jasper]> http://www.hastebin.com/lewiheyoge.rb
+08:58 < Havvy> ignoreErrors(function (res) { ... }) maybe?
+08:59 < [jasper]> well I know where it goes wrong genazt...but I don't see the reason why..let me paste the code
+08:59 < genazt> ok
+09:00 < [jasper]> genazt: http://www.hastebin.com/mipefareba.rb
+09:00 < [jasper]> never mind the return true though...that's not the problem :P that should be return :P
+09:00 < genazt> well you dont give a callback function into the exec
+09:00 < genazt> thats the error
+09:02 < [jasper]> hmm genazt...that's what I figured...but socket.io should do that right?
+09:02 < genazt> no
+09:02 < [jasper]> ah ok...you're right..since there is no data being sent..
+09:02 < [jasper]> I forgot to remove that data parameter..
+09:02 < genazt> socket.io doesnt apply a callback to your functions
+09:02 < [jasper]> thanks
+09:02 < genazt> np
+09:02 < [jasper]> btw genazt...i have another question...when using socket.io ...the user can basically edit all my code...and still connect
+09:03 < [jasper]> how can I make sure their -not supplying callbacks...doesn't crash my server?
+09:03 < genazt> well its easy
+09:03 < genazt> make a typeof check everytime you want to respond to a listener
+09:03 < genazt> if (typeof callback !== 'function') return;
+09:04 < [jasper]> hmm..and should I also check the number of parameters that callback excepts?
+09:04 < genazt> you can do that
+09:04 < Havvy> You don't have to.
+09:04 < jacoblyles> what's the best way for one node server to trigger commands on another node server? I was thinking of using http and expressjs, but if I control both servers can't they open some kind of socket? They'll need to pass JSON back and forth
+09:04 < genazt> you can but you dont must
+09:04 < Havvy> All functions accept up to 1024 arguments.
+09:05 < genazt> jacoblyles, use a net socket between them
+09:05 < genazt> jacoblyles, you dont need a full http stack for this
+09:05 < jacoblyles> just a standard tcp socket? 
+09:05 < genazt> well i use a stream muxer in a tcp socket
+09:06 < genazt> but yes a normal tcp socket
+09:06 < jacoblyles> does that handle gathering all the chunks together into a message? 
+09:06 < genazt> no
+09:07 < genazt> but if you want it easy you can use my stream muxer
+09:07 < genazt> which does this
+09:07 < genazt> https://npmjs.org/package/tcp-stream-muxer
+09:07 < jacoblyles> thanks! 
+09:08 < ningu> genazt: it would help if you didn't have a typo in the package description. just saying.
+09:08 < Sven_vB> hi
+09:08 < [jasper]> so if they provide me with a callback with only one parameter...while my server expects 5...this won't crash my server genazt ?
+09:08 < genazt> try it out
+09:09 < genazt> open node in repl mode and type in function oneArg(one) {}; oneArg(1,2,3,4,5);
+09:09 < Sven_vB> where's that typo?
+09:09 < ningu> trough
+09:10 < ningu> the markdown is messed up, too
+09:10 < ningu> :P
+09:10 < genazt> yes it is github markdown
+09:10 < genazt> npm-www fucks it up
+09:10 < ningu> ahh
+09:10 < genazt> in github its nice
+09:10 < ningu> indeed it is
+09:10 < genazt> but thx for the typo
+09:10 < genazt> i will fix this when i need to make a new version
+09:13 < ningu> genazt: isn't it the server that creates the stream that causes 'stream' to be emitted?
+09:13 < ningu> that's what your example seems to show.
+09:13 < genazt> it can be the other way aroun
+09:13 < genazt> d
+09:13 < genazt> the client can also create streams
+09:13 < genazt> and the server also has a stream event
+09:13 < ningu> ah, ok
+09:14 < ningu> well the docs don't make that clear in the description but that makes sense
+09:14 < genazt> the second example shows it
+09:14 < ningu> yeah, I see
+09:15 < genazt> its nice i use it for an updater for an appjs application
+09:15 < genazt> and i pipe all files into a stream which gets muxed into one and the client can update the files out of the muxer
+09:15 < genazt> with small overhead
+09:15 < genazt> and i dont need to care about connection overflows
+09:15 < genazt> :D
+09:16 < ningu> how does it separate the files in the stream?
+09:17 < deoxxa> https://github.com/deoxxa/asciitable ascii tables! get some graphics up in yo' terminal!
+09:17 < genazt> via the stream id
+09:17 < ningu> oh, you create one stream per file?
+09:17 < genazt> you can have a maximum of 255 streams open in one connection
+09:17 < genazt> yes
+09:17 < genazt> i pipe them into a muxer stream
+09:18 < ningu> how does it handle how many to send at once?
+09:18 < genazt> what do you mean ?
+09:19 < ningu> does it wait for some streams to finish before sending others, or does it just send every stream that's been created as soon as possible?
+09:19 < genazt> its send as soon as possible
+09:19 < genazt> it doesnt wait for streams
+09:20 < ningu> meanwhile, http://i.imgur.com/2YBjbSz.jpg
+09:21 < genazt> but i found a bug in it where pipe chaining breaks
+09:21 < genazt> so i can fix your typo :D
+09:21 < ningu> hehe
+09:26 < genazt> so fixed :D
+09:26 < genazt> thanks
+09:29 < [jasper]> I'm starting to like node more and more :P
+09:29 < genazt> its fast easy and extendable
+09:29 < genazt> and its easy to scale up if you need to
+09:30 < deoxxombie> node.js is where the term "web scale" came from
+09:30 < deoxxombie> it holds the entire weight of the internet on its shoulders
+09:30 < genazt> looool
+09:32 < gf3> deoxxombie: That statement just made me gag
+09:32 < Havvy> deoxxombie: Lulz at how pathetically false that statement is.
+09:33 < deoxxombie> Havvy: someone didn't get the subtle wordplay in there
+09:33 < [jasper]> genazt...I so much love the way it's split up now..
+09:33 < [jasper]> really exciting
+09:33 < [jasper]> kinda weird huh :P
+09:34 < deoxxombie> Havvy: hint: "scale" has two meanings
+09:34 < Havvy> Ah.
+09:34 < ningu> it has more than two meanings
+09:35 < deoxxombie> well, yeah
+09:35 < deoxxombie> but only two that are relevant to my witty interjection!
+09:35 < ningu> be sure to remove the web scales before cooking it
+09:35 < deoxxombie> node.js sings in web scale
+09:42 < [jasper]> hmm something went terrible wrong with the splitting of the files genazt :P
+09:42 < genazt> why ?
+09:46 < [jasper]> don't know...having an error I can't replicate
+09:47 < [jasper]> must have something to do with my sockets not being closed in the browser or something
+09:47 < [jasper]> for some reason my logout listener is called 5 times..
+09:47 < [jasper]> it reports..
+09:47 < [jasper]> while there is only 1 socket connection active
+09:48 < genazt> oO
+09:49 < [jasper]> yeah this is really really weird
+09:49 < genazt> yes
+09:50 < genazt> how do you ensure its only one connection ?
+09:50 < [jasper]> well..I only have the page open in 1 browser...
+09:51 < genazt> in the socketio.addListener("connection", function(socket)
+09:51 < Havvy> [jasper]: On your active socket, write this:   socket.on = function (name, handler) { console.log(name, handler.name); events.EventEmitter.on.apply(this, arguments); }
+09:52 < genazt> which does nothing :D
+09:52 < genazt> cause he doesnt use .on
+09:52 < ningu> someone outside seems to be telling his dog to sit. at 2am.
+09:52 < [jasper]> genazt..the problem is somewhere in my login/logout function I think 
+09:52 < [jasper]> website side
+09:52 < genazt> in the client ?
+09:52 < [jasper]> yeah
+09:52 < genazt> a ok
+09:52 < [jasper]> because if I login / logout several times
+09:52 < [jasper]> the problem occurs
+09:52 < [jasper]> and the socket isn't closed / reopened
+09:53 < genazt> if you dont change the site it will not close
+09:53 < Havvy> genazt: Well, whichever function he uses....wrap it.
+09:54 < genazt> well if it is a client problem it wont help
+09:54 < [jasper]> genazt I was able to replicate it..for some reason a login / logout causes that function to be called 3 times...second time even 6 times..
+09:54 < genazt> but to ensure you only bind the event once its okay
+09:54 < [jasper]> so I need to debug client :P
+09:54 < genazt> use google chrome
+09:54 < genazt> and the google dev panel
+09:54 < genazt> it can debug websocket streams very nice
+09:57 < [jasper]> I'm affraid it has something to do with the way that I build my header...templating wise...probably events sticking to elements being renewed...and then the same element added again
+09:57 < genazt> urgs that would be ugly :D
+09:57 < [jasper]> yes it would
+09:57 < [jasper]> :P
+09:57 < genazt> but first i would look into the websocket stream
+09:58 < genazt> if the client send the event more than once
+09:58 < [jasper]> I can debug this quite quickly
+09:58 < [jasper]> it does genazt :P
+09:58 < [jasper]> allready checked that
+09:58 < genazt> well then its not the node server :D
+09:59 < [jasper]> yeah genazt...it's the client...events don't get removed it appears...so everytime I replace the header with new stuff...the same logout events get binded..
+09:59 < [jasper]> so if you login/logout like 3 times...it calles the logout event 12 times after that :P
+09:59 < genazt> ah okay
+09:59 < [jasper]> fugly :P
+09:59 < genazt> yes
+10:00 < [jasper]> but easily solvable...focussing on server now though
+10:00 < genazt> remove all the listenerz
+10:00 < genazt> :D
+10:03 <@Nexxy> HAPPY DAYLIGHT SAVINGS TIME~!
+10:03 < gf3> Nexxy: Is it, though?
+10:03 <@Nexxy> yeah :(
+10:03 < [jasper]> yeah but I'm working with backbone in combination with dust templating on the client side genazt...so must be doing something wrong there
+10:04 < genazt> i dont use backbonejs
+10:04 < genazt> and neither dust templating :D
+10:04 < [jasper]> :P
+10:04 < [jasper]> I kind of like backbonejs...this is the first project I use it on..
+10:04 < [jasper]> but it structures it nicely
+10:04 < genazt> what does backbone do ?
+10:06 < genazt> does it help you structure your data (hash tables, collections, maps) or what ?
+10:07 < [jasper]> genazt it structures views models etc
+10:07 < [jasper]> mvc
+10:07 < genazt> like locomotive ?
+10:07 < [jasper]> don't know locomotive
+10:07 < [jasper]> http://lostechies.com/derickbailey/2011/12/23/backbone-js-is-not-an-mvc-framework/
+10:09 < genazt> so its does a render
+10:09 < genazt> and then it calls the model via socket.io
+10:09 < genazt> or websocket or something like that
+10:10 < genazt> so the render of the template and the routing is completly client sided ?
+10:14 < [jasper]> yes genazt exactly
+10:15 < [jasper]> and it  uses models...I transfer those models from the socket via socket.io
+10:15 < [jasper]> normally backbone uses rest for this...but I'm doing it via socket.io
+10:15 < ganzuul> Which deferred framework to choose... ¯\(º o)/¯
+10:15 < Ralt> isaacs: is there a reason you're not using strict mode in npm?
+10:18 < ningu> Ralt: afaik, a lot of things break in strict mode, including some of node's core libs :)
+10:18 < Ralt> why should he care about node core libs?
+10:18 < ningu> Ralt: does npm need to open a file?
+10:19 < Ralt> he can still use strict mode in his files
+10:19 < Ralt> ningu: what do you mean ?
+10:20 < ningu> maybe I am misremembering, but I thought the other day I turned on strict mode and was unable to require('fs').
+10:20 < genazt> lol
+10:20 < ningu> ah right.
+10:20 < ningu> that's the v8 option --use_strict.
+10:21 < genazt> thats different :D
+10:21 < ningu> I was just realizing that :)
+10:22 < ningu> however, I can't find any obvious docs on what --use_strict actually does...
+10:23 < genazt> well i havent seen it since forever
+10:23 < ningu> https://github.com/joyent/node/issues/4764
+10:23 < genazt> you are the first that show me the use_strict switch
+10:23 < ningu> see, i told you. you can't require('fs')
+10:24 < Havvy> !mdn use strict
+10:24 < genazt> then why do you use the --use_strict switch ?
+10:24 < Havvy> Havvy: Strict mode - JavaScript | MDN <https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Functions_and_function_scope/Strict_mode>
+10:24 < ningu> genazt: to force all scripts to be in strict mode, even ones that don't declare it.
+10:24 < Havvy> (I highlighted myself because copy paste...)
+10:25 < ningu> anyway, the fs issue is clearly a bug.
+10:26 < Ralt> oh
+10:26 < Ralt> yeah, that doesn't prevent from using "use strict" in npm code though
+10:27 < genazt> to break a lot of code
+10:27 < genazt> to force code to pass a strict test is not the best
+10:28 < genazt> i can still work even if it doesnt pass the strict test
+10:28 < Ralt> npm code doesn't break if you pass it to strict mode
+10:28 < genazt> even expressjs isnt built in strict mode
+10:28 < Ralt> strict mode is function scope, files are new scopes in node.js, --use-strict forces even out of where you force it
+10:29 < genazt> yes npm
+10:29 < genazt> but can yiu ensure that all code that is written in the node modules will pass a strict test ?
+10:29 < genazt> i dont think so :D
+10:30 < Ralt> testing would be quick...
+10:30 < Ralt> sed && npm test
+10:34 < ningu> var obj2 = { get x() { return 17; } };
+10:34 < ningu> you can do that? I had no idea.
+10:34 < ningu> that syntax is pretty whacked out.
+10:35 < skope> wacked out
+10:41 < Havvy> ningu: Yes.
+10:42 < Havvy> There's also set x(val)
+10:43 < [jasper]> fixed it genazt :P
+10:45 < ningu> I also didn't know js had with (foo) { ... }. no one ever uses it.
+10:45 < Havvy> ningu: `with` kills perf.
+10:46 < Havvy> It's also highly ambiguous. x = y  has 4 different meanings under a `with` depending on context.
+10:47 < Havvy> x = y + z   has eight!
+10:47 < ningu> yes, but even without 'with', x could potentially refer to a variable any number of scopes up the chain.
+10:48 < genazt> [jasper], nice
+10:48 < ningu> and introducing another x further down would change the meaning of that code.
+10:48 < Havvy> ningu: Yes, but that can be captured almost lexically.
+10:48 < Havvy> `with` adds a quasi-dynamic situation.
+10:49 < ningu> because the compiler knows all of the lexical variables declared in scope, but not all the properties an object might have at runtime?
+10:49 < Havvy> Yep.
+10:51 < genazt> was it the client binding multiple listeners ?
+10:53 < jibay> hello all, github is down ?
+10:53 < Ralt> yeah
+10:53 < Ralt> http://status.github.com
+10:53 < Havvy> Yay. Single point of failure.
+10:53 < ningu> I wish delete obj.foo returned foo.
+10:54 < Havvy> ningu: That would be interesting.
+10:54 < faceleg1> any v8 programmers here?
+10:54 < Havvy> `return delete foo`
+10:54 < jibay> Ralt: ok thanks
+10:54 < faceleg1> or c++
+10:54 < ningu> Havvy: I'm used to it from perl.
+10:54 < Havvy> err... foo.bar
+10:54 < faceleg1> need to konw if it is possible to have a V8 class inherit from Error
+10:54 < faceleg1> so I can' make custom errors
+10:55 < ningu> well, I don't know V8, but anything that inherits from Error is an Error and should be passable to anything that needs one. I would think...
+10:55 < ningu> that's just regular C++
+10:55 < faceleg1> sure, sure
+10:56 < faceleg1> but I need to know if it is possible to make my V8 )C++) class inherit from Error
+10:56 < faceleg1> IDK v8 is strangeness
+10:57 < korilo> are there any JS coding standard?
+10:57 < ningu> and this class represents what exactly?
+10:57 < faceleg1> aan error.
+10:57 < faceleg1> but constructed in C++
+10:58 < faceleg1> and passed as 1st arg to callbacks
+10:58 < ningu> so all you're trying to do is make a new class with single inheritance from Error?
+10:58 < faceleg1> yeah I think so
+10:58 < faceleg1> but not sure if magic is req. to make it work with JS
+10:58 < faceleg1> and rather noob @ C++ still
+10:59 < faceleg1> class GitError : public Error
+10:59 < faceleg1> is my one failed attempt
+10:59 < ningu> how does it fail?
+10:59 < faceleg1> ../src/../include/error.h:20:25: error: expected class name
+11:00 < faceleg1> I've found discussions on the v8 list about this sort of thing
+11:00 < faceleg1> but from 2010 and no conclusions
+11:01 < ningu> well I dunno without seeing the code
+11:02 < ningu> but remember I just know C++ not V8 :)
+11:02 < faceleg|home> yeah
+11:02 < faceleg|home> i'm not sure you can do it 
+11:02 < faceleg|home> waht I've read so far points to one having to do "magic" in JS to get it to work
+11:02 < faceleg|home> which is super lame
+11:03 < ningu> where is error.h? doesn't seem to be in the V8 repo.
+11:04 < jhsto> Does anyone know modules which can write ID3 tags to media files?
+11:04 < faceleg|home> error.h is a custom class in my project
+11:04 < faceleg|home> I'm attempting to refactor it so that JS sees it as inheriting from Error
+11:04 < faceleg|home> instead of just being an object with similar properties 
+11:04 < ningu> well it sounds like there is some sort of basic syntax error
+11:05 < faceleg|home> is this: class GitError : public Error {
+11:05 < faceleg|home> how I declare a class that inherits from "error" in C++?
+11:05 < ningu> did you #include the header that declares Error?
+11:05 < faceleg|home> no I blindly assumed it would magically be there
+11:05  * faceleg|home facepalm
+11:06 < faceleg|home> my internet is capped
+11:06 < faceleg|home> so googling is horribly slow
+11:07 < deoxxombie> aw man, a fellow australian
+11:07 < faceleg|home> nz
+11:07  * deoxxombie tries to comfort faceleg
+11:07 < deoxxombie> oh
+11:07  * deoxxombie retracts comfort
+11:07 <@Nexxy> WOW
+11:07  * faceleg|home sobs
+11:07 < SomeoneWeird> >.>
+11:07 < deoxxombie> there there, bru
+11:07  * Havvy comforts deoxxombie.
+11:07 <@Nexxy> DEOXXA BE NICE TO YOUR NEIGHBORS
+11:07 < Havvy> Err, not deoxxombie.
+11:07 <@Nexxy> also caps
+11:07 < Havvy> faceleg: .
+11:08 < Havvy> All the people I've met from NZ have been awesome.
+11:08 < deoxxombie> Nexxy: my literal neighbours are loud and annoying. my continental neighbours pale in comparison.
+11:08 <@Nexxy> omg mine too
+11:08 < faceleg|home> lol
+11:08 < Havvy> Mine are sometimes. Most of the time they aren't.
+11:08 < deoxxombie> i'm moving house though, so yay!
+11:08 <@Nexxy> deoxxombie, have your neighbors recently tried to kill themselves? mine have.
+11:08 < faceleg|home> I live in an OK house amidst absolute shit
+11:09 < deoxxombie> Nexxy: god i wish
+11:09 <@Nexxy> I just wish they were successful ;<
+11:09 < deoxxombie> Nexxy: mainly so they could actually succeed, and things would be quiet around here
+11:09 < deoxxombie> yeah
+11:09 < deoxxombie> see
+11:09 < deoxxombie> why do they need to yell so much? i just don't get it
+11:09 <@Nexxy> the interesting thing is that I learned an entire EMS team of 6 large guys is quieter than the 3 of them (small lady and 2 kids) on any given day
+11:10 <@Nexxy> who would have thought
+11:10 < deoxxombie> wait, she tried to pull a lady macbeth?!
+11:10 < deoxxombie> daaaaamn son
+11:11 <@Nexxy> I assume
+11:11 < deoxxombie> kind of depressing that she couldn't even manage to knock off a couple of kids though
+11:11 < deoxxombie> i mean, kids are just so damn tiny
+11:11 < ningu> faceleg|home: it looks like the V8 class is called Exception
+11:11 < deoxxombie> they *suck* at fighting
+11:11 <@Nexxy> I just heard the medical team talking loudly about how she refused to tell them what she took as the wheeled her out on a stretcher to be monitored
+11:11 < faceleg|home> ningu: so MyClass : public Exception?
+11:12 < ningu> faceleg|home: maybe, I dunno, I can't quite see how it's implemented
+11:12 < faceleg|home> ningu:  haha np compiling my 1sta ttempt now
+11:12 < faceleg|home> hmm
+11:12 < ningu> it's not going to work, but whatever
+11:12 < faceleg|home> ningu: too right
+11:14 < faceleg|home> ningu:  does what I'm attempting even make sense?
+11:14 < faceleg|home> ningu: does JS have a problem with "throwing" objects that don't inherit from Error?
+11:15 < ningu> well, js doesn't really have inheritance. anyway, I think you can throw objects of any type.
+11:15 < faceleg|home> for the obj to be usable in JS, the C++ class has to inherit from ObjectWrap
+11:15 < faceleg|home> so it was dumb of me to even try to inherit from anythign else
+11:16 < ningu> faceleg|home: take a look at src/factory.cc line 763 or thereabouts.
+11:16 < faceleg|home> do you have a link? Im' on dialup
+11:16 < ashnur> is there way I could check where from(what path) require loads files?
+11:17 < ningu> https://code.google.com/p/v8/codesearch#v8/trunk/src/factory.cc&q=TypeError%20lang:%5Ec%2B%2B$&sq=package:v8&l=658
+11:17 < faceleg|home> ningu: thx a lot
+11:17 < Havvy> Alright. Who thinks DDoSing github is a good idea?
+11:17 < faceleg|home> let you know when the page loads, sigh
+11:17 < ningu> also line 6093 of this: https://code.google.com/p/v8/codesearch#v8/trunk/src/api.cc&q=TypeError%20lang:%5Ec%2B%2B$&sq=package:v8&l=2492
+11:18 < faceleg|home> it's ruby right
+11:18 < ningu> faceleg|home: well, this isn't really going to answer your question but at least you can see how V8 does it internally
+11:18 < faceleg|home> so 5 or 6 connections is basically DDoS
+11:18 < faceleg|home> ningu: steady on first one still loading
+11:21 < Marek_> hello can someone tell my why this script https://gist.github.com/mzelinka/5128202 work incorrectly: when I type "h" (I want to write "Hello") it writes "hh"
+11:26 < faceleg|home> ningu: looks like they're just using an Object, am I right?
+11:28 < faceleg|home> ningu: no, wait
+11:29 < ningu> faceleg|home: I don't really understand the V8 stuff like Handle
+11:30 < ningu> anyway, that should help in understanding how it generates exceptions
+11:30 < faceleg|home> yeah
+11:30 < faceleg|home> ningu:  thanks a lot
+11:31 < ningu> it looks like you just want to call NewError with the relevant arguments
+11:31 < ningu> no class needed apparently
+11:31 < Mikk36> can javascript take the regex code in the same form as I have it here? http://pastebin.com/xaYzLbKd
+11:31 < deoxxombie> haha jesus christ
+11:31 < faceleg|home> ningu: yes that is what I was thinking
+11:31 < deoxxombie> that's some terrible code
+11:31 < ningu> faceleg|home: but look at e.g. NewReferenceError on line 696
+11:32 < ningu> I'm not sure what "$ReferenceError" actually does
+11:32 < Mikk36> ie, stick that same string to a RegExp constructor?
+11:32 < faceleg|home> yeah I just ignored the $ prefxied maker strings in vain hope that I can get it working without it
+11:32 < ningu> maybe
+11:32 < faceleg|home> I've found v8 to be rather hard to understand
+11:33 < ningu> I don't really know what the makers actually do
+11:33 < faceleg|home> neither
+11:34 < ningu> also, I don't know what valid "type" values would be (one of the args to NewError)
+11:36 < ningu> I guess you have to look at Execution::TryCall to know
+11:39 < ningu> Object*** argv = reinterpret_cast<Object***>(args);
+11:39 < ningu> geez.
+11:40 < faceleg|home> ok that's enough
+11:40 < faceleg|home> error as an object it is
+11:42 < ningu> you can know a programmer by his dog. the C programmer prefers pointers; the OOP programmer prefers setters.
+11:43 < deoxxombie> the js programmer was given a wolf by his grandfather
+11:43 < deoxxombie> ...prototypical inheritence
+11:43 < deoxxombie> ok that made me feel bad inside
+11:43 < ningu> hehe
+11:44 < faceleg|home> yeah screw it
+11:44 < faceleg|home> I made an error factory of my own that wraps the libgit2 errors
+11:44 < faceleg|home> I can add the stacktrace etc to the rror object in said factory
+11:44 < faceleg|home> thanks for your help proving to me tht it's way too complicated to do such a simple thing :P
+11:44 < ningu> http://discuss.joelonsoftware.com/default.asp?joel.3.219431.12
+11:44 < faceleg|home> (too complicated to make it 'inherit' I mean);
+11:45 < faceleg|home> oh look at my automatic ';'. I must be a programmer
+11:45 < ningu> you don't do that in js?
+11:45 < ningu> I mean, you don't have to. but I still do.
+11:45 < faceleg|home> do what?
+11:45 < ningu> automatic ;
+11:45 < faceleg|home> hell yes I do
+11:45 < faceleg|home> yes 
+11:45 < [jasper]> genazt still here?
+11:46 < faceleg|home> I've had jshint on in ST2 for so long I actually know where and where not to use it
+11:46 < ningu> faceleg|home: oh, sorry, I'm tired. I missed it up there.
+11:46 < faceleg|home> np
+11:47 < ningu> I find it very strange that js lets you leave out semicolons randomly if you feel like it
+11:47 < faceleg|home> man the internet is unusable @ 56k
+11:47 < faceleg|home> I know 
+11:47 < faceleg|home> the parser attempts to parse and if it fails, it goes in and adds them then tries again
+11:47 < ningu> it's nice for one line code blocks but that's about it
+11:47 < ningu> like function(foo) { bar }
+11:47 < faceleg|home> one line code blocks are for cowboys
+11:48 < faceleg|home> poor little bar deserves its own line
+11:48 < faceleg|home> I'm going to show V8, this error object is going to be THE BEST
+11:48 < faceleg|home> Handle<bla> I still don't really get it
+11:48 < ningu> well, so many things take functions as arguments, I find it more readable sometimes not to put the new line in
+11:49 < ningu> faceleg|home: it's a template. <bla> is the type.
+11:49 < ningu> I don't know if that helps...
+11:49 < faceleg|home> what is a template
+11:49 < faceleg|home> (be glad I know what a type is)
+11:49 < ningu> a template is like a class that takes a type as an argument
+11:50 < ningu> so, Vector<String> is a vector of strings, Vector<int> is a vector of ints. they are the same except for what type they define.
+11:50 < deoxxombie> ooh, ooh, tell him about specialisation!
+11:50 < faceleg|home> Handle<Object> is a handle of object
+11:51 < faceleg|home> deoxxombie: take it slow I'm kiwi
+11:51 < deoxxombie> lol
+11:51 < ningu> deoxxombie: I think I've reached the limits of my fairly rusty C++.
+11:51 < deoxxombie> you know i can't write your ghost code
+11:51 < ningu> when I was doing C++ templates were pretty new.
+11:51  * faceleg|home slow claps for deoxxombie
+11:51 < deoxxombie> haha
+11:51 < deoxxombie> http://www.youtube.com/watch?v=dIYvD9DI1ZA for anyone confused
+11:51 < faceleg|home> when I was doing C++ they made us use emacs and write code that drew bricks on the screen
+11:52 < faceleg|home> it was the single most frustrating time of my life
+11:53 < ningu> oh, I see. you can have special-case template implementations for particular types.
+11:53 < ningu> didn't realize that.
+11:53 < faceleg|home> you know what is gross about v8?
+11:53 < faceleg|home> this: ObjectWrap::Wrap
+11:53 < faceleg|home> ObjectWrap::New
+11:53 < faceleg|home> caps for first letter of method name makes me retch
+11:54 < faceleg|home> caps for first letter of method name makes me retch
+11:54 < faceleg|home> dammit
+11:55 < ningu> one meaning of handle is a pointer to a pointer. dunno if that's what V8 means by it.
+11:55 < ningu> but based on a line of code I saw a bit ago, I think it probably does mean that.
+11:55 < faceleg|home> sweet pointers to pointers
+11:55 < faceleg|home> great
+11:55 < ningu> the thing I pasted above with Object*** was a pointer to a pointer to a pointer.
+11:55 < ningu> hence the ***
+11:56 < faceleg|home> I hate it
+11:56 < faceleg|home> so Template<type> 
+11:56 < faceleg|home> is sort of like a class
+11:56 < faceleg|home> or something
+11:56 < faceleg|home> lol
+11:56 < faceleg|home> actual lol
+11:56 < faceleg|home> stop I'll wake the wife
+11:56 < ningu> well in that case the template would be named Template
+11:56 < ningu> s/template/class/
+11:56 < ningu> which would be confusing
+11:57 < ningu> it's just a class that has been generalized to apply to a range of types
+11:57 < faceleg|home> 2yep
+11:57 < faceleg|home> I think that is waht I was attempting to articulate
+11:57 < faceleg|home> before the laughter
+11:57 < faceleg|home> worst thing about learning *new* programming
+11:57 < ningu> like [] for array, you can have int[] or char[] or whatever... [] applies to any type. well, similarly a template class does whatever it does for the type you specify.
+11:58 < faceleg|home> is the inability to articulate questions at first
+11:58 < ningu> you can also have template classes that take more than one type.
+11:58 < faceleg|home> The grey light of understanding is peeking over the horizon
+11:58 < faceleg|home> no you can't shut up
+11:58 < faceleg|home> what is this: "Assertion Message: Error reports as a function.
+11:58 < ningu> like Point<int, int> versus Point<double, double> or something like that.
+11:58 < faceleg|home> close "
+11:59 < ningu> then you could do Point<int, double> if you wanted to be strange.
+11:59 < faceleg|home> is that because Error.message is a function not a string?
+11:59 < ningu> I don't know. looks like the code generated that error.
+12:00 < faceleg|home> ningu: can you please ask the v8 devs to stop this: String::New
+12:00 < faceleg|home> I hate it
+12:00 < faceleg|home> nah it was b/c my error object had message = function() { return 'the messsage from c++'; }
+12:01 < faceleg|home> needs to be a property 
+12:01 < faceleg|home> node wasn't liking it
+12:01 < ningu> oh, I see. that was a node error.
+12:02 < faceleg|home> "Assertion Message: Error [[Class]] is of type function."
+12:02 < faceleg|home> cool another hurdle
+12:02 < faceleg|home> how to make v8 set type to something that isn't funciton
+12:02 < faceleg|home> without using the internet to research
+12:06 < deoxxombie> i highly doubt that v8 uses the internet to research
+12:06 < deoxxombie> so i think you're safe
+12:07 < faceleg|home> good to know
+12:07 < ningu> is V8 a kind of tomato juice over there?
+12:07 < faceleg|home> yes
+12:07 < ningu> so it's internationally horrible
+12:07 < faceleg|home> yep
+12:08 < ningu> I wonder if they named it for the juice or the engine
+12:08 < faceleg|home> bowels
+12:08 < faceleg|home> they need it for their bowels
+12:09 < ningu> huh?
+12:09 < faceleg|home> omfg
+12:09 < faceleg|home> rage
+12:09 < faceleg|home> I'm testing by (surprise) running my tests
+12:09 < faceleg|home> these errors are popping out elsewhere
+12:09 < faceleg|home> in a diff file.
+12:09  * faceleg|home facepalm
+12:12 < Deithrian> How do you change a shortcut for a package in Sublime Text 2? D:
+12:13 < Deithrian> I'm using NodeEval, but the shortcut for it doesn't work on windows
+12:15 < Deithrian> nvm found it :)
+12:45 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+12:46 < genazt> yes i am here
+12:46 < genazt> but was in dota2 :D
+13:29 < SomeoneWeird> what's the easiest way to add gzip compression to express?
+13:31 < victorbjelkholm> SomeoneWeird, gzippo http://tomg.co/gzippo
+13:31 < SomeoneWeird> cheers
+13:33 -!- mode/#Node.js [+o piscisaureus] by ChanServ
+13:33 < HardCodev> Hi. I'm using socket.io v0.9.13 with express, and i have some strange behavior of the server. After some time, my server freezes and i can't do anything with it. When I type ctrl + c sequence on the console, server starts to work again for some time until it freezes again. Any suggestions?
+13:39 < high5> we have a node version manager installed (nodist), and we installed v0.6.10 with it, but when we enter node in the commad line it still runs v0.8.16
+14:48 < high5> just installed node.io
+14:48 < high5> command node.io opens a file in the root
+14:48 < high5> instead of running our script
+14:49 < wereHamster> is the npm shrinkwrap file format documented somewhere? In particular the "from" and "resolved" keys?
+14:53 < high5> command node.io doesn't run our script
+14:54 < high5> instead it opens a file /bin/node.io
+15:04 < genazt> is someone in here common with mongodb ?
+15:05 < genazt> i have a expireAfterSeconds index but it doesnt delete old documents
+15:06 < mscdex> Yahoo's IMAP sucks
+15:06 < mscdex> it can't even consistently return the same emails for the same query
+15:06 < mscdex> :/
+15:09 < genazt> oh man mongo is shit
+15:09 < genazt> why doesnt it works a documented -_-
+15:13 < phrearch> hey
+15:13 < phrearch> whats the correct way to write a package.json from an object?
+15:13 < phrearch> its not serialized json, so i probably need some toString method?
+15:15 < genazt> it is serialized json
+15:15 < genazt> why should it be something different ?
+15:16 < phrearch> hm, util.inspect does that
+15:16 < phrearch> ehm, i dont know if package.json is serialized
+15:16 < phrearch> doesnt seem so
+15:16 < genazt> well it is valid json
+15:16 < genazt> so it needs to :D
+15:17 < phrearch> hm you have a point there :)
+15:21 < ganzuul> Can I not stream data from a datagram message event?
+15:22 < genazt> you can
+15:22 < genazt> but udp doesnt has an order
+15:22 < genazt> so it could fail
+15:22 < ganzuul> Order as in event queue?
+15:23 < genazt> no order as in tcp
+15:23 < genazt> tcp has an package order
+15:23 < genazt> which udp hasnt
+15:23 < ganzuul> TCP sequence number?
+15:24 < genazt> you send 1,2,3 over a tcp connection and on the other end its 1,2,3
+15:24 < genazt> in udp it can look so: 3,1,2
+15:24 < mscdex> ganzuul: UDP is message-oriented. TCP is stream-oriented.
+15:24 < genazt> or 2,1
+15:25 < ganzuul> I send a lot of small messages from a sensor in a mobile phone. I can intercept them with node just fine, but getting them to a browser with minimum latency confuses me.
+15:25 < mscdex> ganzuul: also UDP has no delivery guarantee, so you could get an order like 1, 2, 4, 5, 8
+15:26 < genazt> udp is good if you dont need the correct message order
+15:26 < genazt> and if it is not fatal that you miss messages
+15:26 < LuckyBurger> you can also implement reliable messages over UDP
+15:26 < ganzuul> There is comparatively a very long delay between each message, so the order should be good enoguh.
+15:27 < ganzuul> LuckyBurger: for this application latency is a lot more important than reliability.
+15:28 < genazt> if you only have less udp message you can stream them
+15:31 < ganzuul> genazt: I think I want something like shoe to send my datagrams to a browser as soon as a datagram is recieved...
+15:31 < genazt> socket.io
+15:31 < genazt> :D
+15:31 < ganzuul> hmm
+15:32 < ganzuul> Perhaps better documentation there...!
+15:32 < genazt> its easy to use
+15:32 < genazt> i can be realtime (the normal configuration has fallbacks which arent realtime)
+15:32 < genazt> and its easy to extend :D
+15:33 < genazt> and it is safe (as safe as a plain tcp stream can be)
+15:33 < ganzuul> I can probably comment out the fallbacks...
+15:33 < genazt> you can configure them
+15:33 < genazt> you decide which fallback it uses
+15:33 < genazt> if you want realtime only allow websocket and flashsockets for your transport
+15:34 < ganzuul> hm
+15:34 < genazt> if you only have downloading into the client you can use iframe, xhr long polling and so on
+15:34 < genazt> which is great for receiving data but not the best for sending data to the server
+15:35 < genazt> it depends on your case :D
+15:35 < ganzuul> In the I intend to 
+15:35 < ganzuul> ...In the browser I intend to graph the sensor data using svg paths.
+15:36 < genazt> so you dont send but only receive data
+15:36 < genazt> so anything is okay
+15:36 < ganzuul> Yes.
+15:37 < genazt> how many clients do you have ?
+15:38 < ganzuul> Just one. This stage is so that I can plot my raw sensor data and figure out how I need to filter it.
+15:38 < genazt> ok
+15:38 < ganzuul> Fileting I would like to do server-side.
+15:38 < genazt> so you dont need a datastore in between
+15:38 < genazt> which can hold much of concurrent reads
+15:38 < genazt> or something like that :D
+15:39 < ganzuul> No, that would be bad. Ideal would be bypassing all buffers.
+15:39 < genazt> so you have kind of database ?
+15:39 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+15:40 < ganzuul> Not really... There is a matrix computation called a 'particle filter' that I would do with a c++ library server-side.
+15:41 < ganzuul> As soon as I get clean data it would be transported to the browser for use in for example three.js.
+15:43 < squeakytoy> hey guys, i have a strange problem. each time i run my nodev, I get: [nodev node-inspector] CreateProcessW: The system cannot find the file specified. <-- i have no clue what has happened or changed
+15:43 < squeakytoy> anyone knows what the problem could be?
+15:44 < genazt> do you have nodeinspector installed globally ?
+15:44 < squeakytoy> locally
+15:44 < genazt> and thats the error :D
+15:45 < squeakytoy> no, but i have always had it local
+15:45 < genazt> i have nodev running in global install and i dont have this error
+15:45 < squeakytoy> this isnt the cause
+15:45 < squeakytoy> sorry
+15:47 < genazt> what kind of output do you get from nodev ?
+15:48 < squeakytoy> 10 Mar 16:44:54 - [nodev node-inspector] CreateProcessW: The system cannot find the file specified.
+15:52 < [jasper]> hej guys, when requiring
+15:52 < [jasper]> what's the priority?
+15:52 < [jasper]> directorys or files?
+15:52 < [jasper]> ?
+15:58 < genazt> http://nodejs.org/api/modules.html#modules_all_together, [jasper] 
+16:04 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+16:06 < naomi> can someone tell me if they see 0.4.6 or 0.4.7 here: https://npmjs.org/package/burro
+16:07 < Stephen> 0.4.7
+16:07 < naomi> Stephen: ok thank you
+16:07 < Stephen> "last updated a few seconds ago"
+16:07 < Stephen> Hmm
+16:08 < naomi> I'm still seeing 0.4.6 on this end, but that's ok
+16:08 < Stephen> naomi: This package looks interesting
+16:08 < naomi> It must be a caching issue
+16:08 < naomi> stephen, well it's super handy, yeah!
+16:08 < Stephen> I've actually been vetting something very similar
+16:08 < naomi> stephen, oh yeah?
+16:09 < Stephen> naomi: So it's JSON ByteStreams, fixed size?
+16:09 < naomi> stephen: getting objects across network streams is an interesting problem; i think burro solves it very elegantly
+16:09 < naomi> stephen, yeah
+16:10 < Stephen> So, JSON is typically nice becase it's as compact as it needs to be
+16:10 < naomi> stephen, you can see this for a little more exposure: https://github.com/naomik/burro/blob/master/lib/framer.js
+16:10 < Stephen> Why pad it?
+16:11 < Stephen> You'll forgive that I haven't ventured very far into binary object in javascript yet
+16:11 < Stephen> My assumption is binary serialization
+16:11 < naomi> stephen, because a network stream can fragment the packet, and in some cases even buffer it
+16:12 < Stephen> Ah, so paired with a streaming JSON serializer this would be awesome
+16:12 < naomi> Stephen: the length prefix ensures that we get out exactly what was put in, regardless of splitting/combining
+16:12 < naomi> Stephen: well probably not, this doesn't write/parse JSON on the fly
+16:13 < Stephen> I understand. There are other libraries for that
+16:13 < naomi> Stephen: if your JSON is so big that you need to read/write it on the fly (this is obviously much more complex), then you should use that
+16:13 < naomi> Stephen: but in a lot of cases, the json is small enough that you don't need all of that overhead
+16:13 < Stephen> For better or worse all I really need on this project is JSON RPC
+16:14 < naomi> lol
+16:14 < Stephen> I know I'm over complicating it
+16:14 < naomi> https://github.com/deoxxa/pillion
+16:14 < naomi> stephen, no it's LOL because deoxxa made RPC using burro :)
+16:14 < Stephen> Browser Extension -> NodeJS
+16:14 < Stephen> Hell, I could use binary blobs if I wanted
+16:15 < naomi> Stephen: i think you will find deoxxa/pillion super helpful if you want rpc :)
+16:16 < Stephen> Basically, I need a model that lets a user trigger events on the server that serve some immediate data back, and some in a deffered secondary response. Also, the server should be able to push events. All this spells to me I should be using WebSockets.
+16:17 < Stephen> The only problem there is that the interaction is not as constant as one thinks of websockets for
+16:17 < naomi> yep, websockets would be great there
+16:17 < Stephen> Or I could just be being cheap
+16:17 < naomi> stephank: and pillion is nice because it's p2p, not necessarily server/client
+16:17 < naomi> stephen ^
+16:18 < Stephen> rtmfp or WebRTC?
+16:19 < naomi> webrtc seems like the go-to choice
+16:19 < Stephen> I was asking about pillion ;-)
+16:19 < naomi> stephen, oh, i don't think pillion really cares
+16:20 < Stephen> I've been considering writing a socket.io-like package which uses WebRTC with rtmfp fallback
+16:20 < naomi> stephen, ultimately, it's sending objects between two hosts, so pillion will be happy with whatever transport mechanism supports that
+16:20 < naomi> Stephen: i'm fairly certain socket.io supports a variety of fallbacks
+16:21 < Stephen> Sorry, nevermind
+16:21 < naomi> http://socket.io/#faq
+16:21 < Stephen> I was curious what p2p tech pillion used
+16:21 < Stephen> I'm super-familiar with socket.io
+16:21 < naomi> stephank: pillion doesn't care what goes inbetween
+16:21 < naomi> neither does burro :)
+16:23 < naomi> they can be used in the web environment, but deoxxa and i are using them completely differently
+16:51 < MI6> joyent/node: koichik v0.10 * c9a4ec9 : http: ServerRequest does not timeout after 'end'  Fixes #4967 (+1 more commits) - http://git.io/-MyVhQ
+16:56 < BlackFate> hello! i have this.. http://dpaste.org/xHHh3/ with http-proxy... every time i get an error.. i get this { [Error: getaddrinfo ENOTFOUND] code: 'ENOTFOUND', errno: 'ENOTFOUND', syscall: 'getaddrinfo' } . If i request the url again.. i get the same error 2 times. If i request it again.. i get it 4 times. etc
+17:06 < BlackFate> http://dpaste.org/cJRjp/ with every request
+17:10 < MI6> joyent/node: Julian Gruber v0.10 * 738347b : events: Handle missing error obj when domains in use  so `ee.emit('error' - http://git.io/oW8GEw
+17:22 < trey_> i need atleast 10,000 tuples belonging to different users on facebook. On each tuple i need the following information: user_name,gender,work,education,likes,number of photos uploaded by him, number of photos in which he is tagged, number of posts in which he is tagged, etc. I actually need it for as a training set for my project. Can anyone help how can i get this dataset?
+17:24 < trey_> ++
+17:47 < milani> can anyone point me to a node module which uses v8 lockers and isolates?
+17:51 < rmg> wasn't there an experiment with isolates in core a while ago and it utterly failed?
+17:52 < rmg> I'm probably misremembering echoes of whispers of rumours..
+17:52 < milani> rmg: I don't know. isaacs may have more information.
+17:55 < rmg> https://github.com/joyent/node/commit/74a8215a8699f89ee4b82ca616a4eafa3b11203b
+17:56 < rmg> "Revert support for isolates."
+17:56 < phrearch> ehm, writing to package.json with json.stringify doesnt produce anything human readable
+17:57 < phrearch> is there some way to format the output with returns?
+17:57 < tanepiper> phrearch: stringify has additional paramaters
+17:57 < milani> rmg I thinkg its different from v8 isolates.
+17:57 < tanepiper> JSON.stringify({}, null, 2) will do 2 space indenting
+17:57 < phrearch> tanepiper: aha, ill check those. thanks!
+17:58 < milani> what I want to do is to use v8::Locker for switching to different threads while using a SINGLE v8 isolate.
+17:58 < phrearch> tanepiper: yep, just what i needed. thanks!
+17:58 < milani> that is using v8 in multithreads
+18:03 < mscdex> milani: i think i tried something similar before and it just didn't work
+18:03 < mscdex> you need multiple isolates
+18:03 < rmg> milani: ya, all I did was git -S, sorry I can't help more
+18:10 < milani> mscdex: even using multiple isolates doesn't help. 
+18:11 < milani> mscdex: should lock still.
+18:11 < MI6> joyent/node: isaacs v0.10 * cd2b9f5 : stream: Avoid nextTick warning filling read buffer  In the function that  - http://git.io/SwBIRw
+18:21 < cainus> hey all... anyone using heroku?  I'm trying to figure out why it can't find the domain module, even though my package version is >=0.8.6 
+18:32 < genazt> anyone here works with mongodb ?
+18:33 < genazt> i have a ensureIndex on a expire key which holds a date value
+18:33 < genazt> but mongodb doesnt delete if it gets expired
+18:36 < korilo> ST2 support is almost there :D -> http://www.indiegogo.com/projects/tern-intelligent-javascript-editing
+18:39 < MI6> joyent/node: isaacs v0.10 * 327b6e3 : stream: Don't emit 'end' unless read() called  This solves the problem of - http://git.io/4mbTXg
+18:52 < eighty4> I seem to be totaly missing something, shouldn'g fs.truncate('myfile.txt', 0); truncate the file? Instead I get http://pastebin.com/2mki9AcB
+19:04 < genazt> eighty4, i think the c api doesnt accept 0 byte files
+19:06 < genazt> well no, the c documentation (ibm) says if the len if 0 bytes it should work and also delete the digital singature of a file
+19:06 < genazt> so it is a bug in nodejs if it doesnt work
+19:06 < eighty4> seems strange that it wouldn't work.
+19:07 < eighty4> I'll google for bugs. I assumed I missread the docs :)
+19:07 < genazt> i think its a bug
+19:07 < genazt> http://publib.boulder.ibm.com/infocenter/iseries/v5r4/index.jsp?topic=%2Fapis%2Fftruncat.htm
+19:07 < genazt> says that the system call of ftruncate (which the node.js fs.truncate uses) accepts 0 byte lengths
+19:08 < eighty4> well, it still doesn't work if I change it to say 8
+19:08 < genazt> okay thats a bug :D
+19:08 < eighty4> I must be doing something wrong...
+19:08 < eighty4> mind testing it as well?
+19:10 < genazt> one moment
+19:11 < genazt> it fails for me either
+19:14 < genazt> http://hastebin.com/qodunifala.js
+19:14 < genazt> on 0.8.21
+19:15 < eighty4> 8.20 here
+19:16 < genazt> but it seems that no issue is opened for this bug
+19:18 < genazt> do you fill a issue ? or should i do it ?
+19:18 < eighty4> I'll file an issue. I'll just try to debug it a bit first
+19:18 < eighty4> looking at what truncate should do
+19:18 < genazt> ok
+19:23 < genazt> ok
+19:23 < genazt> it seems to be fixed in master
+19:24 < genazt> the v0.8.20 + 21 only accept fds to be truncated
+19:24 < genazt> not paths
+19:25 < [jasper]> hej genazt
+19:25 < [jasper]> small question...do you know if there is like a async library for the browser?
+19:25 < [jasper]> like it is for node?
+19:25 < genazt> in the current unstable build its okay
+19:25 < genazt> https://github.com/joyent/node/blob/v0.9.12-release/lib/fs.js#L533
+19:26 < genazt> [jasper], i think the async module can also be used in browsers
+19:26 < genazt> https://github.com/caolan/async
+19:26 < genazt> the readme says it can work in browsers
+19:27 < reactormonk> How do I tell node not to exit when running in --debug?
+19:27 < reactormonk> Err, exit on TypeError or similar
+19:28 < genazt> you cant :D
+19:28 < dobedobedoh> So I've been trying to write an NPM wrapper module which includes a number of tools that we use as dependencies.
+19:29 < reactormonk> genazt, talk about useless debugger :-(
+19:29 < genazt> no why ?
+19:29 < reactormonk> genazt, can I insert a breakpoint at startup?
+19:29 < dobedobedoh> We need to depend upon different versions of the dependencies for different versions of our app (the tools we're wrapping are YUI shifter, yuidoc, and jshint and we need to build with the same version of those tools for our stable versions)
+19:29 < genazt> you can debug-brk
+19:29 < eighty4> genazt: yeah was looking ad https://github.com/joyent/node/blob/master/lib/fs.js#L533 it should accept paths. Not much to report then I guess
+19:29 < genazt> nodejs waits till the debugger gets applied then it executes the code
+19:29 < dobedobedoh> Is there any way that I can have dependencies with sub-dependencies without publishing those first level deps in the directory?
+19:30 < eighty4> I'll just unlink and be happy with it :)
+19:30 < genazt> eighty4, maybe they should cherry pick the commit to bring it into the 0.8 release
+19:30 < genazt> but tomorrow they release the v0.10 build
+19:31 < eighty4> yeah, If I'm the only one that's had a problem with it (can't find anything on it googling) It's not really worth it
+19:40 < reactormonk> genazt, last time I checked debugger was for debugging crashes
+19:41 < cloudbender> So.  Who needs a slap ...
+19:43 < cloudbender> I'm checking out Google CloudPlatform, where I'm told I can forget infrastructure and get on with coding.
+19:43 < cloudbender> And the first thing they take me through is the infrastructure
+19:43 < cloudbender> ... not the coding
+19:44 < tjfontaine> always know your stack
+19:45 < cloudbender> seamonkey has a call stack viewer in the debugger
+19:45 < cloudbender> ten-point-oh ?
+19:47 < cloudbender> I'm tinkering here this morning ...
+19:47 < cloudbender> https://developers.google.com/compute/docs/hello_world
+19:49 < supersym> cloudbender: I found GAE disappointing
+19:49 < cloudbender> Is it worth any time at all ?
+19:49 < supersym> just proves it again: the great G is not infallible
+19:49 < cloudbender> ok
+19:50 < cloudbender> Funny, we're all hyped up for node over V8.  Seems they (g) would be in shape for us.
+19:50 < supersym> well for me, I was trying to get JRuby running on it at the time, appearantly it wasnt actively developed anymore for 1.5 years but still kept mentioned as 'supported' languages
+19:50  * cloudbender is hyped
+19:50 < supersym> I dont get that
+19:51 < cloudbender> hmmm
+19:52 < cloudbender> Is it a path to distraction ? Or is (g) really trying to flesh it out.
+19:52 < supersym> only one way to find out :P judge for yourself 
+19:53 < supersym> I'm so psyched / high on adrenaline just from learning Clojure... tech rush can be so sweet 
+19:56 < cloudbender> If I write a little app on (g), can I let half-a-dozen people use it ? (database, maybe a million records max)
+19:56 < reactormonk> any way to make node return a non-zero exit code when the code errors out?
+19:57 < cloudbender> reactormonk look at the onexit process event
+19:57 < reactormonk> cloudbender, :-/
+19:57 < isaacs_mobile> Cloudbender: process.exit(1)
+19:57 < apoc> is there an alternative npm mirror or something that supports ipv6?
+19:57 < cloudbender> that's a call to exit ?
+19:58 < isaacs_mobile> Er, reactormonk ^
+19:58 < cloudbender> anyway ty I
+19:58 < reactormonk> just checked ruby, and that one doesn't return a non-zero either on errors...
+19:59 < isaacs_mobile> Reactormonk if you throw and don't catch it, node exits non-0
+19:59 < reactormonk> isaacs_mobile, doesn't
+20:00 < isaacs_mobile> Wanna bet? :)
+20:00 < reactormonk> isaacs_mobile, http://sprunge.us/BZVQ
+20:00 < isaacs_mobile> Reactormonk show me a test. 
+20:00 < reactormonk> isaacs_mobile, damn.
+20:00 < reactormonk> used $! instead of $?
+20:01 < reactormonk> *goes back to learning basics*
+20:01 < isaacs_mobile> Hm. Must be a bug in -e. works for script files. 
+20:01 < isaacs_mobile> Oh!  Ha. 
+20:01 < isaacs_mobile> Didn spot that 😅
+20:02 < reactormonk> $!            the process id of the last command run in
+20:02 < reactormonk>               the background.
+20:02 < isaacs_mobile> Yep
+20:04 < reactormonk> isaacs_mobile, git bisect needs exit code, that's why.
+20:07 < cloudbender> so nice when things work out
+20:11 < supersym> ^^
+20:24 < andrearossi> hi there! any experts on socket.io?
+20:24 < andrearossi> apparencly
+20:25 < andrearossi> apparently I'm one of the millions that have problems with sessions between express3.x and socket.io..
+20:41 < genazt> andrearossi, no you are the only one :D which is the problem 
+20:41 < genazt> ?
+20:42 < andrearossi> I really (reeeeally) cannot save my damn data in the session
+20:42 < genazt> so you have the decrypted session out of express
+20:42 < genazt> but you cannot save it ?
+20:43 < andrearossi> I just want my clients to connect to an url, fetch a param from this url, save it in the session, and then use this data on the handshake of socket!
+20:43 < andrearossi> socket.io
+20:43 < genazt> even not with session.save() ?
+20:43 < andrearossi> which is no more than the room number
+20:43 < andrearossi> nothing
+20:43 < andrearossi> I'm trying with MemoryStore, RedisStore, and now with session.socket.io
+20:43 < andrearossi> but nothing
+20:43 < genazt> well how does your session prototype looks like ?
+20:44 < genazt> util.inspect(sessionObject)
+20:46 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+20:46 < andrearossi> here it is
+20:46 < andrearossi> https://gist.github.com/andreacode/d1a997d1d7823f966587
+20:46 < andrearossi> the code, I mean!
+20:49 < andrearossi> on first call, I have 
+20:49 < andrearossi> { cookie:
+20:49 < andrearossi>    { path: '/',
+20:49 < andrearossi>      _expires: null,
+20:49 < andrearossi>      originalMaxAge: null,
+20:49 < andrearossi>      httpOnly: true } }
+20:49 < andrearossi> then, after the injection and the save in the controller...
+20:50 < andrearossi> { cookie:
+20:50 < andrearossi>    { path: '/',
+20:50 < andrearossi>      _expires: null,
+20:50 < andrearossi>      originalMaxAge: null,
+20:50 < andrearossi>      httpOnly: true },
+20:50 < andrearossi>   room: '1234' }
+20:50 < andrearossi> but then, in the socket.io handshake (actually, in the MemoryStore.get call)...
+20:50 < andrearossi> { cookie:
+20:50 < andrearossi>    { path: '/',
+20:50 < andrearossi>      _expires: null,
+20:50 < andrearossi>      originalMaxAge: null,
+20:50 < andrearossi>      httpOnly: true } }
+20:50 < andrearossi> nothing
+20:50 < andrearossi> absolutely nothing
+20:50 < aandy> ah, there's your problem: cookie.push({spam: true})
+20:51 < andrearossi> ahem, sorry… =/
+20:53 < genazt> hmmm+
+20:55 < genazt> is the socket active while you change it ?
+20:56 < andrearossi> no, as I open the socket connection after loading the page, in a javascript at the end of the body..
+20:57 < genazt> hmmm
+20:57 < genazt> then i dont now why it doesnt work
+21:00 < andrearossi> thank you anyway!
+21:04 < deoxxa> come on, where's 0.10
+21:04  * deoxxa cracks whip
+21:04 < tjfontaine> I ate it
+21:09 < ganzuul> I can't figure out the control logic / hierarchy of what I'm trying to do: https://gist.github.com/ganzuul/5130410
+21:09 < ganzuul> ReferenceError: socket is not defined
+21:10 < ganzuul> Could someone lend a hand, please?
+21:11 < deoxxa> tjfontaine: oh jeez man, come on
+21:12 < tjfontaine> deoxxa: I was hungry and didn't want anything in the cuboard
+21:12 < tjfontaine> cupboard, I type good
+21:12  * spion just installed node.js on MK808B - http://www.amazon.com/Bluetooth-MK808B-Android-Rockchip-Cortex-A9/dp/B00ALSZNLW
+21:12 < deoxxa> lol
+21:12 < deoxxa> i can words
+21:12 < spion> and soon, I shall have my custom super-cheap media server
+21:14 < Virunga> spion: what will you do with node on your system?
+21:18 < spion> Virunga, my main goal was to make a decent file (media) management app
+21:19 < Virunga> spion: uh, cool.
+21:19 < spion> most existing web-based file servers on the android market make absolutely no use of the HTML5 file API 
+21:19 < spion> and feel clunky and hard to use
+21:20 < spion> so... I decided to write my own.
+21:21 < genazt> for a file server on your media server ?
+21:21 < genazt> will it support other channels ?
+21:21 < Virunga> Sounds fun :)
+21:21 < spion> but thats just the beginning (the immediate need) I'm sure I'll come up with other uses of node pretty soon :)
+21:23 < spion> genazt, other channels?
+21:24 < genazt> rtmp, dnla, hls
+21:24 < genazt> dlna*
+21:25 < spion> rtmp, dlna, probably not. don't know what hls is
+21:25  * spion tries to google it
+21:25 < genazt> http live streaming
+21:25 < spion> ah. damn
+21:26 < genazt> it would be nice to have if you are around and you can stream from your android / iphone to your box and it records
+21:26 < genazt> or you send files to it (sharing)
+21:26 < genazt> :D
+21:27 < genazt> or it streams files to you (so you can view it if you leave the house) :D
+21:28 < spion> ... maybe.
+21:35 < asdf12> 0.10 tomorrow~!
+21:36 < genazt> tomorrow 23:59 :D
+21:40 < eighty4> \o/ It's working
+21:41 < eighty4> genazt: 23.59, but what timezone?
+21:43 < genazt> its wayne
+21:43 < genazt> but if you want in mine (GMT +01)
+21:57 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+22:01 < faceleg> anyone familiar with v8 here?
+22:03 < tjfontaine> faceleg: it's easier to ask than it is to ask to ask
+22:03 < faceleg> you've said that to me before
+22:03 < faceleg> you'd think I'd know better by now
+22:03 < faceleg> "No V8 access from worker!
+22:03 < faceleg> "
+22:03 < deoxxa> this conversation is 400% inefficient
+22:03 < faceleg> in: http://kkaefer.github.com/node-cpp-modules/#no-v8-access
+22:04 < faceleg> does this mean one is not allowed *at all* to use V8 code iwthin uv_work Work method?
+22:04 < faceleg> i.e. in this: http://kkaefer.github.com/node-cpp-modules/#worker-function
+22:06 < deoxxa> faceleg: correct!
+22:06 < tjfontaine> faceleg: well, you could use a separate isolate, but you shouldn't try and use the default node v8 isolate from the worker thread
+22:06 < deoxxa> faceleg: because pretty much everything in v8 is like "hahah wow what's concurrency"
+22:06 < faceleg> deoxxa: lol 
+22:07 < faceleg> tjfontaine: not konwing what an isolate is I wont try
+22:07 < faceleg> so my current workflow
+22:07 < faceleg> which is 
+22:07 < faceleg> INitail func: setup uv_work
+22:07 < tjfontaine> faceleg: http://izs.me/v8-docs/classv8_1_1Isolate.html for a primer
+22:07 < faceleg> work: gather data onto the baton
+22:07 < faceleg> after: move data into handles that are then used as args for the JS callback
+22:07 < faceleg> is that right?
+22:08 < tjfontaine> after_work proxy to js objects
+22:08 < faceleg> yeah
+22:08 < jonathanmh> Hey, I'm trying to deploy node.js on a subdomain of nginx, where only the tld isn't pointed to the same server. It's not working out for me.
+22:08 < tjfontaine> faceleg: that is the right idiom
+22:08 < faceleg> just wanted to sanity check
+22:08 < faceleg> ok cool
+22:08 < faceleg> and it's ok for me to make functions that might be used to do the gathering of data (not using V8) for cases where teh gathering must be done in more than one place
+22:08 < faceleg> say in an async and sync version of teh same
+22:08 < faceleg> thing
+22:09 < faceleg> although thinking about it I don't know if this would even result in fewer lines, maybe more.
+22:09 < tjfontaine> I'm not entirely sure what you meant there
+22:09 < faceleg> i have an async and a sync version, of say commit.lookup
+22:09 < faceleg> commit.fetchDetails I mean
+22:10 < faceleg> which gets the details (author, time etc) of a commit from libgit2
+22:10 < faceleg> actually don't worry
+22:10 < tjfontaine> and it behaves sync or not based on if a cb is present?
+22:10 < faceleg> no I've made fetchDetails async
+22:10 < faceleg> and fetchDetailsSync
+22:10 < faceleg> I prefer clarity
+22:10 < tjfontaine> as well you should
+22:11 < faceleg> the sync version, in c++ pretty much does Work and AfterWork in one
+22:11 < tjfontaine> right
+22:11 < jonathanmh> Is there any nginx specialist around, I only have a 16 line logfile that gives me an empty response, even though the node server is fine http://pastebin.com/MGnKriFk
+22:11 < faceleg> was wondering if tehre was a way to make it more DRY
+22:12 < tjfontaine> pull what is done in Work/AfterWork out I suppose and call them from the Sync
+22:12 < faceleg> mm
+22:12 < tjfontaine> you could look at node/src/ to see a bunch of other examples
+22:12 < faceleg> i'm worried that this will make it more complicated than the 'benefits' of DRY will bring
+22:12 < faceleg> yeah
+22:14 < faceleg> nd thus waste my time
+22:27 < binarypriest> hello
+22:27 < binarypriest> I am new to Node and jsdom and was wondering how I can get jsdom / node to recognize external javascript files ? I have tried everything I can find on the net and none of it seems to work
+22:29 < [Fudge]> weird
+22:29 < [Fudge]> getting "Error: A Server or ReplSet instance cannot be shared across multiple Db instances" with mongo-lite
+22:29 < [Fudge]> I'm doing a .forEach on an array and inserting something into the database with the result
+22:30 <@Nexxy> [Fudge], are you trying to connect to the db multiple times?
+22:30 < [Fudge]> nope, just once
+22:30 <@Nexxy> I remember getting an error like yours when debugging something that ended up being multiple calls to db.connect
+22:30 <@Nexxy> or something... I don't really use mongo ;<
+22:31 < [Fudge]> Nexxy: http://d.pr/n/rZ0q
+22:37 < [Fudge]> Nexxy fixed, used async.eachSeries()
+22:37 < [Fudge]> that module is pretty handy
+23:00 < faceleg> i find myself using t constantly
+23:00 < clarkk> would someone mind looking at this for me, please? I have successfully populated a mongo db, via mongoose and the browser. I'd like to refresh the data in the database using a fixtures file. For this I am using mongoose-fixtures at https://github.com/powmedia/mongoose-fixtures . The problem is that nothing is loaded. This is my code. https://gist.github.com/hal-gh/c6b26584afbcc039d8d0  Can anyone see the problem, please?
+23:01 < draginx> how do i get session id from an express app?
+23:01 < draginx> nvm
+23:05 < clarkk> I think the problem is at this bit of code.. http://i.imagebanana.com/img/m0rbokwj/Selection_039.png . This is what node-inspector shows about the arr variable: http://i.imagebanana.com/img/8i98facb/Selection_040.png .  Could someone tell me why !arr.length returns true, hence making the code return to the callback? Am I exporting the data correctly from usersdb.js?
+23:05 < clarkk> it seems to me that arr.length should equal 7
+23:05 < Industrial> can I make a/dir/like/../../this/ into a/this easily ?
+23:05 < dobedobedoh> path.resolve() ?
+23:06 < dobedobedoh> http://nodejs.org/api/path.html
+23:06 < Industrial> right
+23:07 < faceleg> what is a really good movie released in the last few years that I might have missed
+23:07 < deoxxa> faceleg: django!
+23:08 < faceleg> oh yeah
+23:08 < faceleg> is it wife-friendly
+23:08 < clarkk> faceleg that's a bit OT, isn't it? :p  The Prestige, Memento ?
+23:09 < faceleg> deoxxa: watched "The Lincoln Lawyer", it was surprisingly good. Yes this is OT. Seen both of those
+23:09 < clarkk> faceleg what genre?
+23:09 < deoxxa> faceleg: oh, it should be... i guess
+23:09 < faceleg> "Good"
+23:09 < dobedobedoh> Juno?
+23:09 < deoxxa> faceleg: depending on what she's into
+23:09 < faceleg> omg hate Juno
+23:09 < faceleg> wait
+23:09 < faceleg> is taht the one where the teen gets pregnant
+23:09 < clarkk> faceleg yes
+23:09 < faceleg> to "George Michael Bluthe"?
+23:10 < faceleg> s/e\"//
+23:10 < clarkk> faceleg "good" is not a genre
+23:10 < faceleg> clarkk: null then
+23:10 < dobedobedoh> faceleg: yup
+23:10 < faceleg> assuming null causes a genre wide search
+23:10 < clarkk> faceleg "good" is subjective, as you have just demonstrated
+23:11 <@Nexxy> faceleg, Dark Shadows - 2012
+23:11 <@Nexxy> horror comedy
+23:11 < faceleg> yeah I sort of liked that
+23:11 < faceleg> wife hated it
+23:11 < clarkk> 40 year old virgin makes RomComs tollerable. As does Knocked up
+23:11 <@Nexxy> WHAT
+23:11 < faceleg> quite funny how much she hateed it
+23:11 < faceleg> hahaah yeah those are good
+23:12 <@Nexxy> how can you hate a tim burton johnny depp helena bonham carter movie
+23:12 < clarkk> Avengers was surprisingly good
+23:12 <@Nexxy> I just... wow
+23:12 < faceleg> my wife is chinese
+23:12  * dobedobedoh wasn't keen on Dark Shadows. I was expecting more
+23:12 < faceleg> yeah avengers *was* good
+23:12 < faceleg> seen TaiChi Zero?
+23:12 < clarkk> I hate Tim Burton - totally overhyped.  I like Helena, tho
+23:12 < faceleg> actually looking forward to IronMan3 too, marvel comic movies have me addicted
+23:13 <@Nexxy> it's kind of funny to hear 'overhyped' as a reason to dislike someone/thing
+23:13 <@Nexxy> "too many *other* people like them, so *I* don't."
+23:13 < faceleg> node is overhypted
+23:13  * Nexxy counter-cultural
+23:13  * faceleg you probably haven't heard of it
+23:13 < clarkk> Nexxy: ok, let me put it another way - I've never seen a tim burton movie that I've enjoyed
+23:13 < faceleg> ^^
+23:13 <@Nexxy> clarkk, that sounds a lot moar reasonable :P
+23:14 <@Nexxy> also you have poor taste
+23:14  * Nexxy coughs
+23:14 < faceleg> So who else is looking forward to the next Avatar movie?
+23:14 <@Nexxy> ilol'd
+23:14  * faceleg leans forward expectantly
+23:14 < clarkk> heh, nope. The last one wasn't too memorable
+23:15 < faceleg> what? Smurfs in space dancing with wovlves doesn't do it for you?
+23:15 < faceleg> wolves*
+23:15 < faceleg> Shutter Island?
+23:15 < clarkk> oh no, that was not good
+23:15 < clarkk> well, it was average
+23:16 < faceleg> WHAT
+23:16 < faceleg> you've aliented both me and Nexxy 
+23:16 < faceleg> you don't like tim burton, meh neither
+23:16 < faceleg> but you don't like shutter island!?
+23:16 < clarkk> heh
+23:16 < faceleg> what *do* you like?!
+23:17 < clarkk> I gave you two, but unfortunately you've seen them ;)
+23:17 < faceleg> haha
+23:17 < faceleg> "The Grey"
+23:17 <@Nexxy> faceleg, the newest twilight movie ws pretty good
+23:17 < faceleg> appallingly bad
+23:17 < faceleg> Nexxy: havn't seen it. but if it's anything like vampire diaries then I love it
+23:17 <@Nexxy> faceleg, the only warning is how bad the CGI is in the beginning of part 2
+23:17 <@Nexxy> CG*
+23:17 <@Nexxy> derp
+23:18 < clarkk> amore is meant to be amazing
+23:18  * faceleg isn't sure if Nexxy is serious
+23:18 < faceleg> life of pi?
+23:18 < clarkk> Argo is meant to be very good
+23:18 < faceleg> imho that was great until the last 10 minutes
+23:18 < faceleg> yeah it is, good one
+23:18 < Industrial> What's a quick and easy way to load an array of file paths from disk into an object by path?
+23:18 <@Nexxy> clarkk, I heard it was a total sham of a historical account
+23:18 < faceleg> shh we've talking about movies
+23:18 < Industrial> in parallel.
+23:19 <@Nexxy> Industrial, in parallel?
+23:19 < faceleg> async.series?
+23:19 <@Nexxy> use fs.readdir?
+23:19 <@Nexxy> series != parallel
+23:19 < faceleg> it's lunch time
+23:19 < faceleg> ignore me
+23:19 <@Nexxy> I'm sorry, were you saying something?
+23:20 < Industrial> https://gist.github.com/Industrial/f1ac23f3ecc84889066e
+23:21 < Industrial> Nexxy: trying to tackle how to load these up as fast as possible. I want to merge them at certain points before 
+23:22 < Industrial> I'm done loading the configuration so I can start the services according to the configuration (and perhaps figure out a load order, etc)
+23:23 <@Nexxy> Industrial, I mean, this looks OK
+23:23 < clarkk> would someone mind telling me why arr.length is undefined in the following code (from https://github.com/powmedia/mongoose-fixtures)?  http://i.imagebanana.com/img/m0rbokwj/Selection_039.png . See the node-inspector graphic showing length=7 here:  http://i.imagebanana.com/img/8i98facb/Selection_040.png .    Am I exporting the data correctly from usersdb.js in this code?  https://gist.github.com/hal-gh/c6b26584afbcc039d8d0  
+23:24 < Industrial> yeah but I'm not sure how to do the looping asynchronously. when to decrement i precisely in order for it to wait for all fs.readFile() calls to complete and then move on, calling the callback.
+23:25 <@Nexxy> you could look at how async does it
+23:25 < clarkk> faceleg The movie, Drive, wasn't bad http://www.imdb.com/title/tt0780504/
+23:27 < clarkk> faceleg Warm Bodies looks fun, as you like those twilight / vampire type movies http://www.imdb.com/title/tt1588173
+23:32 < spion> or just do it with async: async.parallel(paths.map(function(path) { return fs.readFile.bind(fs, path); }), function(err, contents) { /* all files' contents are now in contents[] */ })
+23:36 < faceleg> clarkk: does everything have Bryan Craston in now?
+23:36 < faceleg> oh yeah clarkk warm bodies looks interesting
+23:36 < clarkk> faceleg hehe, yeah he's got a lot of work since Breaking Bad, hasn't he?! ;)
+23:37 < faceleg> clarkk: an amazing amount
+23:37 < ibash> anyone know requires here?
+23:37 < faceleg> no leads that I know of
+23:37 < ibash> We get undefined when requiring a file, and there is no circular dependency
+23:38 <@Nexxy> ibash, are you exporting anything?
+23:38 < ibash> We're returning
+23:38 < ibash> returning what we want
+23:38 <@Nexxy> ibash, you should gist the file in question
+23:39 < ibash> https://gist.github.com/ibash/5131011
+23:39 < ibash> The file is run, we can console.log stuff from it
+23:39 < ibash> but it shows up as undefined in the file requiring it
+23:39 <@Nexxy> are you using some sort of amdish thing?
+23:40 <@Nexxy> I don't see a module.exports
+23:40 < ibash> @Nexxy isn't that the normal way you define a module?
+23:40 <@Nexxy> no
+23:40 < ibash> for require js?
+23:40 <@Nexxy> you do;
+23:40 <@Nexxy> ah, there you go
+23:40 <@Nexxy> I have no clue
+23:40 <@Nexxy> I don't use requireJS
+23:41 <@Nexxy> node uses module.exports = function() { // your exported stuff here };
+23:41 < ibash> … thanks anyway
+23:41 < clarkk> faceleg I find that US TV shows eclipse a lot of movies these days, because the scale can be much greater due to the time they have to develop the plot and characters, and the budgets can be extremely large too. The Wire, The Shield, Farscape, Battlestar Galactica, Lonesome Dove. All more "classic"/must-see than a lot of movies in recent years
+23:41 <@Nexxy> I'd be surprised if there was actually a good reason to use AMD
+23:41 <@Nexxy> (in node)
+23:42 < echo> I didn't know requireJS node-side was a thing, I've only seen it implemented browser side.
+23:42 <@Nexxy> I think its usefulness is often quite debatable in the browser as well
+23:43 < Sly> Nexxy: I've missed you. Where have you been?
+23:43 <@Nexxy> Sly, here and there
+23:44 < Sly> How's the little one?
+23:44 <@Nexxy> he's becoming some sort of carpet warrior
+23:44 <@Nexxy> falling down over everything
+23:44 < clarkk> node follows the CommonJS spec, doesn't it?
+23:44 <@Nexxy> and crawling onto things
+23:45 <@Nexxy> clarkk, kind of maybe a little bit
+23:45 < ibash> ...
+23:45 < ibash> fuuuuck
+23:45 < ibash> grr
+23:45 < ibash> << hates bugs
+23:45 < Industrial> Nexxy: https://gist.github.com/Industrial/f1ac23f3ecc84889066e/revisions :-)
+23:46 <@Nexxy> Industrial, sweet! does it work?
+23:46 <@Nexxy> also I think you're leaking a global scoped 'i' now
+23:47 < Industrial> Nexxy: in the map? how's that global?
+23:47 < Industrial> (also yes it works)
+23:48 < Industrial> instead of doing async.apply(fs.readFile, path); can I also add other operations to each like .toString() ?
+23:49 < Industrial> or would it make more sense to do that in a different loop?
+23:50 <@Nexxy> Industrial, I just don't see a 'var'
+23:50 < Industrial> it was an argument :0
+23:50 < Industrial> now gone
+23:52 < Industrial> https://gist.github.com/Industrial/f1ac23f3ecc84889066e/0068cbbe17765070658dd6eef7fe4066017dc2de
+23:52 < Industrial> yay empty JSON definitions
+23:52 < ibash> figured it out
+23:52 < ibash> booo
+23:52 < ibash> thanks!
+23:55 < clarkk> Would someone please mind looking at this and letting me if I am interpretting it correctly.    http://i.imagebanana.com/img/8i98facb/Selection_040.png   Is arr.length === 7?  It seems to be returning as undefined
+23:56 < Sly> clarkk: arr.Users.length = 7
+23:56 < Sly> Object.keys(arr).length = 1
+23:57 < clarkk> riiight
+--- Log closed Mon Mar 11 00:00:54 2013
