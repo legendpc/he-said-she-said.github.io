@@ -1,0 +1,1084 @@
+--- Log opened Sun Feb 24 00:00:26 2013
+00:04 < jtomasrl> should i use varnish as an http proxy ar put it before a proxy ?
+00:16 < someprimetime_> so… what am I doing wrong here: http://jsfiddle.net/KsZww/
+00:16 < someprimetime_> to get my own session flash working
+00:16 < someprimetime_> that's pretty much it no?
+00:19 < someprimetime_> yo hallas can you scope that please
+00:20 < hallas> error and success is mixed up in your middleware
+00:20 < hallas> might aswell use res.locals also
+00:21 < hallas> other than that looks fine, might aswell do app.use(flashMessages); before the router is added to the stack
+00:22 < hallas> unless you really want that control @someprimetime_ 
+00:23 < robinson_k> that moment you made a pull request to npm-www and recognize six minutes later that you committed one semicolon :(
+00:23 < hallas> app.locals will not be cleaned up
+00:24 < hallas> in my opinion, even accessing app directly from a route 
+00:24 < hallas> err, from a middleware function, shouldnt be done
+00:24 < hallas> use req.app
+00:24 < someprimetime_> ah that's right.. you *just* told me to use `res` my mistake
+00:24 < hallas> its cleaner and wont break when you refactor into seperate controllers
+00:24 < someprimetime_> wait what?
+00:25 < someprimetime_> didn't catch the last part really
+00:25 < ugarit> what's the preferred paste website for this channel?
+00:25 < robinson_k> hrm, should i rebase the pull request now?
+00:25 < hallas> well, the only reason you can even do app.locals is because you're defining your routes and their respective middleware is because its in the same file where the app is a part of the scope
+00:25 < boogyman> there isn't
+00:26 < hallas> but once you have middleware in files where the app object is not defined
+00:26 < hallas> it'll break
+00:26 <@isaacbw> ugarit: hastebin if you want to be cool
+00:26 <@isaacbw> gist if you're a sheeple
+00:26 < hallas> therefor there is a reference to the app object in the request object, so you can still access it, for example to read settings and stuff
+00:27 < hallas> its not gonna do anything in your case, @someprimetime_, just pointing it out for later :)
+00:27 < someprimetime_> hallas: well I wasn't planning on keeping everything in app.js and was about to put them into ./config/routes.js instead
+00:28 < hallas> then you'd wonna do what I suggested
+00:28 < someprimetime_> and just go require('./config/routes.js');
+00:28 < someprimetime_> err
+00:28 < someprimetime_> require('./config/routes.js')(app)
+00:28 < someprimetime_> ah ok thanks
+00:28 < someprimetime_> I'll try thst
+00:28 < someprimetime_> s/st/at
+00:28 < hallas> dont pass the app as an argument unless you really have to
+00:28 < hallas> when it comes to routes, you dont have too
+00:28 < someprimetime_> ok good to know
+00:29 < someprimetime_> what does that do though?
+00:29 < someprimetime_> (if i did do that it)
+00:29 < someprimetime_> just curious
+00:29 <@isaacbw> no js
+00:29 <@isaacbw> *.js
+00:30 < ugarit> Where do I put the memcached in my code http://hastebin.com/vetiguhona.coffee ?  I want each row to be set in mamcached, but the asyncronous part is confusing me
+00:30 <@isaacbw> do you know what memcached is
+00:30 < hallas> there is some technical stuff specific to the V8 interpreter that I'm not sure of, but a rule of thumb, dont create references that you dont need, it only means more memory consumption and more garbage to clean up
+00:30 < ugarit> isaacbw yes, I've used it.
+00:30 < hallas> Only pass app to a module if you need to use the object from outside the middleware stack
+00:31 < ugarit> isaacbw I'm new to node
+00:31 < someprimetime_> ah +1
+00:31 < hallas> @someprimetime_ just to be clear, i realize i might have mislead you now :)
+00:32 < hallas> you'd obviously need to pass the app to the routes, in order to define the routes
+00:32 < hallas> but when you create controllers, you shouldnt
+00:33 < someprimetime_> hallas: ok, np
+00:33 < someprimetime_> but this modification didn't really affect anything
+00:33 < someprimetime_> now I get an error: http://jsfiddle.net/KsZww/1/
+00:33 < someprimetime_> TypeError: Cannot read property 'messages' of undefined
+00:33 < someprimetime_> but if i switch the order of app.use(app.router) it works but the flashes won't show.
+00:36 < ugarit> Where do I put the memcached in my code http://hastebin.com/vetiguhona.coffee ?  I want each row to be set in mamcached, but the asyncronous part is confusing me. I'm using http.createserver
+00:37 < mikolalysenko> is there a simple way to get the system endianness in node?
+00:38 <@isaacbw> why would you need that mikolalysenko 
+00:38 < carpii> any tips for running my node server as a service via init.d ?
+00:39 < mikolalysenko> isaacbw: I have an array buffer view I am using
+00:39 <@isaacbw> array buffer 'view'?
+00:39 < mikolalysenko> yeah, in the typed array spec you can make multiple views of the same buffer
+00:39 < mikolalysenko> but the behavior depends on system endianness
+00:39 < mikolalysenko> http://www.khronos.org/registry/typedarray/specs/latest/
+00:40 < hallas> @someprimetime_ it shouldnt be req.app.session
+00:40 < hallas> its req.session
+00:41 < mikolalysenko> here is an example:
+00:41 < mikolalysenko> var buf = new Uint8Array(4)
+00:41 < mikolalysenko> buf[0] = 1
+00:41 < mikolalysenko> console.log((new Int32Array(buf.buffer))[0])
+00:41 < someprimetime_> ah well what did you mean when you said `hallas: use req.app` ?
+00:41 <@isaacbw> what are you going to do with it
+00:41 < someprimetime_> sorry i'm just hung up on that 
+00:41 < mikolalysenko> convert a file 
+00:41 < mikolalysenko> I am writing a .ply parser
+00:41 < hallas> someprimetime_ when you use app, you should use req.app, when you use req, just use req :D
+00:42 < mikolalysenko> and I want to use this behavior to convert a binary buffer -> float
+00:42 < someprimetime_> ahh ahah ok thanks
+00:42 < someprimetime_> makes sense now.
+00:42 < hallas> but req.app is for when your inside the middleware scope
+00:42 < mikolalysenko> there are also two endian formats for ply, so I need to switch depending on what system I am running
+00:42 < someprimetime_> hallas: why would I still be getting this error: `500 TypeError: Cannot read property 'success' of undefined`?
+00:42 < someprimetime_> should my app.use() go before or after app.router?
+00:42 < hallas> before
+00:42 < someprimetime_> probably before right? so it can send it to the routes?
+00:42 < hallas> messages is probably not defined
+00:42 < hallas> its empty
+00:43 < mikolalysenko> never mind, I'll just make a module to test system endianness
+00:51 < someprimetime_> hallas: so now when I POST to contact I'm setting req.session.messages['error'] to my error message and redirecting to '/'…  which should now checks to see if req.session.messages exists… and there is no error message and when I output res.locals within my app.use() I get this: { [Function: locals], flashSuccess: undefined, flashError: undefined }
+00:52 < someprimetime_> this is what I have in there: http://jsfiddle.net/KsZww/3
+00:53 < someprimetime_> either i'm overlooking something very simple or there is something majorly wrong
+00:53 < someprimetime_> at this point i just don't know
+00:55 < hallas> someprimetime_ from here on
+00:55 < hallas> it can only be one thing :)
+00:55 < hallas> you're sessions are not being stored
+00:56 < hallas> http://jsfiddle.net/KsZww/5/ should do you good
+00:57 < hallas> it specifically uses the cookie to store
+00:57 < mikolalysenko> isaacbw: done, https://github.com/mikolalysenko/is-little-endian
+00:58 < hallas> someprimetime_ i changed the contact to a get for my convenience
+00:59 <@isaacbw> mikolalysenko: what a wonderful hack
+00:59 < crazydiamond1> Hi. Can anyone suggest jade language channel?
+00:59 < mikolalysenko> yeah, seems somewhat obvious though; but couldn't find anything on npm that immediately did the same
+01:00 < someprimetime_> hallas: ok thanks trying this now
+01:00 < hallas> someprimetime_the session can be stored differently, memory, cookie, redis even
+01:00 < hallas> per default i think it is just discarded (not sure though)
+01:06 < someprimetime_> hallas: ah so I have to explicitly send res.locals.flashError?
+01:06 < someprimetime_> like in my app.get('/')?
+01:06 < someprimetime_> is there no way to just always send it?
+01:06 < someprimetime_> like on all requests
+01:06 < someprimetime_> to all routes
+01:07 < hallas> the middleware sends it
+01:07 < hallas> applied to the locals every request
+01:07 < hallas> you can just replace res.send(…) with your res.render('index')
+01:07 < someprimetime_> oh shit!
+01:07 < someprimetime_> it works
+01:08 < someprimetime_> hell yeah man thanks so much.
+01:08 < someprimetime_> i don't know who you are hallas , but I like you!
+01:08 < someprimetime_> :D
+01:08 < hallas> follow me on twitter and on github and ill be happy :)
+01:08 < someprimetime_> links please
+01:11 < hipsters_> why reinvent things for flash messages? just install connect-flash and if you need it express-messages
+01:12 < hallas> hipsters_ i think its just an exercise
+01:13 < hipsters_> oh well, fair enough then. looking through them as an example of how to go about it right might be good though
+01:14 < hallas> i think he started out with connect-flash, turns out the issue was just a non persistant session store
+01:14 < hallas> would probably have worked fine
+01:15 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+01:36 < ugarit> beware newbie and not experienced with asynchronous coding. Why does my for loop repeat 0, 1, 2, 3 and why are json rows repeated in this code http://hastebin.com/lesifogiki.vhdl ?
+01:42 < tassmjau> hey, I'm switching from mongoose to mongodb.MongoClient on a project I'm working on, does anyone know if there's some way to write virtual/pre methods on schemas in mongoclient?
+01:43 <@isaacbw> MongoClient doesn't have schemas
+01:45 < tassmjau> isaacbw: yeah, I know, but those pre-methods usually come in so handy :)
+01:46 < tassmjau> guess I'll just decorate my stuff instead..
+01:47 <@isaacbw> the native client is much lower level than mongoose
+01:47 < jrajav> Automatic Semicolon Insertion visualizer, for anyone who's interested: http://jsbin.com/onoqif/2
+01:47 < SomeoneWeird> <tassmjau> hey, I'm switching from mongoose to mongodb.MongoClient < why?
+01:47 <@isaacbw> I prefer the native client
+01:48 < ugarit> Why does my for loop repeat 0, 1, 2, 3 twice and why are json rows repeated in this code http://hastebin.com/lesifogiki.vhdl ?
+01:49 < tassmjau> SomeoneWeird: I wrote this code base a while back, and have been working on a different project(with the native client) for a couple of weeks, I felt like trying it out ont this one :)
+01:50 < SomeoneWeird> ic
+01:50 < tassmjau> SomeoneWeird: you prefer mongoose?
+02:07 < astropirate> Why are there both App.js and node-webkit?
+02:07 < astropirate> don't they do the same thing?
+02:09 < jrajav> Yeah, pretty much
+02:09 < mephux> hello everyone.. is there a way to get unix select type functionality in nodejs. Mostly to tell if a stream is readable.
+02:09 < jrajav> node-webkit is just there though, App.js is a little hipster about it :P
+02:09 < jrajav> I personally use node-webkit, it works great
+02:09 < astropirate> jrajav, ohh i thought app.js came first
+02:09 < jrajav> I don't know which came first
+02:10 < jrajav> I meant that node-webkit doesn't have a flashy "Web 3.0" homepage
+02:10 < mephux> or will i have to do it by hand.. like this for example https://gist.github.com/shinout/1750489
+02:32 < vampi-the-frog> hey guys, any idea how I can use connect.use() to get a callback function for any URL that's like /foo/123, where 123 is any number?
+02:34 < vampi-the-frog> well it looks like I just need to pass '/foo' as the first argument. thanks
+03:02 < MI6> joyent/libuv: Ben Noordhuis master * e89aced : darwin: implement uv_set_process_title, part 2  Make changes to the proce (+2 more commits) - http://git.io/xkYZNg
+03:04 < draginx> http://clock.co.uk/tech-blogs/preventing-http-raise-hangup-error-on-destroyed-socket-write-from-crashing-your-nodejs-server thoughts?
+03:10 < SomeoneWeird> draginx, domains
+03:11 < draginx> SomeoneWeird: i mean is it a viable solution for this problem..?
+03:11 < MI6> joyent/node: Ben Noordhuis master * 8df893c : test: re-enable simple/test-setproctitle on darwin  The functionality is  (+1 more commits) - http://git.io/329a1w
+03:12 < bnoordhuis> rejoice, nodelings! process.title = 'my first fart app' works again on os x
+04:01 < asdf12> whats the difference between a mock and a stub? ie: a calls b, and i make a fake b to test if a called it, that would be a mock or a stub?
+04:05 < douglaslassance> anyone knows if there is a watch.js channel?
+04:24 < andrewaclt> Whats the proper way to escape an expressjs parameter for use in sql?
+04:31 < Havvy> andrewaclt: Look at what mysql_real_escape_string does in PHP
+04:31 < Havvy> Or use a library that already gives you that.
+04:32 < lohkey> ore just use prepared statements and paramatarized queries
+04:36 < RLa> why not use mysql module?
+04:37 < andrewaclt> I was using sequelizejs
+04:38 < andrewaclt> I guess it has a validate option
+04:40 < RLa> oh
+04:57 < rerer> m
+04:57 < rerer> nhh
+05:08 < WotWhere> hi,  where is this being set in the path variable ?  c:\users\auser\appdata\roaming\npm   
+05:09 < WotWhere> or which script is seting tha npm in the path?
+05:09 < jtomasrl> what should i use to cache https requests on my node server
+06:17 < Anup> Hello
+06:18 < Anup> I have a query regarding nodejs... anybody there?
+06:21 < gkatsev> no one here. Move along.
+06:21 < rlfcptr> plenty are, ask and you'll likely get a response
+06:33 < owen1> what folder on linux is it common to deploy the project into?
+06:38 < Havvy> owen1: ~
+06:39 < gkatsev> /var/www?
+06:40 < gkatsev> /opt
+06:40 < gkatsev> /srv
+06:40 < asdf12> C:\windows
+06:40 < gkatsev> asdf12: lol
+06:44 < Havvy> owen1: There's no real standard. Projects are self contained.
+07:02 < owen1> Havvy: nice. thank you
+07:02 < owen1> gkatsev: i like /var/www but sometimes it's not web-based
+07:16 < finishingmove> Hello node.js
+07:17 < geNAZt> hi
+07:20 < geNAZt> does someone know a benchmark.js suite for benchmarking http servers ?
+07:22 < owen1> geNAZt: https://github.com/oren/oren.github.com/blob/master/posts/benchmark.md
+07:23 < geNAZt> no i already use benchmark.js but i only search a site that provides "most used" tes cases in a benchmark.js suite
+07:23 < geNAZt> ps.s. creating a new Date object is slow :D
+07:27 < WotWhere> hi, where is this being set in the path variable ? c:\users\auser\appdata\roaming\npm 
+07:27 < WotWhere> or which script is seting tha npm in the path?
+07:29 < WotWhere> its not being set by nodejsvars.bat  so where?
+07:30 < geNAZt> its set into your env PATH variable
+07:30 < geNAZt> which will be set by windows
+07:30 < geNAZt> the installer adds the directory to it
+07:31 < WotWhere> huh... but when i check my environment vars.. it doesnt show up there why?
+07:32 < geNAZt> maybe you installed node wrong
+07:34 < WotWhere> no it works..  just wanted to know which script puts the npm into path var .. i did move the node dir after installation 
+07:35 < WotWhere> also the above mentioned dir is empty
+07:36 < geNAZt> for normal the installer for node sets it
+07:36 < WotWhere> i have installed express ejs stylus and made a small app.. it works..  am i missing something?
+07:37 < WotWhere> but y wont it show up in the environment variables ? so i can remove it
+07:46 < geNAZt> why should it show up in the env ?
+07:46 < Havvy> WotWhere: Unless you installed them globablly, they are in a subdirectory called node_modules
+07:47 < Havvy> If you installed them globally, remove with `sudo npm rm package`
+07:47 < Havvy> If you installed them globally, remove with `sudo npm rm package -g` **
+07:48 < WotWhere> i want to remove the 'c:\users\auser\appdata\roaming\npm'   in the path env var   dont know where its being set or by which script
+07:49 < geNAZt> it is set by windows
+07:49 < geNAZt> you must set it in the system config
+07:50 < geNAZt> http://www.computerhope.com/issues/ch000549.htm
+07:54 < WotWhere> yes.. i open the "Environment variables" window but "c:\users\auser\appdata\roaming\npm" is not listed there.. but when i do an echo %PATH it shows up there in the DOS command prompt 
+07:54 < geNAZt> restart your prompt
+07:58 < WotWhere> ok its still there.. and i just rechecked "Env vars" does not have that
+07:59 < geNAZt> there is a var called "path"
+07:59 < geNAZt> there you must delete it from
+07:59 < geNAZt> not the complete path variable only the part you want
+07:59 < HexSquid> Oh wow this room is popular :)
+08:04 < WotWhere> thanks @geNAZt.. will make a .bat file and reset the path var.. but still dont understand y it doesnt show  in the "Env Vars" window
+08:06 < asdf12> https://github.com/lovebear/intercept.js interrrcepppttttt
+08:06 < asdf12> ^ intercepting functions
+08:09 < geNAZt> its like rollback for objects or not ?
+08:09 < asdf12> no there's no rollback
+08:10 < asdf12> it's like if you intercept myfunc, and you call myfunc();
+08:10 < asdf12> it never gets called, your intercepting function gets called
+08:11 < geNAZt> but what is the use case of intercepted functions ?
+08:11 < asdf12> theres a few, but its literally new ground, you never had the ability before, so you don't know what to do with it :P
+08:12 < asdf12> but one is to use it for mocking functions in tests
+08:12 < geNAZt> ah okay its a "cause i can" thing :D
+08:12 < asdf12> or using it as a easier way of saying if (err) intercept(Database, save, recover) // ex: if there's an error and you call save(), it won't save
+08:12 < asdf12> it'll call your recover() func
+08:13 < geNAZt> which is a rollback :D
+08:13 < asdf12> well in that example, you can use it as a database roll back sure
+08:14 < asdf12> that's not a new solution though, it's just a different way of writing it
+08:14 < asdf12> but literally, new territory, so who knows what cool stuff can be done
+08:14 < geNAZt> yes it should save you a bit of errorhandling
+08:15 < asdf12> a lot of it is just making existing ways of doing something easier
+08:16 < geNAZt> yes
+08:17 < geNAZt> the thing that you never touch the function body is nice so you can wrap in anything
+08:17 < asdf12> yes you dont need to blow up your existing code
+08:18 < asdf12> or write new code.. but the lib enforces a certain way of doing things
+08:18 < geNAZt> yes you must throw errors 
+08:20 < WotWhere> geNAZt : problem remains.. i have reset the Path var.. but when i open a new cmd window the c:\users\auser\appdata\roaming\npm  dir shows up again.. 
+08:22 < WotWhere> Also when i open cmd as administrator.. it doesnt show there.. so it must be about my home dir there is a .npmrc there but that has the correct paths
+08:23 < geNAZt> then you should check your account env variables
+08:23 < geNAZt> which should be in the same setting window
+08:24 < triptec> is there anyone here who have used the racer module
+08:24 < triptec> ?
+08:24 < WotWhere> user env vars only has temp and tmp.. pointing to dirs.. am checking those
+08:24 < triptec> I'm wondering how the accesscontrol should be set up
+08:31 < pats_Toms> morning
+08:31 < pats_Toms> haha http://youtu.be/1e1zzna-dNw
+08:31 < geNAZt> well nothing new......
+08:32 < WotWhere> Thanks a Heap @geNAZt .. that was it .. users  environment vars .. in my idiocy.. i was always checking the admins env vars .. thanks again for Help on using Windows :)
+08:32 < geNAZt> no problem :D
+08:36 < Daynab> Hi all, wondering if I could get some pointers - this is baby's first node project. I need to serve/do something with the contents of a few xml files, but I'm not sure where to start or what module to use. I was first thinking about parsing the relevant bits to a json file and then doing something with it, but I don't know if it's a good idea
+08:36 < geNAZt> do the xml files always look the same ?
+08:36 < asdf12> whos baby
+08:36 < geNAZt> if not you need a dom parser
+08:36 < Daynab> it's basically a one-page site with what would be content from those files
+08:36 < Daynab> I'm baby
+08:37 < asdf12> why do you refer to yourself as baby
+08:37 < Daynab> cause I have the knowledge of a baby with node
+08:37 < Daynab> and what do you mean by always look the same?
+08:37 < gkatsev> same xml format
+08:37 < geNAZt> is the structure the same ?
+08:37 < Daynab> oh, yes.
+08:37 < geNAZt> is the data you search for the same
+08:38 < geNAZt> may be you should regex search after them
+08:38 < SomeoneWeird> use xml2json
+08:38 < SomeoneWeird> and then parse the json
+08:38 < SomeoneWeird> LOL
+08:38 < SomeoneWeird> don't use regexs to parse xml
+08:38 < geNAZt> no parse
+08:38 < geNAZt> search
+08:38 < SomeoneWeird> still a very bad idea
+08:38 < Daynab> it's a lot of content, so I doubt regex would be usable. We're talking hundreds of lines
+08:39 < geNAZt> you dont need to parse a whole xml file into a json to reparse it if you search one line in an xml
+08:39 < Daynab> if not thousands
+08:39 < SomeoneWeird> geNAZt, yes you do
+08:39 < SomeoneWeird> :P
+08:39 < Daynab> I'll check xml2json, thanks
+08:39 < geNAZt> yes if you want it to be slow as hell :D
+08:39 < SomeoneWeird> barely
+08:39 < Daynab> but then I'm wondering - how would I handle the data after? I dont want to parse the json everytime the site's accessed
+08:40 < Daynab> that doesnt seem very efficient
+08:40 < geNAZt> but why do you use xml as data files ?
+08:40 < geNAZt> or do they come out of a api ?
+08:41 < Daynab> it's a long story - I'm making a sort of encyclopedia of a game's data. There's always a site like it but it's all client side and takes 1 minute to start, so I thought it'd be a fun project to try server side
+08:41 < Daynab> stuff like items and such are stored in xml
+08:41 < geNAZt> so you only need a one time convert ?
+08:41 < Daynab> yep
+08:42 < HexSquid> Oh gee, convert it once and store it as .json
+08:42 < geNAZt> or store it in an redis store or mongo
+08:42 < geNAZt> or some other sort of database
+08:42 < Daynab> okay but once it's a json, then what?
+08:42 < geNAZt> you can use it as ann normal variable
+08:42 < HexSquid> Does it need to change over time? Will you be adding to the data?
+08:42 < Daynab> (sorry for the cluelessness, I'm pretty new at server side stuff)
+08:43 < SomeoneWeird> then just read it each time you start your app ?
+08:43 < Daynab> I'll have to use new xml files maybe once every few months, but I can just convert it then 
+08:43 < geNAZt> how much data is it ?
+08:44 < geNAZt> and the final question: do you search in the data ?
+08:44 < HexSquid> Haha +!
+08:44 < HexSquid> Haha +1
+08:45 < conancat> hi guys! any mongoose users here? 
+08:45 < Daynab> <5mb worth of xml maybe? a few thousand lines. I just want to parse it then use it in a html page
+08:45 < conancat> anyone have time to test out a plugin i wrote for mongoose? 
+08:46 < geNAZt> then you can store it in memory
+08:46 < geNAZt> so you dont need to convert it into a json
+09:25 < AAA_awright> GNU Make is officially one of the coolest programs there is
+09:25 < AAA_awright> Says me
+09:29 < Voting> Sorry about this but my server needs to be RoR for this client... ow should I push data into a browser if I care about reliability AND cross browser compatibility? http://stackoverflow.com/questions/15047637/pushing-data-into-a-browser-from-jruby-highly-reliable-websockets-package-or-wh ... suggestions? 
+09:30 < Gambit-> AAA_awright, every time someone uses gnu make for their project, a small kitten is crushed.
+09:30 < asdf12> websockets is out if it needs to be browser compatible
+09:30 < geNAZt> socket.io is good for cross browser things
+09:30 < geNAZt> but i dont know if there is an ruby inplementation
+09:30 < AAA_awright> Gambit-: s/make/autotools/
+09:31 < Gambit-> AAA_awright, s/kitten/litter of puppies/
+09:31 < Gambit-> or, grammatically correct:
+09:31 < Gambit-> AAA_awright, s/kitten is/litter of puppies are/
+09:31 < AAA_awright> Well, that too
+09:32 < Gambit-> anyone awake who knows node's "gyp" build system enough to tell me the necessary command to build everything - deps, .o's, etc - but not perform the last link step?
+09:38 < AAA_awright> Gambit-: And you say Make kills kittens?
+09:38 < AAA_awright> What's the error you're getting
+09:39 < Gambit-> AAA_awright, gyp is worse, imho.
+09:39 < Gambit-> AAA_awright, not an actual error.  For reasons best left undiscussed, I need to build everything up-to-but-not-including the final link step.
+09:40 < AAA_awright> Well build the final product and ignore it?
+09:40 < Gambit-> can't.
+09:40 < AAA_awright> WHy
+09:40 < Gambit-> due to reasons I really don't want to go into, I've lobotomized libuv out of node.
+09:40 < AAA_awright> You'll get, what, an error? So what
+09:40 < Gambit-> Those symbols will be supplied later.
+09:40 < Gambit-> well, (a) it fucks up the build process, (b) it looks ugly, and (c) it's harder to tell if you've broken something else.
+09:43 < AAA_awright> Also, which other system is cool enough that you can specify a recipe that has a preresiquite on *some* file, containing a wildcard, invokes a recipie to generate a file matching that wildcard, and returns to the recipie the filename with wildcard filled in
+09:43 < Gambit-> that sounds like a pretty normal build system requirement.
+09:44 < AAA_awright> While you're modifying Node.js internals you'll probably have to comment out the final link step, and `touch` that file instead
+09:44 < Gambit-> fuck.
+09:45 < Gambit-> if I could even /find/ where that final link step occured.
+09:45 < TheDukeofURL> hey y'all 
+09:46 < Gambit-> oh wait
+09:46 < Gambit-> out/node.target.mk looks incredibly possible.
+09:46 < TheDukeofURL> I've a question, what module exists to keep node running while i edit the app?
+09:46 < Gambit-> TheAceOfHearts and TheDukeofURL need to get together sometime.
+09:47 < TheDukeofURL> heh
+09:47 < Gambit-> anyways, you want to live upgrade an app, basically?
+09:47 < TheDukeofURL> yea like i edit file
+09:47 < TheDukeofURL> it shuts down and restarts the app
+09:47 < geNAZt> nodemon or nodev
+09:47 < TheDukeofURL> automagically
+09:47 < TheDukeofURL> any preference?
+09:47 < asdf12> automagically??
+09:47 < asdf12> sounds dangerous
+09:47 < TheDukeofURL> thats a word!
+09:47 < TheDukeofURL> i think
+09:48 < geNAZt> use nodev for development
+09:48 < geNAZt> and nodemon for normal uses
+09:48 < TheDukeofURL> ok thanx for the advice
+09:48 < geNAZt> nodev spawns a nodeinspector on restart for remote debugging
+09:49 < TheDukeofURL> oooOOOooo
+09:49 < Gambit-> arrgh, of course gyp autorecreates that file *facepalm*
+09:49 < geNAZt> nodemon doesnt but keeps restarting the app if files changes
+09:50 < geNAZt> or you look on forever if you finished building which also handles app crashes
+09:50 < AAA_awright> Everyone bug bnoordhuis to get python out of Node.js
+09:50 < AAA_awright> That crap has been in Git for too long
+09:50 < AAA_awright> and ryah, etc
+09:51 < asdf12> http://img-cdn.mediaplex.com/0/16357/03365_twist_scarves_728x90.jpg
+09:52 < AAA_awright> "Sweatshop free" Um, that's a bad thing...
+09:53 < asdf12> twist scarves yo
+09:53 < AAA_awright> What is it with people and complete ignorance of economics that's literally been around since Wealth of Nations... "Made in the USA because we WANT to raise prices and starve little children into prostitution!"
+10:23 < instinkt> Hi everyone. I'm trying to install node 0.6.7 through n but it says it cannot find that version. Why is this?
+10:24 < instinkt> It used to work fine like 2 months ago.
+10:38 < darrenlooby> Hi Guys, Socket.io room is a little quite today. So, posting here. Getting 404 on socket.io.js and unable to make a connection - only thing that's changed about my environment is it's not on my laptop - not a remote server. Code is the same, and all dependencies too. https://gist.github.com/anonymous/5023335
+10:44 < bobby_> hhey can anyone help me with this question http://stackoverflow.com/q/15038054/462951
+10:44 < bobby_> im getting a socket hanup error http://stackoverflow.com/questions/15038054/node-js-socket-hang-up-error-when-connecting-to-twitter-api
+10:47 < bobby_> hhey can anyone help me with this question http://stackoverflow.com/questions/15038054/node-js-socket-hang-up-error-when-connecting-to-twitter-api
+10:48 < darrenlooby> bobby_,  what line is that error occurring?
+10:48 < bobby_> it just throwing the error, i think something is wrong with authorization
+10:49 < darrenlooby> Do you have a trace of errors in your console?
+10:50 < bobby_> no i have caught the error using request.on(error, function);
+10:52 < darrenlooby> Are you able to print out the request url that it's made?
+10:52 < darrenlooby> To see what url it's actually requesting
+10:53 < asdf12> bobby_: try options.auth = '$username:$password'
+10:53 < bobby_> ok il will try it..
+10:53 < asdf12> dont set your auth headers
+10:53 < bobby_> okay!!
+10:54 < asdf12> well okay!
+10:54 < bobby_> @darrenloopy how to print the request url
+10:55 < bobby_> 		console.log("Received Request:" + request.url);
+10:56 < bobby_> @asdf12 where should i write options.auth code
+10:57 < asdf12> just replace headers: { } with auth: ''
+10:57 < bobby_> okay..il will do it
+10:57 < asdf12> i dont think its an auth problem though
+10:57 < asdf12> just saying you dont need to set the header yourself
+10:58 < nickoe> is this bad? http://dpaste.com/985204/
+10:58 < bobby_> iokay!! i tried still gwtting same error --- 		auth: username + ":" + password
+10:59 < nickoe> I am trying to build v0.6.21
+10:59 < darrenlooby> Have a quick look at this http question
+10:59 < darrenlooby> http://stackoverflow.com/questions/3905126/how-to-use-http-client-in-node-js-if-there-is-basic-authorization
+11:00 < bobby_> i have seen the question before...it is structured same as my code..
+11:01 < bobby_> i have tried this way too .. http://stackoverflow.com/a/6436986/462951
+11:01 < asdf12> socket hang up probably means the server didn't even get your request
+11:02 < asdf12> if it was an auth issue, you would've gotten a response
+11:02 < bobby_> hmm...where could it go wrong
+11:05 < bobby_> When i tried console.log("Received Request:" + request.url);
+11:05 < bobby_> It says request is undefined.
+11:14 < darrenlooby> Right, change ... var request = https.request(options, function(response){
+11:14 < darrenlooby> to ... var request = https.get(options, function(response){
+11:14 < darrenlooby> bobby_, give that a go - it worked for me
+11:14 < jetienne> .
+11:14 < bobby_> thnks i ill try it!!
+11:15 < bobby_> @darrenlooby  thanks it worked perfectly!!
+11:15 < bobby_> can you tell me what i did wring
+11:16 < bobby_> wrong*
+11:16 < darrenlooby> I only wish I  could...
+11:16 < darrenlooby> I just compared your code to lots of other examples of how to build requests - and spotted a difference
+11:16 < darrenlooby> So, evidently *.request is better as *.get
+11:17 < darrenlooby> You also don't need to declare "GET" in the options as a result
+11:17 < bobby_> hmmm....thanks...
+11:17 < darrenlooby> From my code anyway
+11:18 < darrenlooby> If I were to guess - *.request builds the request, but doesn't send it (there might be another trigger) and *.get actually goes full circle
+11:18 < darrenlooby> But, that could be complete bollocks! lol
+11:18 < bobby_> ha ha
+11:18 < bobby_> im starting with node.js 
+11:18 < darrenlooby> Glad I could help
+11:18 < darrenlooby> I'm pretty n00b too
+11:19 < bobby_> you are good..!
+11:19 < darrenlooby> I'm having a headache with socket.io at the moment - made even more annoying by the fact that my code was 100% working on a different machine
+11:20 < darrenlooby> But, now I've got my code on the same machine I'm opening the page from - nada!
+11:20 < bobby_> i havent started learning socket.io yet.. got stuck with this issue from yesterday
+11:20 < darrenlooby> It's wonderful stuff
+11:21 < bobby_> It should work!- a programmer's last words.
+11:21 < darrenlooby> Traffic is smaller than http(s) requests too.
+11:21 < bobby_> ha ha
+11:21 < darrenlooby> haha
+11:21 < darrenlooby> What you building?
+11:21 < bobby_> hmm...
+11:22 < bobby_> i just learning and  practicing with examples..
+11:22 < darrenlooby> I'm working on an IDE - it's very basic. But Cloud9 does my head it, because it is dependant on old code... and I've not yet made it work on my own hosting... pain in the ass...
+11:22 < bobby_> getting familiar with node.js
+11:22 < darrenlooby> So, I decided to roll my own IDE and see if I can pull something together
+11:22 < bobby_> hmm..
+11:23 < bobby_> you got it on github?
+11:23 < darrenlooby> I save the files to database, to keep versions - and then overwrite the hardfile each save, then re-run the aoo
+11:23 < darrenlooby> *app
+11:23 < darrenlooby> And now, it's broken as socket.io has fallen over
+11:24 < bobby_> hmm..
+11:25 < darrenlooby> When I have it in working order - with all the basic functions I need, I'll put it up
+11:26 < bobby_> what languages are you supporting in your  IDE
+11:27 < darrenlooby> Any...
+11:28 < darrenlooby> The editor formatting supports javascript, php etc...
+11:28 < darrenlooby> But, there is a plain text mode that you can write anything you like to
+11:28 < bobby_> do you use any plugin for formatting
+11:28 < darrenlooby> The deploy methods will allow you to use various options - and include commands to run it
+11:28 < darrenlooby> Yea, I'm using CodeMirror
+11:29 < bobby_> hmm...
+11:29 < bobby_> what features are you trying to incorporate in it
+11:30 < darrenlooby> Well, I'm currently just putting together the core features - loading files into it etc
+11:31 < darrenlooby> That'll all happen over socket.io - so I'm not making progress without that functioning correctly
+11:31 < bobby_> hmm...
+11:32 < darrenlooby> I got the saves working, and was planning on doing the loading today... but, hey... seems like I'm not going to manage that in the next few hours
+11:34 < bobby_> yea..thats programming..you get stuck often..you'll work through it
+11:40 < darrenlooby> Can anyone help with this? https://gist.github.com/anonymous/5023335
+11:44 < geNAZt> maybe not a valid ssl cert ?
+11:44 < darrenlooby> Hmmm... interesting...
+11:45 < darrenlooby> I'll dive in and change them, and report back
+11:45 < geNAZt> do you need ssl ? or is it only cause it looks safer ?
+11:47 < darrenlooby> I tend to prefer it
+11:47 < darrenlooby> It'll be handling people code
+11:48 < geNAZt> on your server you have a full ssl cert ?
+11:48 < geNAZt> or "just" a self built one
+11:48 < darrenlooby> So, it's liking that end users will like it https
+11:48 < darrenlooby> It's self-signed at the moment
+11:48 < darrenlooby> I'll get a better one later
+11:48 < geNAZt> okay so you want the whole data to be safed in the connection
+11:49 < darrenlooby> Re-signed and created new ones - still the same error
+11:49 < geNAZt> for which domain you create the ssl ?
+11:50 < geNAZt> localhost or ?
+11:51 < darrenlooby> Didn't supply a domain to it
+11:51 < geNAZt> maybe you should
+11:52 < darrenlooby> It worked on my server, but willing to get anything ago
+11:52 < geNAZt> you had no domain in the server ssl ?
+11:53 < geNAZt> do the nodejs versions differ from the server to your laptop ?
+11:53 < geNAZt> i think they changed the ssl version not long time ago
+11:56 < darrenlooby> I had no domain in the server ssl
+11:56 < darrenlooby> The node version is the same as on the server
+11:56 < darrenlooby> The website comes up - served through NodeJS
+11:57 < geNAZt> the thing i wonder about is that you get an response on http(port 80) when you start express on https(443)
+11:57 < darrenlooby> The only issue I'm having is the socket.io bit
+11:57 < davidisawesome> Hello
+11:57 < geNAZt> so where does the http 80 server come from
+11:57 < darrenlooby> As I'm not attaching a server to port 80 - socket.io does that on it's own
+11:57 < darrenlooby> As that's the default
+11:58 < geNAZt> but you tell socket.io to bin to the ssl server
+11:58 < geNAZt> so spawning its own would be wrong
+11:58 < darrenlooby> Indeed it would
+12:01 < darrenlooby> No idea why it's doing that
+12:01 < darrenlooby> I've cut my code right to the bone
+12:02 < geNAZt> welll i look at the socket.io code to find why it is doing that
+12:03 < geNAZt> https://github.com/LearnBoost/socket.io/blob/0.9/lib/socket.io.js#L54-L57
+12:03 < geNAZt> so the only case where socket.io would use a port 80 http server is when you dont give a server into it
+12:04 < geNAZt> maybe you have a typo ? or try console.log(httpsserver); between the two lines
+12:08 < darrenlooby> Okay, so I've got this... var server = https.createServer(options, app).listen(443); = undefined
+12:09 < geNAZt> you have checked this ?
+12:09 < darrenlooby> I've put it through console.log(server)
+12:09 < darrenlooby> And it prints out undefined
+12:10 < geNAZt> can you do a log out for https ?
+12:14 < darrenlooby> https outputs... I'll gist it
+12:14 < darrenlooby> https://gist.github.com/anonymous/5023596
+12:15 < geNAZt> console.log(https.createServer(options));
+12:15 < geNAZt> what does that print ?
+12:21 < darrenlooby> returns undefined
+12:23 < geNAZt> well thats bad
+12:23 < darrenlooby> Indeed lol
+12:23 < geNAZt> fill an issue for this ?
+12:24 < darrenlooby> I've not done yet, I'll file one later
+12:24 < darrenlooby> Going to go spend some time with the kids
+12:24 < darrenlooby> Thanks for your help so far
+12:24 < geNAZt> np
+12:26 < finishingmove> I'M A RAINBOW TOO
+12:27 < yawnt> i'm a rainbow hunter
+12:37 < nickoe> Is this bad? http://dpaste.com/985204/   I am trying to build v0.6.21
+12:53 < dmcaodha> Anyone having socket hang-up troubles with Express?
+12:53 < nikentic> Same. 
+12:55 < [Fudge]> I need to read a 4GB+ file using Node, however the process runs out of memory
+12:55 < [Fudge]> any solution?
+12:56 < Sven_vB> read it in chunks?
+12:56 < Sven_vB> ans process in chunks, if possible
+12:56 < geNAZt> streams ?
+12:56 < [Fudge]> I'll show you how I'm doing it currently
+12:57 < [Fudge]> the thing is, I need to use xml2js on it
+12:57 < geNAZt> no
+12:57 < Stilo> someone work with backbone.js here?
+12:57 < geNAZt> then you do it wrong :D
+12:57 < [Fudge]> it seems to read it, then when it's getting parsed it runs out of memory
+12:57 < [Fudge]> it's stored in a buffer at first
+12:57 < nikentic> What are the actual advantages of using MongoDB over MySQL?
+12:57 < [Fudge]> nikentic: it depends on what data you're working with
+12:57 < geNAZt> well nodejs / v8 has a memory heap limit of ~1.4 Gb
+12:57 < nikentic> I see MongoDB all over the place (used in Node) that is
+12:57 < geNAZt> so it never would work
+12:58 < [Fudge]> geNAZt: is there a way of increasing that limit at runtime?
+12:58 < geNAZt> no and it shouldnt be
+12:58 < geNAZt> nodejs has streaming data
+12:58 < geNAZt> and i dont think that you need 4 gb in memory
+12:58 < geNAZt> and if you need maybe you should think of a database or key value store
+12:58 < nikentic> [Fudge]: I'm just using a single collection in MongoDB atm, with 2 rows of text
+12:58 < nikentic> simple stuff
+12:59 < [Fudge]> that's what I'm going to do geNAZt 
+12:59 < [Fudge]> that's what the script is for
+12:59 < [Fudge]> but the file is an XML
+12:59 < geNAZt> if you stream contents and parse them on the go you never run out of memory
+12:59 < geNAZt> well whats the problem with xml ?
+12:59 < geNAZt> you only need a xml parser that can parse from streams
+13:00 < [Fudge]> I want to convert it to a javascript object then add it to my database :P
+13:00 < [Fudge]> well
+13:00 < [Fudge]> how would I go about doing that?
+13:00 < geNAZt> https://github.com/assistunion/xml-stream
+13:00 < geNAZt> that seems to do it for you
+13:01 < [Fudge]> mm
+13:01 < [Fudge]> I'll try it out
+13:02 < [Fudge]> var file = fs.createReadStream("the.xml");
+13:02 < [Fudge]> file.on("data", function(data) {xml += data});
+13:02 < [Fudge]> geNAZt^
+13:02 < [Fudge]> is how I'm reading it
+13:02 < geNAZt> the worst you can do :D
+13:02 < [Fudge]> nvm the data evebt though
+13:02 < [Fudge]> event*
+13:13 < nikentic> I might as well swap over to MySQL, simply because MongoDB has such gimicky ways to get a random record
+13:14 < geNAZt> nikentic: db.yourCollection.find().limit(-1).skip(yourRandomNumber).next().  ?
+13:45 < nikentic> geNAZt: it's not very efficient with many records
+13:46 < geNAZt> thats true
+13:46 < geNAZt> but with many records mongodb is slow in all things
+13:49 < nikentic> I thought that's where mongoDB is shining? with scaleability and such
+13:49 < geNAZt> the only thing mongodb does good is storing data in json format
+13:50 < geNAZt> if you want to now more about nosql vs sql you can look this: https://www.youtube.com/watch?v=rRoy6I4gKWU
+13:50 < geNAZt> its about backend databases on app engine
+13:51 < geNAZt> which use cases they cover and what they in general cover
+13:51 < geNAZt> and nosql / mongo / couch is good for storing much data, if you dont bother about read delay
+13:53 < nikentic> hmm
+13:54 < nikentic> The thing I am doing is that I am picking a random record on each page refresh, and showing it as text
+13:54 < nikentic> I am not sure how to do it efficiently, using angular and express
+13:54 < geNAZt> append a random number to the records ?
+13:55 < geNAZt> and then db.collection.find({random: { $gt: <randomnumber> }}).limit(1);
+13:55 < nikentic> hmm?
+13:55 < geNAZt> ?
+13:55 < nikentic> hmm, I suppose.
+13:55 < geNAZt> then you can index the number
+13:56 < geNAZt> which will give a little performance
+13:56 < nikentic> But I suppose the performance increase isn't really noticeable in a small environment?
+13:56 < geNAZt> well that depends on "small"
+13:57 < nikentic> compared with the skip()
+13:57 < nikentic> It'll be <5k records
+13:58 < geNAZt> well i would use the random number thing
+13:58 < geNAZt> since the skip can cost much time
+13:58 < geNAZt> and can cause race conditions
+13:59 < geNAZt> the bigger the data set the bigger the issues
+13:59 <@Nexxy> mo' data mo' prollemz
+14:00 < nikentic> It's fun learning new stuff with MongoDB and Angular. Started with it yesterday
+14:00 < geNAZt> yes it should be easy
+14:01 < geNAZt> since you dont need to parse the sql protocol into javascript
+14:01 < fkm> Hi there. I have a problem with my node.js application. If I should rather be asking in the express or jade channel, please tell. The problem: I would like to pass a single row from the database to the template, but somehow the framework tells me, that the variable is not defined. Although from my understanding, I did everything correctly.
+14:01 < fkm> Here's the code and error: http://dpaste.com/986359/
+14:02 < nikentic> Are you sure the query is returning the correct results?
+14:02 < geNAZt> well you have a big injection bug
+14:03 < fkm> nikentic: Yes. I did a console.log and the object looks just fine.
+14:03 < nikentic> I haven't used Jade much, but shouldn't event.title be inside #{}?
+14:05 < fkm> As I understand it, the equal sign after the h2 does the trick. But I wasn't sure so I tried with "h2 #{event.title}" and it didn't work either :-(
+14:06 < fkm> http://dpaste.com/986404/
+14:06 < fkm> ^ The object
+14:07 < fkm> Is there a Jade channel?
+14:08 < geNAZt> why jade ? :D
+14:09 < nikentic> Templating ftw
+14:09 < geNAZt> swig ftw or eja
+14:09 < geNAZt> ejs*
+14:09 < geNAZt> jade is pain
+14:09 < geNAZt> pure pain
+14:09 < Edy> ejs +1
+14:09 < Kakera> I like jade
+14:09 < nikentic> Same
+14:11 < nikentic> Em, any way to prevent NodeJS from crashing when I spam refreshes when browsing?
+14:11 < nikentic> :P
+14:11 < geNAZt> well i love swig since i used the symfony2 framework in php
+14:11 < geNAZt> nikentic: look a toobusy
+14:12 < geNAZt> https://github.com/lloyd/node-toobusy
+14:12 < nikentic> Well why is it crashing from me just holding down f5?
+14:12 < geNAZt> maybe the queue is full and your server is slowwwwwww
+14:13 < geNAZt> but it shouldnt crash than either
+14:13 < geNAZt> then*
+14:13 < nikentic> Socket hangup
+14:15 < geNAZt> well thats not a bug
+14:16 < geNAZt> its an error you should handle :D
+14:16 < nikentic> That's why I asked how I should prevent it ;)
+14:17 < geNAZt> maybe listen to the clientError event from the http server is enough
+14:25 < nikentic> I'm using express, I am trying to do what you said but it's never triggering the event :S
+14:26 < nikentic> must be doing something wrong
+14:27 < geNAZt> do you have an error message with line number and filename ?
+14:27 < nikentic> yeah
+14:28 < geNAZt> which is it ?
+14:28 < nikentic> Events.js:71 throw arguments[1]; // Unhandled 'error' event
+14:29 < geNAZt> okay bind an error listener to http server
+14:29 < geNAZt> then it should be okay
+14:31 < DarkArgon> do you make db querys in your req nikentic?
+14:32 < nikentic> I do
+14:32 < DarkArgon> do you react to errors? if(err) return next(err); for example
+14:33 < nikentic> I do not
+14:34 < nikentic> oh, it's mongo that is throwing it
+14:34 < nikentic> I see
+14:34 < DarkArgon> :D
+14:34 < geNAZt> lol mongo can cause socket hangups ?
+14:34 < nikentic> apparently
+14:35 < nikentic> how should I catch the error? First time doing this kind of stuff.
+14:37 < DarkArgon> callbackFromMongo(err, result){ if(err) return next(err); }
+14:38 < denysonique> https://gist.github.com/denysonique/76f5b6b9c9a27871fb0c
+14:38 < denysonique> gives me: { [Error: incorrect header check] errno: -3, code: 'Z_DATA_ERROR' }
+14:39 < denysonique> if I do curl http://url | gunzip -- this works fine
+14:39 < nikentic> It points me to the res.json call. hmm
+14:41 < DarkArgon> what points you to res.json?
+14:41 < nikentic> at exports.posts:40:17
+14:41 < nikentic> which is res.json
+14:42 < DarkArgon> do you catch the error from mongo?
+14:43 < DarkArgon> or do you handle it. (because its not throwing)
+14:45 < nikentic> process.on('uncaughtException', function(err) {}); fixed it
+14:45 < nikentic> not sure if I should solve it that way
+14:45 < DarkArgon> not good
+14:48 < nikentic> well it works.
+14:49 < DarkArgon> thats not fixed
+14:49 < DarkArgon> your just ignoring every error
+14:49 < nikentic> I assume it's my mongo server that can't handle all the requests
+14:49 < nikentic> yeah I know
+14:50 < DarkArgon> do you use mongoose or the native mongodb driver?
+14:50 < nikentic> native
+14:50 <@Nexxy> nikentic, where is the error originating?
+14:50 <@Nexxy> nikentic, also what version of node are you using?
+14:51 < nikentic> 0.8.20
+14:51 < nikentic> http://i.imgur.com/ChpDeqw.png
+14:51 < DarkArgon> ahh windows 8
+14:52 < nikentic> does it cause a problem?
+14:53 <@Nexxy> nikentic, are you binding an error handler to your response object?
+14:53 < nikentic> Nexxy: would if I knew how
+14:53 <@Nexxy> res.on('error', function(err) { // do something w/ err });
+14:54 < nikentic> where would I put that?
+14:54 < spion> hey guys. one more star on http://code.google.com/p/v8/issues/detail?id=2355 and it will be come the 2nd most starred issue in v8.
+14:54 <@Nexxy> nikentic, anywhere you're handling requests
+14:56 < nikentic> socket hang up code: 'ECONNRESET'
+14:57 < DarkArgon> nikentic, just post a gist/pastebin of your mongo query
+14:57 < nikentic> be ready for shitty code then. heh..
+14:58 < DarkArgon> lol
+14:58 < nikentic> I kind of have no idea what I am doing, just trying to make something work.. :P
+14:58 < nikentic> http://pastebin.com/cLdLLkeH
+14:59 < DarkArgon> line 1
+14:59 < DarkArgon> exports.posts = function (req, res, next) {
+14:59 < spion> if implemented it would give us JSON.stringify(yield collection.findOne.bind(collection, {id: blah})) and more.
+15:00  * spion lobbies for moar votes xD
+15:07 < nikentic> hmm
+15:08 < DarkArgon> line 9. forgot to handle the "error1"
+15:16 < nikentic> Ah well, I'll fix that later when I understand it better
+15:16 < joelmob> is there any point in minifying .js files thats runned by node
+15:16 < nikentic> i am handling all the errors afaik
+15:18 < DarkArgon> just put return next(error1); after line 9
+15:18 < nikentic> I have
+15:18 < nikentic> same thing
+15:19 < DarkArgon> and replace line 1 with exports.posts = function (req, res, next) {
+15:19 < nikentic> yup, same thing
+15:24 < DarkArgon> do you get the error on every request?
+15:24 < nikentic> nonon
+15:24 < nikentic> I don't even get it if I refresh the page as fast as I can
+15:24 < nikentic> only if I literally hold f5 down
+15:30 <@Nexxy> what is good for webaudio api?
+15:30 <@Nexxy> mbalho, ?
+15:35 < MI6> joyent/libuv: Ben Noordhuis threadpool-rework * c7d53e2 : unix: make threadpool spiffier (+4 more commits) - http://git.io/NLha_w
+15:36 <@Nexxy> omg, plx 2 halp
+15:40 < gnarf> Nexxy: like for what?
+15:40 < pats_Toms> Nexxy, what really you need?
+15:41 < gnarf> http://www.html5rocks.com/en/tutorials/webaudio/intro/ ? or are you like looking for an abstraction for some part of it Nexxy?
+15:42 < pats_Toms> Nexxy, check soundmanager2
+15:43 < jetienne> webaudio.js
+15:43 < jetienne> http://jeromeetienne.github.com/webaudio.js/
+15:43 <@Nexxy> cool
+15:43 < jetienne> http://jeromeetienne.github.com/webaudio.js/examples/histotquery.html
+15:43 <@Nexxy> jetienne, I think this is what I want! thank you :D
+15:43 <@Nexxy> gnarf, pats_Toms thank you!
+15:44 < gnarf> have you seen the github song btw?
+15:44 < gnarf> i figure everyone has by now
+15:44 < gnarf> i saw like 40 retweets
+15:46 <@Nexxy> gnarf, yeah haha
+15:51 < gnarf> completely off topic, but has anyone here ever had a layover in heathrow terminal 3
+15:51 < gnarf> this has been the worst airport experience ever... this place sucks
+15:52 < gnarf> also, anyone planning on TXJS?
+15:58 < hangtwenty> Does anybody have experience with Jade, LaTex, TeXML, XML, and/or XLST? Want to bounce an idea off of you if so :P
+15:59 < hangtwenty> not trying to recruit any efforts, just looking to brainstorm a little. Basically, I want to be able to write LaTeX semantics with Jade syntax.
+16:01 < JmZ> for what reason would fs.createReadStream('somefile').pipe(fs.createWriteStream('anotherfile')) hang?
+16:01 < JmZ> if i create them separately and don't pipe, just to check they aren't throwing errors, they work fine
+16:04 < JmZ> even if i add a callback to each one's error event, there are no errors. but it hangs 
+16:48 < nikentic> Anyone who can give suggestions why my app crashes when I refresh the page consantly (holding f5)?
+16:49 < nikentic> using express & mongodb
+16:49 < DarkArgon> mongodb also running on windows?
+16:49 < nikentic> yeah
+16:49 < nikentic> same comp
+16:50 < nikentic> Is it a problem?
+16:51 < pats_Toms> hmm, I have page with the same setup, I will test how it goes for me
+16:51 < DarkArgon> i don't wanna bash windows, but that probably won't happen on linux
+16:52 < DarkArgon> still you should handle that error
+16:52 < pats_Toms> works nice for me
+16:52 < pats_Toms> instant response too
+16:52 < pats_Toms> wow
+16:52 < LordThumper> Hi, I am trying to install socket.io using "npm install socket.io" on my Windows 8 / VS2012 Environment
+16:53 < LordThumper> I had to install "Microsoft Windows SDK for Windows Server 2008 and .NET Framework 3.5" to get vcbuild.exe, but that didn't work either.
+16:53 < nikentic> http://nicentic.com:3000/ can someone of you hold f5 on this for me please? :P
+16:53 < LordThumper> Is that because the vcbuild.exe installed is 32bit? My node.js is 64bit
+16:53 < DarkArgon> i did nikentic 
+16:53 < pats_Toms> nikentic, I am doing this now
+16:54 < nikentic> okay it filled it with messages
+16:54 < nikentic> but it doesn't crash
+16:54 < nikentic> only when I do it locally
+16:54 < nikentic> is it because I load the page instantly and mongodb can't handle it?
+16:57 < DarkArgon> do you create a new mongodb connection on every request?
+16:58 < nikentic> I do?
+16:58 < nikentic> no.
+17:08 < nikentic> let's try hosting it on heroku
+17:53 < shaneeb> hi
+17:53 < shaneeb> not sure if it is the right place, but what is the best option for pdf generation in node?
+17:57 < shaneeb> anyone with any experience in pdf generation?
+17:58 < Edy> we use mpdf
+17:58 < Edy> (html to pdf with php)
+17:59 < ajf> hmm
+17:59 < ajf> Python has ReportLib
+17:59 < ajf> I think there's something similar for node
+18:04 < erichocean> hey, anyone know how to put a multi-byte Unicode character in a string literal? I'm trying to do U+1F4C5
+18:05 < erichocean> "\u1F4C5" doesn't work o_0
+18:06 < shaneeb> @Edy is there something to design the document rather than hand code it?
+18:07 < erichocean> I also tried using the actual Unicode character in UTF-8
+18:07 < Edy> shaneeb: nope
+18:08 < shaneeb> Edy: hmm, how do u do it in mpdf?
+18:09 < shaneeb> @Edy: manual calculation?
+18:10 < Edy> i hand code my html templates for mpdf
+18:12 < shaneeb> hmm interesting...
+18:12 < shaneeb> is there any way i could let my users customize the templates?
+18:13 < shaneeb> like the layout and everything?
+18:13 < Edy> let them upload their html
+18:16 < shaneeb> hmm that could work, thanks :)
+18:30 < StPiere> whats the best way to share the user session between node.js and php/python/perl ?
+18:31 < ganzuul> A database?
+18:32 < lohkey> yeah, i usually opt for memcache or redis for that
+18:32 < StPiere> what is redis ?
+18:32 < lohkey> it's an in memory data structure server, like memcache on steroids
+18:32 < monkeynipples> Hi - anyone recommend anywhere I can find freelance nodejs dev's ?
+18:33 < StPiere> i see :) ... memcache sounds like a good option
+18:33 < lohkey> monkeynipples: how many billable hours is said project?
+18:33 < StPiere> thanks
+18:33 < paulkon> monkeynipples... I'm impressed with the name
+18:34 < paulkon> quite original
+18:34 < monkeynipples> lohkey: I'd say probably 2 weeks - month project 
+18:34 < monkeynipples> thanks paulkon
+18:35 < monkeynipples> at least for first phase
+18:36 < lohkey> monkeynipples: full time or part time?
+18:37 < monkeynipples> either, as long as the work gets done, i'm not so focused on time spent, just output
+18:37 < lohkey> is it a new project or an existing code base?
+18:38 < lohkey> and are the any other people working on it?
+18:38 < monkeynipples> new, does involve some 3rd party libs - and no, no one else is currently working on it
+18:38 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+18:43 < ganzuul> Any tips for getting really low latency communication with an android device over local wifi? I'd like to try my hand at making a game controller.
+18:43 < ganzuul> A number I saw while googling for this was 200ms, but that's a bit high.
+18:45 < jrajav> ganzuul: Rather than the network latency, which will be low enough not to matter for a home network, I would worry about the latency of the capacitive touchscreen
+18:45 < jrajav> ganzuul: The technology used in current phones and tablets produces a delay of >=100ms
+18:46 < jrajav> ganzuul: The number you saw probably factored that in along with worst-case network latency and processing
+18:46 < ganzuul> jrajav: Actually the display would be that of a PC, where the game runs in something like three.js.
+18:46 < jrajav> No, I'm talking about input
+18:46 < jrajav> Not rendering
+18:46 < jrajav> You said you were making a controller
+18:47 < ganzuul> Using the sensors. I should have said that...
+18:47 < jrajav> Oh
+18:47 < jrajav> I'd say it should be fine then. Certainly nowhere on the order of 200ms
+18:48 < jrajav> Only way to know for sure is to profile it yourself
+18:48 < ganzuul> I saw a guy on the mtbs VR enthusiast forum who came up with the idea of using a balance board as a game controller.
+18:49 < ganzuul> And js is the only hammer I know... :D
+18:49 < ganzuul> This --> http://www.mtbs3d.com/phpBB/viewtopic.php?f=140&t=16515#p102198
+18:51 < ganzuul> Well, better get me an android phone at last. :D
+19:01 < ganzuul> Or not. Seems my Nokia N8 will work fine: https://github.com/wildabeast/phonegap-demo/blob/master/js/controller.js
+19:07 < andrearossi> hi everybody, node.js noob here!
+19:08 < ganzuul> Welcome. =)
+19:08 < andrearossi> thanks! could anybody gimme a hand with a httpRequest issue I'm having?
+19:09 < ganzuul> Just ask. Use https://gist.github.com/ for pasting code. If someone knows they're likely to answer.
+19:12 < andrearossi> oh, okay! I'm writing a little API in node+express that should serve various applications, and let them talk together. Something like a proxy API. Now, as I'm registering apps in MongoDB, I want them to be identified by (in addition to obvious authentication) hostname of the incoming request. To test it while developing I created a little faker.js, that creates httpRequests, hijacking the Host header with the one passed by argv.
+19:13 < andrearossi> the problem is that in the API I call Mongo to get the app with that hostname, and as soon as mongo gives me back the app, I send back...
+19:13 < andrearossi> res.send(200, format("Hey, you are %s! Welcome!", app.name));
+19:13 < andrearossi> but…on the other side...
+19:13 < andrearossi> problem with request: socket hang up
+19:14 < blocky97> hi i'm a noob to node.js …and i'm making my first app…. When i do apps for client side i usually wrap everything in an anonymous function i.e. (function(){
+19:14 < blocky97>     "use strict";
+19:14 < [Fudge]> .
+19:14 < blocky97> })()
+19:14 < blocky97> should i do that for my classes in node? …the samples don't seem like they do it like that.
+19:14 < [Fudge]> no
+19:14 < [Fudge]> you don't need to
+19:15 < geNAZt> its bad for debugging
+19:15 < geNAZt> since anonym function appear anonym in stacks
+19:15 < darrenlooby> Does anyone have any ideas why a script would work on a remove server, and not locally? Using the same node js version? I'm using socket.io and the static file 404'd
+19:15 < blocky97> So then is everything just scoped to the file?
+19:15 < geNAZt> yes
+19:16 < geNAZt> nodejs has no "global" like a browser does
+19:16 < ganzuul> andrearossi: I can't give you a direct answer. I'm new to node as well, however, "Use the -v form to control the level of verbosity by including the option multiple times, (e.g. -vvvvv.)" says the mongo manual.
+19:16 < blocky97> ahh ok cool! thanks a bunch :)
+19:17 < andrearossi> looks like the httpRequest doesn't want to wait for the mongo callback, and closes the connection immediately. trying the same thing via browser works like a charm, but I cannot hijack the Host header via Chrome...
+19:18 < ganzuul> Are you using SSL?
+19:18 < andrearossi> ganzuul: nope
+19:20 < ganzuul> Are you using long polling in faker.js?
+19:21 < andrearossi> ganzuul: hum, no. the code looks very simple. Just a basic httpRequest.
+19:22 < ganzuul> Those close when completed. - No waiting. You are probably looking for long polling. :)
+19:22 < andrearossi> well, solved. 
+19:22 < andrearossi> now that's crazy!
+19:23 < ganzuul> oh?
+19:23 < andrearossi> I was just using the pasted code from the node api doc, as it was everything I needed. And I just left the req.write('data\n'); bit, as I was thinking it was harmless.
+19:23 < andrearossi> Now I just removed it. Working perfectly.
+19:24 < andrearossi> don't ask me why.. :D
+19:27 < ganzuul> I see 'data', 'end' and 'close' in the node api, but no 'write'...
+19:28 < ganzuul> Might be deprecated?
+19:30 < ganzuul> nm, found
+19:42 < LordThumper> Did anyone install nodejs on Win8?
+20:06 < Kakera> are there any libraries that use libuv?
+20:06 < Kakera> C libraries I mean
+20:06 < Kakera> not bindings to other languages
+20:08 < bnoordhuis> Kakera: probably. why do you ask?
+20:09 < Kakera> bnoordhuis, to see how they implemented custom events and functions
+20:11 < bnoordhuis> Kakera: not sure what you mean by that
+20:12 < Kakera> bnoordhuis, in Node.js you just create a class that inherits EventEmitter. What's the libuv way?
+20:14 < bnoordhuis> Kakera: you specify a callback
+20:14 < bnoordhuis> e.g. uv_read_start(handle, alloc_cb, read_cb)
+20:14 < Kakera> bnoordhuis, a callback that listens to every event?
+20:16 < bnoordhuis> Kakera: 'every event' as in 'process wide'? no
+20:16 < Kakera> no, as in every event my library would emit
+20:16 < bnoordhuis> i'm not sure i follow
+20:16 < Kakera> think an IRC library
+20:17 < bnoordhuis> libuv works like this: you create a handle, register one or more callbacks, whenever something interesting happens, libuv calls you
+20:17 < Kakera> it would have events like "message" "mode" etc
+20:18 < Gambit-> hey bnoordhuis, I have traffic passing :)
+20:18 < bnoordhuis> Gambit-: yeah? congratulations :)
+20:18 < darrenlooby> I've decided to completely remove nodejs from my laptop and start again. It seems that I've littered my machine with different node installs... and I've removed most - but, can't find the rest. How do I find out where node is still installed?
+20:18 < Kakera> bnoordhuis, I'm not talking about using libuv directly, but about writing a library that uses libuv
+20:19 < Gambit-> bnoordhuis, ended up performing deep fuckery on libuv to just implement the API rather than trying to patch it in at a lower level.  Not sure what that will do to my compatibility with other source-code modules.
+20:19 < Gambit-> Kakera, I assume you're writing a node.js library, right?
+20:20 < Kakera> no, libuv
+20:20 < Kakera> in node.js you just inherit EventEmitter and export your class
+20:20 < Gambit-> oh, no offense to bnoordhuis et al, but libuv by itself isn't something I'd bring elsewhere.
+20:22 < robinson_k> hrm i spotted a bug in my pull request. what is best practice here: close it, rebase and open another pull request or just adding the fix as commit?
+20:22 < niggler> robinson_k if you are using github just add changes and it should automatically update thep ull request
+20:23 < robinson_k> niggler: yeah but doesn't it look sloppy?
+20:23 < bnoordhuis> robinson_k: squash and force push it
+20:23 < niggler> yeah you should squash your commits to whatever makes sense
+20:28 < robinson_k> thanks alot for your advice
+20:29 < thisissam> hello everybody
+20:35 < jasper^off> hej guys, I'm getting the following error: Error: targetStart out of bounds
+20:36 < jasper^off> http://paste.ubuntu.com/5562824/
+20:36 < jasper^off> does that look familiour to anyone?
+20:36 < bnoordhuis> jasper^off: you're calling buffer.copy() with a bad arg
+20:37 < jasper^off> bnoordhuis I'm not
+20:37 < jasper^off> I'm only using node-static
+20:38 < bnoordhuis> jasper^off: okay. then node-static is calling buffer.copy() with a bad arg
+20:38 < jasper^off> hmm
+20:38 < jasper^off> that's messed up then
+20:53 < joocebocks> Hi all, I have a problem upload a binary file - express 'bodyParser' is giving me a parsing exception. I think I know what is malformed request is, but it's being produced by a vendor I'm using.  I can't get rid of them just now and they are unresponsive, so I'm looking to code around their problem on the server side.  Can anyone recommend some way to hire someone to help me solve this?
+20:56 < Anton____> Hi all.
+20:56 < Anton____> Somebody known about implementation threads in node.js ?
+20:57 < nkohari> what do you mean by "implementation threads"?
+20:57 < gkatsev> webworkers? fibers? green threads?
+20:57 < Anton____> implement multiple copy of V8 ScriptEngine in one process
+20:58 < Anton____> green threads
+20:58 < nkohari> look at node-fibers for a similar idea
+20:58 < Anton____> im need some code, but somebody code may lock V8 EventLoop - I'm need manage it
+20:58 < Anton____> Im try using a threads_a_gogo - but thread.destroy dont destroy infinite code in thread
+20:58 < nkohari> if you're running third-party code, you may want to use a sandbox via the vm module instead
+20:58 < gkatsev> there is node-fibers for fibers, which is similar to green threads.
+20:59 < Anton____> node-fibers use on V8 engine
+20:59 < Anton____> then - if loop will been locked - all others fibers will be locked too
+20:59 < Anton____> Im need simple - multiple instance of V8 in one process (spawn don't approve)
+21:00 < nkohari> http://nodejs.org/api/vm.html
+21:00 < gkatsev> Anton____: https://github.com/joyent/node/wiki/modules#wiki-async-flow-fibers choose a module from here
+21:00 < carpii> how can i troubleshoot an intermittent connection using request.js? Sometimes its taking 5 seconds to respond, despite it being on a lan and it does appear to be some node issue rather than network or latency
+21:00 < nkohari> i don't think you really want threads Anton____ 
+21:00 < nkohari> it's not really a concurrency problem
+21:00 < Anton____> nkohari, VM module use ONE context - then, if I launch in VM while(true) { } - its lock ALL process
+21:01 < lyaunzbe> hey guys, I have a general js question (##js is too busy). How do I manipulate a cloned array without altering the original? http://pastebin.com/xZTzpsMJ
+21:01 < Anton____> Im need only 4 function create/start/stop/eval for thread
+21:01 < nkohari> in that case, you probably just want to shell out another node process to run the third-party code and then watch it
+21:02 < lyaunzbe> In that paste, Im doing obj.sort.slice() to create a clone of obj.sort, but in the end, obj.sort gets altered.
+21:02 < lyaunzbe> obj.sort.slice(0)*
+21:02 < gkatsev> lyaunzbe: you want obj.slice.sort instead
+21:02 < lyaunzbe> gkatsev, the name of the array is obj.sort 
+21:02 < gkatsev> oh
+21:02 < nkohari> yeah, Array.sort() will mutate the array itself
+21:03 < nkohari> oh.
+21:03 < gkatsev> nkohari: lol
+21:03 < lyaunzbe> ya, thats really a bad name for the array...
+21:03 < Anton____> in this capter https://github.com/joyent/node/wiki/modules#wiki-javascript-threads only one solution
+21:03 < Anton____> * chapter
+21:04 < nkohari> Anton____: you're probably going to want to run another node process
+21:05 < Anton____> i'm need launch about 100-150 tasks %)
+21:05 < nkohari> lyaunzbe: so, you're wondering why the items in obj.sort are getting obj.sort.items set to empty arrays?
+21:05 < nkohari> er, i should say, why the items in obj.sort are getting their item properties set to empty arrays
+21:05 < Anton____> if you try spawn 100-150 instance of node - you system will be slowdown
+21:06 < nkohari> Anton____: i don't know what you're trying to do but there's a reason the halting problem is unsolvable
+21:06 < lyaunzbe> nkohari: yes, I want to be able to manipulate limit without altering obj.sort at all
+21:06 < OliverJAsh> Given this data and query, I need a filter function that will match http://jsbin.com/umeros/1/edit?javascript,console,live
+21:06 < OliverJAsh> Can anyone help me refactor that filter function to work?
+21:06 < nkohari> lyaunzbe: slice() is only going to copy the array itself, not the members of the array
+21:06 < nkohari> for that you'd need some kind of deep copy
+21:06 < nkohari> since the array only contains references to the objects
+21:07 < lyaunzbe> nkohari: Okay, I read about that but I wasn't sure that it applied to my issue. Do you know of the best way to make a deep copy? Underscore's clone seems to be shallow as well...
+21:08 < lyaunzbe> ahh so basically limit.items is actually a reference to obj.sort.items
+21:08 < nkohari> if obj.sort is an array
+21:08 < nkohari> you're creating a new array by calling slice(0)
+21:08 < nkohari> which contains the same references
+21:09 < nkohari> then you're iterating over the copy
+21:09 < nkohari> and altering the references
+21:09 < nkohari> but since they're the same references, you're changing the objects in both arrays
+21:11 < lyaunzbe> any suggestions on how I would achieve a deep clone?
+21:11 < nkohari> i'm sure there's a library that's implemented it
+21:11 < Anton____> nkohari, i'm have compute system - this system have plugins. plugins write from 3rd party person. system must run this pluings per request (about 10-20 request per minute). some plugins may slowdown system or break it. now plugins work in separate process - but plugins is TOO much (more 100) - Im think so need 1 thread = 1 plugins
+21:12 < nkohari> Anton____: you might try creating a job queue with a pool of worker processes
+21:12 < Anton____> Im try find solution - HOWTO create multiple thread in ONE node.js instance
+21:12 < Anton____> queue already work for request
+21:12 < nkohari> do you need to run all 100 plugins for every request?
+21:13 < Anton____> for plugins its impossible as architecture
+21:13 < Anton____> yes
+21:13 < Anton____> 1 plugins work about 0.3-0.5sec
+21:14 < Anton____> If im run it in queue it will be about 0.4x100 = 40sec delay
+21:14 < Anton____> now it work as setTimeout launch - and delay about 2-4sec
+21:14 < Anton____> or smaller
+21:15 < nkohari> what if you had a pool of 5-10 worker processes that would execute the plugins as necessary and return the values back to the master process
+21:16 < nkohari> then the master could watch the workers and if it didn't get return values rapidly it would assume a plugin had hung, and kill it and respawn
+21:16 < nkohari> i just don't think you're going to solve the problem through threading
+21:17 < nkohari> and if threads are the answer, node isn't the best platform for it, since there's no native thread implementation
+21:20 < gurjeet> Is it possible to launch Jasmine tests from within another JS file? Like this Jakefile does with nodeunit : https://github.com/jamesshore/lets_code_javascript/blob/episode9/jakefile.js
+21:21 < gurjeet> .. or do it with jasmine-node instead..
+21:29 < Anton____> maybe jasmine-node it's solution. thx. :)
+21:30 < nkohari> i might be wrong, but i don't think gurjeet meant that as an answer to your question
+21:30 < booyaa> anyone else getting peerDependencies errors on node v0.8.20 when trying to do npm install -g express?
+21:31 < gurjeet> Anton___:  nkohari is correct
+21:31 < Anton____> thx.
+21:31 < Anton____> booyaa, express version?
+21:32 < booyaa> Anton____: not sure how do i tell?
+21:33 < booyaa> 3.1.0 according to express -V
+21:33 < carpii> could someone critique a very simple module wrapper ive done please? Im not sure if its the right way to go about it… http://pastie.org/6330170
+21:33 < carpii> just trying to encapsulate buffered-writer and add some helper methods
+21:34 < nkohari> looks fine structurally
+21:34 < bnoordhuis> carpii: why module.exports.ChatLogger instead of exports.ChatLogger?
+21:34 < nkohari> you'd actually want module.exports = Chatlogger
+21:34 < nkohari> most likely
+21:34 < bnoordhuis> btw, i usually put all my exports at the top of the file, makes it easy to see what's exported
+21:34 < nkohari> well, it depends on if you want people to do:
+21:34 < gluxon> carpii: I would be consistent with my indent style, but that's picky.
+21:34 < nkohari> Chatlogger = require("chatlogger");
+21:35 < nkohari> er, with var at the beginning ;)
+21:35 < nkohari> or var Chatlogger = require("chatlogger").Chatlogger;
+21:35 < nkohari> for the former, use module.exports = Chatlogger
+21:35 < nkohari> for the latter, use exports.Chatlogger = Chatlogger
+21:35 < bnoordhuis> module.exports = ChatLogger would override module.version
+21:35 < carpii> i forgot to add my client code, sorry. one sec
+21:36 < hallas> no reason to do module.exports.chatlogger
+21:36 < hallas> ever
+21:36 < carpii> client code is at bottom, this is how id liekt o use the object-- http://pastie.org/6330197
+21:37 < carpii> ok hallas, i was just following a tute. what are my options?
+21:37 < hallas> it seems what you want is module.exports = ChatLogger
+21:37 < nkohari> typically if you want to export a single class you use module.exports = TheClassName
+21:38 < carpii> and this will let me instantiate the class mutliple times?   
+21:38 < nkohari> if you want to export more than one function or class, you do exports.TheClassName = TheClassName, etc.
+21:38 < MI6> joyent/libuv: Ben Noordhuis threadpool-rework * 6fba593 : test: remove 'is root?' check  I debug tests regularly as root (because d (+4 more commits) - http://git.io/gsVl7A
+21:38 < nkohari> either way will do that, yeah
+21:38 < carpii> ok thanks
+21:38 < nkohari> it's a subtle difference :)
+21:38 < carpii> why do i sometimes see   module.exports = export = classname ?
+21:38 < carpii> exports
+21:38 < nkohari> people being confused and just doing both Just In Case(tm)
+21:38 < nkohari> :)
+21:38 < carpii> as in, what role does the local exports play?
+21:39 < nkohari> none really
+21:39 < carpii> ok, so i can ignore local exports
+21:39 < nkohari> and you can't do exports = Something in order to export the class
+21:39 < hallas> shorthand for module.exports
+21:39 < nkohari> it's sort of shorthand but it isn't
+21:39 < nkohari> exports.Foo = Foo will export Foo
+21:39 < nkohari> exports = Foo will not
+21:39 < nkohari> (at least, that used to be how it worked)
+21:39 < hallas> the members of exports are copied over to module.exports
+21:40 < hallas> but not exports it self :) ?
+21:40 < gluxon> exports = Foo seems kind of dangerous too.
+21:40 < carpii> so if i have "module.exports = Chatlogger"  and my client code is still "chatlogs = require('./helpers/chatlogs.js')"    how do i then say   var catlogger = new chatlogs.Chatlogger() ?
+21:41 < nkohari> if you did module.exports = Chatlogger
+21:41 < nkohari> you would do var Chatlogger = require("./helpers/chatlogs.js")
+21:41 < carpii> yes
+21:41 < nkohari> and then var chatlogger = new Chatlogger()
+21:41 < nkohari> if you did exports.Chatlogger = Chatlogger
+21:41 < nkohari> you would do what you pasted in
+21:41 < carpii> "chatlogger = new Chatlogger()" => Chatlogger is not defined
+21:42 < mikolalysenko> is there anyway to trigger a garbage collect for benchmarking purposes?
+21:42 < nkohari> mikolalysenko: if you run node with --expose-gc you can call gc()
+21:42 < nkohari> or use memwatch
+21:42 < nkohari> which is a pretty cool library
+21:42 < carpii> this is my latest module source -- http://pastie.org/6330230
+21:42 < nkohari> carpii: that seems fine, what's your client code look like?
+21:43 < mikolalysenko> are there docs for --expose-gc?
+21:43 < carpii> var chatlogs = require('./helpers/chatlogs.js'); var chatlogger = new Chatlogger();
+21:44 < nkohari> mikolalysenko: sorry i don't know where it's documented offhand, but i'm sure there is :)
+21:45 < nkohari> carpii: try this
+21:45 < nkohari> var Chatlogger = require('./helpers/chatlogs.js');
+21:45 < nkohari> var logger = new Chatlogger();
+21:47 < OliverJAsh> If an NPM module has a file that is not it's main file, but I want to require it… do I have to provide a full file path?
+21:47 < OliverJAsh> Or can I still use the NPM module name as an alias
+21:48 < nkohari> i believe you can still use the npm module
+21:48 < nkohari> but i might be wrong
+21:48 < carpii> similar problem nkohari-- http://pastie.org/6330250   -- i used chatlogger_obj because logger conflicted already
+21:48 < nkohari> the problem is on the first line
+21:49 < nkohari> you're assigning the result of your require() statement to the chatlogs variable
+21:49 < nkohari> not the Chatlogger variable
+21:49 < nkohari> common.js is a little confusing if you're used to other packaging systems like java
+21:49 < nkohari> because you assign the result of a require to a variable
+21:50 < carpii> hm
+21:51 < carpii> sorry nko, would it be possible to elaborate? 
+21:51 < WarheadsSE> how to fix an oops w/ npm publish? Accidentally published to an apparently new account ... https://npmjs.org/package/kismet 
+21:52 < bnoordhuis> WarheadsSE: unpublish?
+21:56 < WarheadsSE> K, how do i fix my username, so that it publishes to my original?
+22:26 < OliverJAsh> Sorry was just disconnected, don't know if anyone replied…
+22:40 < carpii> is tehre a way to add a finaliser function which will always be excuted, even if I CTRL-C the server?
+22:41 < nkohari> process.on("exit", function() { ... });
+22:45 < carpii> thankyou
+22:47 < damarusama> hi there, I am playing around with creating a cli app with node and came accross commander.js
+22:47 < damarusama> it seems to do most of the work, but is a bit limited on documentation, on how to parse the args send to the app
+22:47 < damarusama> anyone knows a nice library to use to create nice cli apps ?
+22:52 < nkohari> optimist is nice if you just want argument parsing
+22:53 < damarusama> hum that's seems sweet
+22:55 < damarusama> I wonder if I can use it with the commander.js - since the help function is quite sweet in commander..
+22:55 < damarusama> thanks!
+22:55 < nkohari> sure
+23:13 < carpii> anyone know of a php library which emulates socket.io's protocol for stress testing purposes ?
+23:15 < mscdex> carpii: "php socket.io protocol" gives as the first link: https://github.com/wisembly/elephant.io
+23:15 < carpii> thanks, my search terms were screwy :(
+--- Log closed Mon Feb 25 00:00:32 2013
