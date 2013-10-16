@@ -1,0 +1,1109 @@
+--- Log opened Sat Apr 20 00:00:02 2013
+--- Day changed Sat Apr 20 2013
+00:00 < mscdex> or what is going on
+00:01 < ryanaz> mscdex: http://pastebin.com/rTsHmaVi
+00:01 < mscdex> ryanaz: do a `chunk.toString('binary');` instead
+00:02 < SrPx> var conn = net.connect(23,"myhost"); conn.on("data",function(data){ 	console.log(data.toString("utf8")); }); // that is just printing a weird string. I was expecting it to print the output I got on the terminal (asking password etc) ?
+00:02 < mscdex> ryanaz: just don't upload a binary file....
+00:03 < ryanaz> mscdex: what require do I need for chunk ? 
+00:03 < mscdex> SrPx: what is the remote endpoint?
+00:03 < mscdex> ryanaz: it's the Buffer passed to your data handler
+00:03 < SrPx> mscdex: what do you mean? It's a random vps I set up for testing
+00:04 < mscdex> SrPx: did you write the telnet server or ?
+00:04 < SrPx> mscdex: oh I see, I installed it using "sudo apt-get install telnet2"
+00:05 < mscdex> ok so you'll probably need an actual telnet module to handle all the telnet codes and whatnot
+00:06 < mscdex> SrPx: something like this possibly?: https://npmjs.org/package/telnet
+00:07 < SrPx_> But there is no telnet module on node.js I guess
+00:07 < [Fudge]> Having a weird memory leak issue it seems
+00:07 < [Fudge]> using express (node 0.10.4, I believe)
+00:07 < [Fudge]> it crashes randomly, I don't know what I can narrow it down to
+00:10 < mscdex> SrPx_: just for fun, what if you try doing `conn.setEncoding('utf8');` after `net.connect()`?
+00:10 < mscdex> SrPx_: and then change your handler to just do `console.log(data);`
+00:10 < ryanaz> mscdex:  http://pastebin.com/WVuHbsKd   it looks like it's cutting off some of the data at the top  the file begins with "This is a test" 
+00:11 < ryanaz> mscdex: so it seems like somewhere, something is reading the buffer.. is there a way to see what's in the buffer before we start? 
+00:11 < mscdex> ryanaz: hrmm are you on node 0.8.x or earlier?
+00:11 < ryanaz> mscdex: yes
+00:11 < mscdex> ahhh ok
+00:11 < SrPx_> mscdex: weird string again ):
+00:11 < mscdex> ryanaz: what you'll probably need to do is pause the req earlier on
+00:12 < ryanaz> mscdex: hmm
+00:12 < mscdex> ryanaz: i think 'data' events are being discarded before the callback is called
+00:12 < mscdex> because there are no listeners yet
+00:12 < ryanaz> mscdex: interesting… 0.10.x fixes this?
+00:13 < mscdex> ryanaz: i think it pauses by default or some such
+00:13 < mscdex> ryanaz: because of this very issue
+00:13 < ryanaz> mscdex:  interesting …    I was told to be working with 0.8.x because most modules aren't fully supportive of 0.10.x yet ?
+00:14 < mscdex> ryanaz: *shrug* i dunno, i haven't personally run into any compatibility issues
+00:15 < ryanaz> hmm…  well, i'm heavily trenched into express.. so i'm trying to think how to do this earlier
+00:15 < mscdex> ryanaz: well i take that back, the node addon ABI changed
+00:15 < mscdex> ryanaz: make a little middleware at the very top that does a `req.pause();` or something
+00:16 < mscdex> ryanaz: although i think even in 0.8.x, pause() is supposedly only advisory
+00:17 < mscdex> not 100% sure though. pause() might always work as intended for http/tcp requests
+00:17 < mscdex> just have to try
+00:18 < ryanaz> where do I try it, I see a place where it could be doing something…  
+00:18 < ryanaz> mscdex:    app.use(function(req, res, next) { res.locals.auth = {}; res.locals.auth.isAuthenticated = req.isAuthenticated(); next(); });
+00:19 < ryanaz> mscdex: i have this in there before the routes..  
+00:19 < ryanaz> mscdex: so the buffer could be doing something in that .. 
+00:19 < ryanaz> mscdex:  how can I tell the app.req to pause? 
+00:21 < mscdex> ryanaz: try putting an `app.use(function(req,res,next){req.pause();next();});` near the top somewhere
+00:23 < ryanaz> mscdex: it's just sitting there now
+00:23 < ryanaz> mscdex: do I need to put a continue somewhere? 
+00:24 < mscdex> ryanaz: ok try putting `req.resume();` right before the `req.pipe(d);`
+00:24 < mscdex> or after it rather
+00:24 < ryanaz> Bingo
+00:24 < ryanaz> mscdex: you did it !   
+00:25 < ryanaz> now I see "end of part"  and all the other ones
+00:25 < mscdex> ryanaz: ok, so you'll probably want to move that new middleware function below the `urlencoded()` and `json()` middleware and/or put a guard around that pause() statement so that it only pauses if it's a multipart request
+00:27 < ryanaz> mscdex: hmm. ok let me try that
+00:34 < ryanaz> what is the most efficient way to do this in javascript:   if (req.headers =~ m/^multipart\/form-data;/) { … } 
+00:34 < ryanaz> (yes, that's perl) 
+00:34 < ryanaz> seems like in javascript you have to make a string for the regular expression, and then do a compare on it
+00:34 < Havvy> ryanaz: JS has regex too.
+00:34 < Havvy> No, we have regex literals too.
+00:34 < Havvy> !mdn regex
+00:34 < ryanaz> can I do the same thing? 
+00:35 <@konobi> well //.match
+00:35 < ryanaz> !mdn regex
+00:35 < Havvy> What does m/^multipart\/form-data;/  actually do?
+00:35 < ryanaz>         if it finds that string… then return 1
+00:36 < Havvy> >> Object
+00:36 < purr> Havvy: (function) Object
+00:36 < Havvy> >> "multipart/form-data;otherstuff".startsWith("multipart/form-data;")
+00:36 < purr> Havvy: TypeError: Object multipart/form-data;otherstuff has no method 'startsWith'
+00:37 < Havvy> Okay...
+00:37 < Havvy> >>> "multipart/form-data;otherstuff".startsWith("multipart/form-data;")
+00:37 < purr> Havvy: TypeError: Object multipart/form-data;otherstuff has no method 'startsWith'
+00:37 < Havvy> Well, that'll be there eventually.
+00:37 < mscdex> ryanaz: you can re-use the if statement in the example
+00:37 < Havvy> >>> "multipart/form-data;otherstuff".match(/multipart\/form-data/)
+00:37 < purr> Havvy: (object) ['multipart/form-data']
+00:38 < Havvy> >>> "notmultipart/form-data;otherstuff".match(/^multipart\/form-data/)
+00:38 < purr> Havvy: (object) null
+00:38 < ryanaz> hmm..
+00:38 <@konobi> ryanaz: MDN ftw
+00:38 < mscdex> i actually wrote a header value parser for this
+00:38 < Havvy> >> /^multipart\/form-data/.test("multipart/form-data;otherstuff");
+00:38 < purr> Havvy: (boolean) true
+00:38 <@konobi> ryanaz: don't forget that perl has the idea of true-ish
+00:42 < Havvy> Also, !mdn works in ##javascript
+00:43 < lime_> Does anyone know of a package that detects a keyboard layout and converts it potentially to another one?
+00:43 < ryanaz> mscdex:     app.use(function(req,res,next){ if ((req.method === 'POST') && (req.headers['content-type'].match(/^multipart\/form-data;/))) { console.log(req.headers); req.pause(); next(); } else { next(); } } );
+00:43 < ryanaz> mscdex: i put that in just after all my middleware stuff (after express.json and express.urlencoded) … 
+00:44 < ryanaz> mscdex:  that seems to work well…. 
+00:44 < mscdex> ok
+00:44 < mscdex> here's the header value parser FWIW: https://gist.github.com/mscdex/3c029f42e1bafcb35272
+00:45 < mscdex> if you don't want to rely on a regexp
+00:45 < ryanaz> mscdex: wow you did that right now?
+00:45 < mscdex> no i wrote it a few days ago
+00:46 <@konobi> mscdex: no newlines!?
+00:46 < mscdex> konobi: ?
+00:47 <@konobi> mscdex: multiline headers
+00:47 <@konobi> =0)
+00:47 < mscdex> konobi: folded headers are already taken care of by dicer
+00:47 < sinclair-linux> hey all
+00:47 < sinclair-linux> i have a quick question about mongo
+00:48 <@konobi> ah
+00:48 < sinclair-linux> where is the most applicable place to install mongo on linux?
+00:48 < sinclair-linux> is there a standard location?
+00:48 < mscdex> i think node's http-parser handles them too
+00:48 <@konobi> sinclair-linux: try #mongo?
+00:52 < mscdex> node needs an official mascot
+00:53 <@konobi> isn't that a dude with a horses head?
+00:53 < mscdex> eh?
+00:53 < deoxxa1> horsejs
+00:53 < deoxxa1> https://twitter.com/horse_js ?
+00:54 < mscdex> maybe joyent should adopt substack's turtle with a rocket as a mascot?
+00:54 < ryanaz> i sure hope the horse head isn't the logo
+00:59 <@konobi> ryanaz: heh, inside joke
+01:00 < ryanaz> mscdex:  seems like this isn't working.. :( 
+01:00 < mscdex> ?
+01:00 < ryanaz> mscdex:  seems like now that it's lower in the stack it's jacked up
+01:01 < ryanaz> mscdex: let me move it around and see where to put it 
+01:01 < mscdex> ryanaz: i think as long as the if statement is there to check it's a multipart request, that should be enough and you could leave it at the top
+01:02 < ryanaz> mscdex: ok, yah if I put it directly under where I initialize app=express… it works
+01:03 < ryanaz> mscdex: I just now have to test all my other pieces to make sure nothing else is broken and don't  know about it
+01:03 < mscdex> ryanaz: although i guess it should then really be this: `app.use(function(req,res,next){if (multipart) req.pause(); next();});`
+01:03 < mscdex> so that next() is always called
+01:03 < ryanaz> mscdex :  Yah I had to do that or everything else hung.  :)  
+01:03 < mscdex> :-)
+01:04 < ryanaz> mscdex:    app.use(function(req,res,next){ if ((req.method === 'POST') && (req.headers['content-type'].match(/^multipart\/form-data;/))) { console.log(req.headers); req.pause(); next(); } else {  next(); } } );
+01:04 < ryanaz> mscdex:  Is there a shorter version I can try? 
+01:04 <@konobi> use the body parser middleware?
+01:05 < ryanaz> konobi:  I wish
+01:05 < ryanaz> konobi:  The whole point is to bypass it because it's writing the huge file uploads to /tmp first before doing anything with it
+01:05 < ryanaz> konobi: There should be an option to leave the file as a stream so you can attach to req.stream or something
+01:05 <@konobi> well, steal, cheat and reuse
+01:05 <@konobi> =0)
+01:07 < Trex005> Hello folks.  I'm trying to use SSL as per http://nodejs.org/api/https.html#https_class_https_server but I have no idea where to find my key and cert files.  I'm on a cpanel machine
+01:08 < Trex005> when I use locate, there are TONS of .pem files in my system
+01:08 <@konobi> Trex005: you need to generate them
+01:08 < dminus> try /etc/ssl, /usr/local/apache
+01:08 <@konobi> there's lots of tutorials out there
+01:08 <@konobi> there's self-signed which is what you want for testing purposes
+01:08 < Trex005> so could I not use the same cert I have for my webserver on the same domain?
+01:08 < dminus> or grep "SSL" /etc/httpd/conf/httpd.conf for clues
+01:09 < samholmes> How do I return out of a .forEach?
+01:09 <@konobi> Trex005: depends on the IP/domain/cert
+01:09 < samholmes> I mean, how do I break?
+01:09 <@konobi> samholmes: mdn!
+01:10 < TehShrike> mdn is awesome
+01:10 < dypsilon> samholmes, you can't return out of native foreach
+01:11 < dypsilon> look at lodash utility package
+01:11 < samholmes> dypsilon: seems a bit limited huh? You'd think the implementation would use return false;
+01:11 < Trex005> dminus, I think you got me what I needed.... I just hope that .key and .crt files are the same as .pem :)
+01:12 < mscdex> ryanaz: something like this is probably good enough: `app.use(function(req,res,next) { if (req.method === 'POST' && /^multipart\/\w+/i.test(req.headers['content-type']) req.pause(); next(); });`
+01:12 < TehShrike> samholmes: the spec is simple, I can't complain too much in that case
+01:12 < robinson_k> hey
+01:12 < dypsilon> samholmes, it is what it is, I stopped complaining about the spec and started using lodash. I think the comittee is aware of this problem.
+01:12 <@konobi> samholmes: you have a for loop in that instance
+01:12 < robinson_k> something wrong with node streams since 10.03 and 10.04?
+01:12 < TehShrike> samholmes: in JS, making a version of forEach that lets you short-circuit is pretty easy, so I can live without it in the core libs.  Though I totally understand why it was there and wouldn't mind it myself.
+01:13 < ryanaz> mscdex:  cool I think that's what I have right now basically :    app.use(function(req,res,next){ if ((req.method === 'POST') && (req.headers['content-type'].match(/^multipart\/form-data;/))) req.pause(); next(); } );
+01:13 < samholmes> lodash is like radish?
+01:13 < mscdex> mrsdash
+01:13 < mscdex> mrsdash.js -- spice up your javascript!
+01:13 < dypsilon> samholmes, dont know about radish, lodash is underscore competitor
+01:14 < mscdex> ryanaz: yeah more or less
+01:15 < dypsilon> samholmes, also, because we are in the node channel, you might want to have a look at "async".
+01:15 < samholmes> oh
+01:15 < samholmes> I thought I was in the js chan
+01:16 < mscdex> asink
+01:32 < zamnuts> does anyone know of any memory leaks with v0.10.x? gc doesn't seem to kick in on 0.10.0 and 0.10.4, but works just fine on 0.8.23. same script was used to test
+01:34 <@konobi> zamnuts: is it crashing?
+01:34 < zamnuts> not crashing, the memory usage is just climbing and never goes down
+01:35 < zamnuts> for example, the process starts around 20mb, after thousands of queries it climbs up to around 50mb+ and just sits there, i can send more requests and it still climbs
+01:35 <@konobi> zamnuts: v8 may just be optimizing it differently
+01:35 < zamnuts> using v0.8.23, it climbs, but resolves itself after a few seconds
+01:36 < zamnuts> konobi, do you know what version of v8 is being used in 0.8 vs 0.10?
+01:36 <@konobi> zamnuts: it's in the repo
+01:40 < zamnuts> konobi, it looks like 0.10 uses v8 3.14.5 and 0.8.23 uses v8 3.11.10.25
+01:41 < zamnuts> what i'm confused about, is does this have to do with my application or is it a bug in v8?
+01:41 <@konobi> zamnuts: it may not be a bug
+01:41 < zamnuts> must i refactor my code to satisfy the v8 optimizer?
+01:41 <@konobi> just "different"... VMs are a hard task master
+01:42 < zamnuts> i'd hate to just downgrade b/c "it works" and not know the underlying reason
+01:42 < zamnuts> any advice?
+01:43 <@konobi> test your app with load
+01:45 < zamnuts> konobi, i am, multiple 8 threads of queries in a queue of 10,000 on each thread
+01:45 < zamnuts> the results say downgrade to 0.8
+01:45 <@konobi> why?
+01:46 <@konobi> nothing is crashing... are you getting a plummet in r/s ?
+01:46 < zamnuts> konobi, b/c when running 0.10, memory never clears up, but 0.8 it goes back down to normal - even periodically during load
+01:46 < zamnuts> konobi, sorry, what is "plummet in r/s" ?
+01:47 <@konobi> requests per second
+01:47 <@konobi> maybe 0.10 is just hanging onto memory for a far bit longer...
+01:47 < zamnuts> r/s seems good on the testing script, and i'm seeing equal response from the application, so i'd say 'no'
+01:48 < zamnuts> konobi, i let it sit for 20 minutes
+01:48 < jaseemabid> Hello all, my native extension is being rebuild again and again when I run 'npm link' inside the directory. Looks like this is a known issue. https://github.com/isaacs/npm/issues/2788 Any help ?
+01:48 < mscdex> zamnuts: i think v0.10.x turned off idle notifications for GC
+01:48 <@konobi> zamnuts: i don't see an actual problem, just a perceived one
+01:48 < mscdex> at least by default
+01:48 < mscdex> that's the only gc-related change i know of
+01:49 < zamnuts> konobi, i understand your POV, but on a prod system, i'll have to closely monitor the service. at one point i was cycling the service almost every 2 days
+01:49 < zamnuts> mscdex, what is an idle notification for GC? idle as opposed to what?
+01:50 <@konobi> zamnuts: it doesn't crash, it still handles the same r/s and there's nothing to cleanup after...
+01:50 < zamnuts> mscdex, GC only kicks in under load?
+01:51 < mscdex> zamnuts: you can tell v8 when your application is "idle" so it has the chance of performing gc more often
+01:51 <@konobi> zamnuts: you can always run it with gc exposed and run the GC yourself
+01:51 < zamnuts> konobi, what happens when i run out of RAM (and eventually swap)? i risk page faults, and even no system resources
+01:51 <@konobi> zamnuts: nothing has indicated that will happen
+01:51 < mscdex> zamnuts: but for most node usage it turns out that the idle notifications hinder more than help
+01:52 < zamnuts> konobi, good point on running gc manually
+01:52 < zamnuts> mscdex, how would i enable this? the same way konobi describes it?
+01:52 < jaseemabid> isaacs: Can you have a look at https://github.com/isaacs/npm/issues/2788 sometime? 
+01:52 < mscdex> zamnuts: well, i think the code for it is totally removed now IIRC
+01:53 < mscdex> zamnuts: not 100% sure though
+01:53 <@konobi> zamnuts: but try it for a while, you probably will find that v8 is doing better with available space vs being constrained
+01:53 < zamnuts> konobi, ok. to test that, i'll bring down the RAM on my staging VM, see if i can get it to cap faster
+01:54 < zamnuts> mscdex, thanks for the info
+01:55 < mscdex> zamnuts: yep, it looks like it was totally removed, no option to re-enable it
+01:55 < gluxon> TooTallNate: Hi, are you around? I've been looking into compiling the latest version of node for iOS. If you have time, is there a list of gotchas you could tell me before I start?
+01:55 < zamnuts> mscdex, thanks for veriifying
+01:55 <@TooTallNate> gluxon: it's been a long time since i've gotten that working…
+01:55 < gluxon> TooTallNate: I know :)
+01:55 <@TooTallNate> gluxon: my patch that made V8 work on iOS got stale
+01:55 <@TooTallNate> so that would be your first hurdle :)
+01:56 < gluxon> Does it just not work at all anymore, or was it taken out?
+01:57 < gluxon> I wonder if node-iOS still works...
+02:02 < harrisonm> Guess who just got a Parrot AR
+02:02 < harrisonm> relatedly, guess what takes a lot of space to fly around without crashing
+02:11 < mscdex> harrisonm: a space shuttle?
+02:17 <@konobi> for the node aerocopter meetup in vancouver, we're thinking football stadium
+02:20 <@Nexxy> harrisonm, lol
+02:20 <@Nexxy> harrisonm, they're so much fun
+02:22 <@konobi> mbalho: how's that looking?
+02:23 < harrisonm> mscdex: Valid answer
+02:23 < harrisonm> Nexxy: Yeah looking forward to having daylight again and hoping the wind's not too bad
+02:23 <@Nexxy> harrisonm, haha yeah. I'm working on adding flood LEDs to the bottom of mine for night flights
+02:24 < harrisonm> nice
+02:24 <@Nexxy> just not sure if I want to attach them to the lipo
+02:25 <@Nexxy> I don't want an asploding drone
+02:25 <@Nexxy> probably will just use some AAAs or something
+02:25 < harrisonm> "South wind 10 to 15 mph, with gusts as high as 25 mph." ugh Dallas
+02:26 <@konobi> harrisonm: oh, boo-urns
+02:26 <@Nexxy> harrisonm, did you get extra batteries?
+02:27 <@Nexxy> I take mine to a park w/ open fields & even in high winds I get almost an hour of flying with 3 batteries
+02:27 < harrisonm> Nexxy: not yet, was gift
+02:27 <@Nexxy> ohh sweet
+02:27 <@Nexxy> I'd definitely recommend a few extra parrot batteries
+02:27 <@Nexxy> and some spare propellers
+02:28 < harrisonm> Yeah for sure, and good to hear, was worried about it blowing away more than anything
+02:29 <@Nexxy> it's not as bad with the outdoor hull
+02:29 <@Nexxy> just don't turn or accelerate quickly in high win
+02:29 <@Nexxy> wind
+02:29 <@konobi> Nexxy: where's max these days?
+02:30 <@Nexxy> konobi, I believe he's doing beard training
+02:30 <@konobi> heh
+02:30 <@Nexxy> afk tho :P
+02:31 <@konobi> oh.. we ops... so busy...
+02:36 < AAA_awright> It really can't be THAT hard for MongoDB to implement transactions, even in a simple form... Updating/inserting multiple documents all at once, or automatically finishing a transaction if it fails for some reason
+02:37 < AAA_awright> The problem with putting your transactions in your application is that code is hardly if ever used, you'll never know if you lose data because of a bug
+02:40 <@mbalho> im not afk
+02:44 <@konobi> mbalho: what what1?
+03:03 < zamnuts> konobi, well you were right about the gc. v8 is memory hungry, it won't clean up until it has to. I'd be interested to know how it determines when to initiate gc, b/c right now i'm at 7mb free, no room for other processes?
+03:24 -!- ServerMode/#Node.js [+o mbalho] by sendak.freenode.net
+03:25 < asadpakistani1> I am trying to compile o3 for lastest node...it uses node-waf...but node-waf is depreciated, hence is not there so i get a command not found error.
+03:25 < asadpakistani1> i am running this script ./tools/node_modules_build in o3 folder....any help
+03:28 < mscdex> i'm starting to think node could benefit from linking against jemalloc
+03:30 < mscdex> it's very noticeable in some of these buffer benchmarks
+03:35 <@konobi> zamnuts: v8 is pretty good overall
+03:36 < bitRipperX> I have an idea for a project but I'm struggling to find the proper way to implemnt it in nodes. 
+03:37 < bitRipperX> I want to set up a service where a 3rd party website can connect to my service and authorize/reject a user on their site that isn't signed in and doesn't want to make an account. 
+03:38 < deoxxa> bitRipperX: something like a SAML identity provider?
+03:40 < bitRipperX> deoxxa: hmmmm, sort of the same principal, but I'm not authenticating idenity. An important aspect of this is anonymity
+03:41 < deoxxa> oh, i see
+03:41 < bitRipperX> deoxxa: you can think of it like a payment gateway. the user goes to some blog or something. they want to see a page but need to pay .02 to see it. 
+03:41 < deoxxa> you could always just return the same information for all users, or a pseudorandom identity
+03:42 < deoxxa> so the user can really easily generate new identities that aren't linked to their old one
+03:42 < deoxxa> s/old/main/
+03:42 <@konobi> bobosomfan: not a nodee-ism, right?
+03:42 < bitRipperX> I want that site to query my service to see if the user has paid, then they can be granted or denied access
+03:42 < bitRipperX> all anonymously
+03:42 <@konobi> bitRipperX: ha
+03:43 < chilts> encryption, obfuscation and randomness is probably what you want, but I have no idea how that would work :)
+03:43 < chilts> heh
+03:44 <@konobi> bitRipperX: any browser is traceable these days
+03:45 < bitRipperX> @konobi: yeah, but at the moment I'm mostly concerned about the mechanism of passing info back and forth between hosts for the purposes of authorization
+03:45 < deoxxa> bitRipperX: the remote site can generate a token, then provide it to the client. the user then goes to your site, which does all the payment etc, then signs the token with a private key and gives the signature to the client. client connects back to the remote site which verifies the signature with a public key and invalidates the token. done!
+03:46 < bitRipperX> can't quite work out the details 
+03:46 <@konobi> bitRipperX: this is why some people get paid
+03:46 < bitRipperX> hehehe yep
+03:47 < deoxxa> konobi: that's my job too, working out details :P
+03:47 < deoxxa> but right now is weekend time :>
+03:47 <@konobi> heh
+03:47 <@konobi> sounds familiar
+03:49 < bitRipperX> @deoxxa: this sounds exactly like what I need, but one major catch is it should be seamless as possible for the existing site. I want to hand the client a pice of code that will query my service and redirect the user as transparently to everyone as possible. 
+03:50 < bitRipperX> deoxxa: if I had control of the client site, it would be straight forward to set up what you mentioined. What's driving me crazy is trying to automate the process as much as possible
+03:51 < deoxxa> bitRipperX: ok, better plan then
+03:54 < deoxxa> bitRipperX: 1) remote site asks your site for a token, where public/private components are generated and the pair is given an "unpaid" status, then both components are given to the remote site securely 2) client is redirected to your site, with the public token, where it's potentially paid for somehow 3) client goes back to the remote site, so the remote site asks your site about the public token's status. if it's unpaid, go to step 2 and repeat. otherwise
+03:55 < deoxxa> bitRipperX: the remote site would only be able to redeem the token using the private half
+03:55 < deoxxa> and now i have to go to ikea! good luck!
+03:56 < bitRipperX> deoxxa: thanks! quick question before you go!
+03:56 < bitRipperX> damn
+04:03  * konobi sticks his hand up as a node consultant
+04:12 < QRPIKE> GIT Server written in nodejs https://github.com/qrpike/NodeJS-Git-Server
+04:40 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+04:50 <@konobi> oh man, those north koreans are kinda weak and puny
+04:50 < LuckyBurger> lol
+04:50 < mscdex> what, they use Java?
+04:51  * mscdex ducks
+05:06 < asadpakistani1> how can i convert a wscript to binding.gyp
+05:13 < JamesMGreene> gnarf got ops? Oooo :-o
+05:14 < JamesMGreene> So anyone want to NOT ignore my question from last night tonight (about the new Readable API)? https://gist.github.com/JamesMGreene/5418084
+05:23 < mscdex> JamesMGreene: with regards to your first comment, see here: https://github.com/joyent/node/blob/v0.10/lib/_stream_readable.js#L224
+05:24 < JamesMGreene> mscdex: Looks like that answers both questions
+05:24 < mscdex> yeah kinda
+05:25 -!- mode/#Node.js [+o xyxne] by ChanServ
+05:25 < JamesMGreene> What an odd uptake in joiners
+05:25 < mscdex> ?
+05:26 <@xyxne> lol
+05:26 < JamesMGreene> 18 people joined the room in the last minute
+05:26 < mscdex> conspiracy.js
+05:26 < JamesMGreene> (or more, actually)
+05:26 <@xyxne> network issues
+05:27 <@xyxne> [01.22.38] »¡« Irssi: Join to #Node.js was synced in 99 secs
+05:27 < mscdex> irsheesh
+05:47 < erichocean> is there anything I can do to make this go faster? https://gist.github.com/erichocean/cb52a1cc19c0857f21f3
+05:47 < erichocean> serving from 127.0.0.1 to Chrome takes 300ms for a 34.5KB file
+05:48 < erichocean> or even a 981 byte file
+05:49 < mscdex> erichocean: skip the stat call
+05:49 < erichocean> I measure the amount of time it takes from getting the request callback to after the .pipe() call and it's less than 10ms
+05:49 < erichocean> that's including the stat()
+05:49 < mscdex> ok, but just saying the stat is unnecessary in any case :-)
+05:50 < erichocean> I dropped that, it made no difference.
+05:51 < erichocean> I'm loading around 300 JavaScript files into Chrome, and it just gets slower and slower (and starts out slow).
+05:51 < mscdex> 300? why so many separate files?
+05:51 < erichocean> because it's a gigantic application framework
+05:51 < erichocean> and I'm in develop mode
+05:52 < mscdex> erm ok
+05:58 < erichocean> in Firebug, the same problem is there; it shows that it just sits there waiting for almost two seconds, and then receives in 0 ms
+05:58 < erichocean> I show it only took 1ms to handle that same request from the .request() callback to right after the .pipe() call
+05:59 < erichocean> which leads me to believe that on the Node side, it sat there for a few seconds before it decided to let me handle the request. is that possible?
+06:23 < Rhainur> hey guys, I've set up the tutorial program from the node homepage, and when I run it, it says "server running at http://127.0.0.1:1337/" but I can't get any output from it when I connect via a browser or telnet
+06:25 < mscdex> Rhainur: what address are you using in the browser?
+06:36 < JamesMGreene> mscdex (et al): Is there any way to properly 
+06:36 < JamesMGreene> mscdex (et al): Is there any way to properly "close" a read stream before reaching the end?
+06:36 < JamesMGreene> e.g. close/destroy/dispose/etc.
+06:37 < JamesMGreene> Or do I just null out of the object reference and leave it be?
+06:37 < JamesMGreene> out of = out
+06:37 < mscdex> JamesMGreene: "The push() method will explicitly insert some data into the read queue. If it is called with null then it will signal the end of the data."
+06:38 < JamesMGreene> Hmm
+06:38 < JamesMGreene> That's more for those extending the Readable though, isn't it?
+06:38 < JamesMGreene> I'm just using it to wrap a fs.createReadStream
+06:38 < JamesMGreene> I guess it would work either way
+06:39 < asadpakistani1> how can i convert a wscript to binding.gyp
+06:40 < mscdex> JamesMGreene: you can call .destroy()/.close() on fs.ReadStream
+06:40 < JamesMGreene> Which is the underlying object, not the Readable, right?
+06:41 < mscdex> well, fs.ReadStream doesn't inherit from Readable per-se, it does call the constructor though
+06:42 < mscdex> but it's otherwise a Readable stream
+06:42 < mscdex> oh wait nevermind, it does inherit Readable
+06:43 < JamesMGreene> I don't see a `close`/`destroy` documented anywhere...?
+06:45 < JamesMGreene> mscdex: I don't see a `close`/`destroy` documented anywhere...?
+06:47 < erichocean> does it make sense to show 'waiting' in the browser of 400ms when timing the entire request callback, all the way to after req.end() is called is about a ms?
+06:54 < bitRipperX> exit
+06:55 < erichocean> haha, I think I found it: fs.createReadStream() gets slower and slower at opening fds the more simultaneous requests there are
+06:55 < erichocean> 50x slower
+07:06 < mvta> morning mates
+07:07 < mvta> is anybody in the room?
+07:08 < mvta> ¬¬
+07:10 < sneakyness> ヾ(*д*)ﾉ゛
+07:14 < mvta> sneakyness, 
+07:14 < mvta> hi
+07:14 < mvta> I looking for a framework 
+07:15 < mvta> I used symfony and flow3 and I would like some similar in node
+07:15 < mvta> do you know anything?
+07:31 < Rhainur> what's the pattern for performing a series of write -> read (checking the response each time) on a socket?
+07:32 < shesek> > typeof require('crypto').createHash('sha256').update('x').digest() // -> string
+07:33 < shesek> shouldn't digest() with no argument return a Buffer? "If no encoding is provided, then a buffer is returned" at http://nodejs.org/api/crypto.html#crypto_hash_digest_encoding
+07:52 < chovy> is there a module for 'find' ?
+07:52 < chovy> i want to do `find . -type f -maxdepth 1`;
+07:53 < geNAZt> you want all files in the current dir ?
+07:53 < geNAZt> why not fs.readdir ?
+07:54 < chovy> geNAZt: yeah
+07:54 < hackedy> chovy: recursive-fs looks like it will help
+07:55 < chovy> i'm using exec() now to call find. its
+07:55 < hackedy> oh wait oh
+07:55 < hackedy> no maxdepth 1 means go into one directory deep though
+07:55 < geNAZt> thats also no problem
+07:55 < hackedy> wait no i'm wrong i misread the manpage ignore me
+07:55 < hackedy> fs.readdir will do what you want probably
+07:56 < geNAZt> but you need to stat the files
+07:56 < geNAZt> to get the type
+07:56 < hackedy> yes
+07:57 < chovy> geNAZt: i'm just tring to get a list of files
+07:57 < chovy> actually. i really want to ignore all files in ./dev/
+07:57 < chovy> find . -type f -not -path './dev/*' seems to work
+07:58 < ome> How can I manage Events in a sort of automtic way, but the other way around, so when even the same Even gets triggerted, all previous handlers should die.
+07:58 < ome> whenever* the same
+07:58 < geNAZt> chovy: you can write a function, that makes the same
+07:58 < geNAZt> in nodejs
+08:00 < ome> Forexample, I can use 'once' to bind a handler and at the end of the handler bind it again, that way all other Events are ignored until this event is handlered properly, but I want exactly the opposite of this, when ever a new even gets triggered, all previous handlers should halt.
+08:01 < geNAZt> well events dont work async
+08:01 < geNAZt> so you have to wait will all handlers of the previous event has handled
+08:01 < luto> I'm trying to build etherpad-lite on a raspberry pi. When installing the deps npm errors on me: http://pastebin.com/raw.php?i=q46WixQL
+08:01 < luto> /bin/sh: 1: pg_config: not found
+08:01 < luto> gyp: Call to 'pg_config --libdir' returned exit status 127. while trying to load binding.gyp
+08:02 < geNAZt> luto: you have postgres installed ?
+08:02 < luto> I've compiled node from source.. v0.10.4
+08:02 < ome> geNAZt: But there must be a way to stop all event handlers at a given time?
+08:02 < luto> geNAZt: oh. pg => postgres... what does need postgres in there o.O
+08:02 < geNAZt> ome: no once emitted you cant "skip" or "stop" them
+08:03 < geNAZt> pg_config is the configure program of postgres
+08:03 < luto> hm.
+08:03 < geNAZt> maybe does etherpad-lite require postgres ?
+08:05 < ome> geNAZt: I see, then I would probably havet to find a way to solve my problem.
+08:05 < geNAZt> what is the problem ?
+08:05 < geNAZt> why must the old function be stopped ?
+08:06 < luto> geNAZt: ha, it works anyway. thanks! :D
+08:06 < ome> geNAZt: because it's an Stream that keeps pushing the data to client with websocket, once the user requests a new one, I like to stop the previous one.
+08:06 < ome> a Stream*
+08:08 < geNAZt> well you get a closed event ?
+08:13 < ome> geNAZt: from the client?
+08:13 < ome> Let me pastebin a bit of code.
+08:16 < ome> Here is the code: http://pastebin.com/Lx5LnF5y
+08:17 < ome> That is baiscally what I am doing it now, How would I close the previous streams when a new one event is triggered?
+08:17 < geNAZt> bind the stream to the socket
+08:17 < geNAZt> and socketio gives you a disconnect event when a client disconnects
+08:17 < geNAZt> you can destroy the stream
+08:17 < geNAZt> in that event
+08:19 < ome> geNAZt: How would I bind it? Can give you some hints?
+08:19 < geNAZt> socket.stream = new socketio(req)
+08:20 < geNAZt> socket.on('disconnect', function() { delete socket.stream; });
+08:21 < ome> geNAZt: Thanks, and if I override the socket.stream, it wild be the same as deleting it first?
+08:21 < geNAZt> no
+08:22 < geNAZt> since the socket changes everytime a client connects
+08:26 < ome> Ah, in this example, http://pastebin.com/yG5s8FTg would there be always only one stream for each client?
+08:28 < ome> geNAZt: ^ :)
+08:29 < geNAZt> if a client refreshese the page the old socket gets destroyed
+08:29 < geNAZt> and a new one gets build up
+08:31 < ome> Thanks, and what happens when a client triggers a second 'request' event while still connected?
+08:32 < geNAZt> then the stream will be overwritten
+08:34 < ome> geNAZt: Fantastic, Thanks a lot.
+09:48 < geNAZt> np man :D
+10:09 -!- mode/#Node.js [-o gnarf] by gnarf
+10:09 < ashnur> anyone knows what kind of require has mocha.js inside it? https://github.com/visionmedia/mocha/blob/master/mocha.js#L5
+10:16 < Chiffon> hi all
+10:18 < geNAZt> hi
+10:33 < standoo> how often do you use anything apart from npm install and npm update?
+10:36 < ashnur> npm init
+10:36 < ashnur> npm remove
+10:36 < ashnur> npm shrinkwrap
+10:36 < geNAZt> npm publish
+10:37 < ashnur> yes, that too
+10:37 < geNAZt> npm unpublish
+10:37 < ashnur> well, that is not that oftent
+10:37 < geNAZt> well i often use this "move" command
+10:37 < geNAZt> to move submodules up
+10:38 < geNAZt> dedupe !
+10:38 < geNAZt> :D
+10:38 < geNAZt> https://npmjs.org/doc/dedupe.html
+10:43 < boundless> hi everyone, nodeJS noob here...
+10:43 < boundless> quick question:
+10:43 < boundless> regarding the example in the node docs for net server.listen (http://nodejs.org/api/net.html#net_server_listen_port_host_backlog_callback)
+10:43 < boundless> server.close(); is immediately followed by server.listen(PORT, HOST);
+10:43 < boundless> am i missing something? because i thought server.close was async and therefore the listen should be nested inside the close
+10:44 < boundless> as in, passed as a callback
+10:46 < geNAZt-laptop> well in this example it is inside a error listener
+10:46 < geNAZt-laptop> and inside a timeout
+10:46 < geNAZt-laptop> so this code executes only if an error on the server occurs and what the code does is to close the server after the error + timeout
+10:49 < boundless> hmm, sure but won't the listen get executed while the close is still being performed?
+10:51 < geNAZt> no
+10:51 < ashnur> :D
+10:51 < ashnur> dedupe :))
+10:52 < ashnur> standoo: so?
+10:52 < geNAZt-laptop> dedupe is nice to keep the modules clean
+10:54 < boundless> geNAZt: ok, thanks :)
+11:01 < Kakera> is there a pythonw equivalent for node?
+11:01 < Kakera> (no terminal window under Windows)
+11:05 < dleonardi> hello! i would like to use node to build a website.. while i do know js i'm a bit of a noob with node. I've been looking at meteor but i'm not sure it fits my purpose. So i'd like to replace meteor with a bunch of custom code. yet i dont know how to handle the frontend serving aspect. Is there any documentation to get me started in that direction?
+12:23 < reddy> nodesters are the new gangsters
+12:26 < gildean> reddy: good to know
+13:17 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+13:22 < AnthonyCat> For a web socket (socket.io), how do you get the associated express/connect session?
+13:23 < AnthonyCat> I can read the cookie as a string, which probably helps
+13:23 < bmatusiak> AnthonyCat  check this out: https://gist.github.com/bmatusiak/4070108
+13:24 < AnthonyCat> reading through it now. thanks
+13:25 < bmatusiak> AnthonyCat  this example uses mongodb for session storage.. but you can use others. concept is the same
+13:25 < geNAZt> what deployment tools do you use for node ?
+13:26 < bmatusiak> i use git  to deploy to heroku.. if thats what your asking
+13:26 < geNAZt> well i have a git and want to deploy it on my servers
+13:28 < bmatusiak> well,, there many ways to do that.  but with out any knowledge 
+13:28 < bmatusiak> on the git script
+13:28 < bmatusiak> would be a bear
+13:28 < geNAZt> why git script oO
+13:29 < geNAZt> i want to have my maschine that says "This software up to Server XY"
+13:29 < geNAZt> and the software deploys the software installs and runs it
+13:29 < geNAZt> and uninstalls the older version
+13:29 < bmatusiak> https://www.google.com/search?q=git+script+hooks
+13:30 < geNAZt> well thanks but i know how git scripts work
+13:30 < AnthonyCat> bmatusiak: what is the redis stuff for if you are using mongo?
+13:30 < geNAZt> and no i dont want git hooks
+13:31 < bmatusiak> AnthonyCat redis is for socket.io to cross communicate socket events to other server running socket.io 
+13:32 < bmatusiak> makes it so your client can connect to multi socket.io servers and you can call the event on another
+13:32 < oskude> hi, am i doing something wrong with spawn/exec here to get "stty: standard input: Inappropriate ioctl for device" http://sprunge.us/WebS ?
+13:34 < oskude> eg. not setting some option? or should use something else to get a column width for the shell command?
+13:34 < AnthonyCat> bmatusiak: so is that so io.sockets.in(sessionRoom) emits for all sockets on other servers?
+13:35 < bmatusiak> it should
+13:35 < AnthonyCat> ok, thats great. Thanks
+13:36 < bmatusiak> the concept it to not care what server there connected to if you have many servers running
+13:56 < iam5o1> hi
+13:56 < bmatusiak> hi
+13:57 < iam5o1> how's it?
+13:58 < kenperkins> morning
+14:00 < bmatusiak> mongoose
+14:00 < bmatusiak> site is down
+14:00 < sinclair-work> mongoose is rubbish
+14:00 < sinclair-work> you don't need it
+14:00 < dypsilon> +1
+14:02 < bmatusiak> lol, wasn't asking if it was rubbish or not. just declaring its down :P 
+14:02 < dleonardi> hey guys, what alternatives do you have to express to provide stuff like routing, sessions, and interpolation in templates?
+14:03 < dypsilon> dleonardi, flatiron
+14:03 < dleonardi> or, how would you guys go about to build a site that has users, lots of different views and where security is somewhat critical?
+14:03 < dleonardi> thanks dypsilon , i'll theck it out
+14:04 < dypsilon> dleonardi, also maybe, just maybe, you want to take a look at hapi.
+14:05 < dypsilon> dleonardi, hapi tech lead is Eran Hammer, the spec lead of oauth1a, so I think he puts alot of thought in security of hapi.
+14:05 < dleonardi> hapi seems to be more geared towards webservices, rather than serving content. but yeah, i do need webservices too, so that might be a good fit
+14:07 < dypsilon> dleonardi, true, primary use case for hapi are rest apis, but they have a view engine integration, too. Also every well designed website is by definition restful.
+14:10 < kenperkins> is anyone actually using flatiron for their website
+14:10 < kenperkins> i've only heard of folks using some of the sub-projects (i.e. winston, nock, etc)
+14:14 < dleonardi> dypsilon: https://docs.google.com/presentation/d/1K4RY_1dOi2o_0RBPTr05WL0Vr9E28rRJsnbUP23D6hc/edit#slide=id.gf37f796_147_0
+14:14 < dleonardi> the last slide is quite interesting
+14:14 < dleonardi> as i need both api and realtime stuff i probably will go with derby
+14:16 < dleonardi> also, i already know mvc so i dont have to learn new paradigms :)
+14:16 < dleonardi> i'll dive in now ;) thanks for all the help :)
+14:17 < dypsilon> dleonardi, great, tell me how it went after you have done something with it
+14:18 < dleonardi> sure :)
+14:22 < [Fudge]> ugh
+15:23 < geNAZt> does someone know a program that helps me with port switching ? i want to switch port 80 from port 8001 to port 8002
+15:24 < geNAZt> so the program listens to port 80 and proxies the requests to 8001 till i say "now you redirect to 8002"
+15:25 < robmisio> can anyone help with a node/npm install issue on linux?
+15:25 < geNAZt> issues on linux ?
+15:25 < geNAZt> which linux ?
+15:25 < robmisio> linux mint
+15:25 < geNAZt> debian edition ?
+15:25 < gildean> you should be able to use the ubuntu repo for mint, if it's not lmde
+15:25 < robmisio> no, i belive it's the ubuntu one
+15:25 < geNAZt> ok whats the problem ?
+15:26 < gildean> sudo add-apt-repository ppa:chris-lea/node.js
+15:26 < gildean> then sudo apt-get update && sudo apt-get install nodejs
+15:27 < robmisio> when i install packages globally that have a cli, like express... I type express and bach just goes to the next line -- no ouput at all. I think a related issue may be that typeing 'node' doesn't get me into the node, I need to type 'nodejs'.
+15:27 < geNAZt> well its no issue 
+15:27 < geNAZt> :D
+15:27 < geNAZt> its a conflict in debian / ubuntu repos
+15:28 < robmisio> the conflict is not an isse?  :D
+15:28 < geNAZt> other programs also ship a "node" binary, but the packagaes are named as node, node in ubuntu is called nodejs
+15:28 < gildean> ln -s /usr/bin/nodejs /usr/bin/node
+15:28 < geNAZt> so ubuntu and debian says => binary not nodejs, then not in our repo
+15:28 < geNAZt> wait
+15:28 < geNAZt> you dont know if there is a node binary
+15:29 < geNAZt> if you link it this way you can destroy other things
+15:29 < robmisio> i think there is some node folder that's not nodejs
+15:29 < gildean> i doubt he's a ham-radio-amateur using his computer as a radio
+15:29 < geNAZt> yes from a package called node
+15:29 < geNAZt> do you know ?
+15:29 < gildean> the bin node is a ham-radio application of sorts
+15:29 < robmisio> i don't mind having to type nodejs, I just though this was related to my other issue, which is blocking me.
+15:30 < geNAZt> yes it is since most scripts based on nodejs have !#/usr/bin/node as interpreter
+15:30 < geNAZt> which would be wrong in your case
+15:30 < robmisio> ahh
+15:30 < gildean> geNAZt: i'm 99% sure he's not using node as in the radio-application
+15:31 < geNAZt> you can verify that you dont need the node
+15:31 < robmisio> what would be the quickest fix? (and no, I'm not a ham-radio-amateur!)
+15:31 < geNAZt> first check what kind of node it is
+15:31 < geNAZt> (which node)
+15:31 < gildean> then just: ln -s /usr/bin/nodejs /usr/bin/node
+15:31 < pats_Toms> hi, is there any node module for creating some versioning to api? I mean like /1.0 or /2.0 and so on...
+15:32 < geNAZt> pats_Toms: restify
+15:32 < robmisio> which node --> /user/sbin/node
+15:33 < geNAZt> sudo apt-get purge node
+15:33 < geNAZt> sudo apt-get install nodejs
+15:33 < geNAZt> which node
+15:34 < pats_Toms> I suggest to install nodejs from source on debian / ubuntu
+15:34 < gildean> pats_Toms: why?
+15:34 < pats_Toms> be up to date :)
+15:34 < geNAZt> because its better
+15:34 < geNAZt> i also compile my software myself on all linux
+15:34 < geNAZt> :D
+15:34 < gildean> on ubuntu just use the repo from chris lea
+15:34 < gildean> it's up to date and easier to keep up to date
+15:35 < geNAZt> well it doesnt run against your toolchain
+15:35 < geNAZt> and your toolchain can be more up 2 date
+15:35 < geNAZt> and so on
+15:35 < geNAZt> but thats another topic
+15:36 < robmisio> so which path should i take, the purging or the sym link?
+15:36 < geNAZt> purge
+15:36 < geNAZt> if you symlink you have a corrupted program
+15:36 < geNAZt> which cant be uninstalled
+15:36 < geNAZt> if you dont need the node package uninstall it
+15:37 < robmisio> will i have two nodejs installs then?
+15:37 < geNAZt> no
+15:38 < robmisio> which node ---> /usr/bin/node
+15:38 < robmisio> and my cli global modules now work!
+15:39 < robmisio> however typing node doesn't get me into the node shell, still need to type nodejs
+15:40 < gildean> robmisio: which version are you on?
+15:41 < gildean> node -v
+15:41 < robmisio> nodejs -v ---> v0.10.0
+15:41 < robmisio> ls
+15:42 < geNAZt> have you purged node ?
+15:42 < robmisio> i did
+15:42 < geNAZt> can you also purge nodejs ?
+15:42 < geNAZt> and install nodejs again ?
+15:44 < robmisio> same issue, have to type nodejs
+15:45 < luto> robmisio: that is expected on some distro. forgot which one.
+15:45 < geNAZt> the node executable is there ?
+15:45 < geNAZt> its linux mint ubuntu edition
+15:45 < luto> it's debian
+15:45 < geNAZt> no
+15:45 < luto> yea, mint is ubuntu and ubuntu is debian
+15:45 < luto> so that is expected.
+15:45 < geNAZt> well
+15:45 < geNAZt> ubuntu != debian
+15:46 < luto> fork, bla
+15:46 < geNAZt> thats like saying mac os x is like debian
+15:46 < geNAZt> because they use a linux kernel
+15:46 < luto> I think you get what I'm saying
+15:46 < geNAZt> lol
+15:46 < luto> debian is the root of ubuntu
+15:46 < robmisio> if my only issue is having to type nodejs, I'm fine. My concern is it's a symptom of something bigger. I am able to run cli node modules now, which is the big thing i was after.
+15:47 < [Fudge]> geNAZt OS X doesn't use the linux kernel :P
+15:47  * [Fudge] lurks again
+15:47 < luto> robmisio: yes, that is your only issue
+15:47 < geNAZt> well it does sort of
+15:47 < [Fudge]> nope
+15:47 < gildean> no, it uses freebsd kernel
+15:47 < [Fudge]> OS X uses Darwin, which is based on FreeBSD
+15:47 < luto> geNAZt: lol OS X and linux kernel
+15:47 < [Fudge]> BSD != Linux
+15:47 < geNAZt> yes true
+15:47 < robmisio> another thing is that for some reason I have global node packages installed in /usr/local/lib/node_modules and others in /usr/lib/node_modules
+15:48 < sashman> i hate mac osx for life now
+15:48 < luto> sashman: haha, why?
+15:48 < [Fudge]> System Information: Model: MacBook Pro (15-inch Retina Mid-2012) • Memory: 16.00 GB • Uptime: 15 Hours • Load: 27% • OS: Mac OS X 10.8.3 (Mountain Lion) (Build 12D78)
+15:48 < [Fudge]> =3
+15:48 < sashman> i even cant ./configure node.js 
+15:48 < luto> sashman: sure you can, why not?
+15:48 < [Fudge]> sashman why not?
+15:48 < gildean> osx is pretty shitty, i'd rather use freebsd than osx
+15:48 < sashman> it stucks at ./config.mk while compiling
+15:48 < sashman> for years
+15:48 < geNAZt> Microsoft Windows [Version 6.1.7601]
+15:48 < geNAZt> :D:D
+15:48 < [Fudge]> I use FreeBSD server side and OS X here
+15:49 < gildean> but that's mainly because of the desktop env, not so much the kernel etc.
+15:49 < geNAZt> well i always had a linux kernel
+15:49 < geNAZt> and i always will have a linux kernel :D
+15:49 < sashman> if u have apple hardware u cant even get rid of osx shit so easily u have to dualboot another os
+15:50 < robmisio> geNAZt & gildean: thanks for the help!
+15:50 < sashman> yea geNAZt ill stick to it too
+15:50 < geNAZt> well are mac os x not UEFI save ?
+15:50 < gildean> robmisio: np
+15:50 < sashman> yea i guess they are
+15:50 < geNAZt> so it would be possible to install any UEFI os on a mac or ?
+15:51 < sashman> yea nearly dualbootin u have to have osx installed at least 
+15:51 < gildean> geNAZt: not, the bootloader is totally locked down
+15:51 < luto> sashman: ./configure works fine for me
+15:51 < geNAZt> you cant overwrite the bootloader
+15:51 < geNAZt> omfg -_-
+15:52 < sashman> i have a webproject which is totally based on rails but now i want to switch to node .. but this shitty os doesnt compile anything 
+15:53 < genazt_> :D:D
+15:53 < luto> sashman: get the compiled version then
+15:53 < luto> compiling works fine for me on osx, so fix your system and don't cry.
+15:53 < sashman> macports package managers works like a shit too i think i will install today a linux os beside and start from scratch
+15:53 < genazt_> nodejs runs on mac os x
+15:53 < genazt_> look 80% of the nodejs talks => macbooks
+15:53 < genazt_> :D
+15:53 < luto> just get the compiled version off the homepage
+15:53 < sashman> mhh k i try
+15:54 < luto> compiles in 1 minute and 10 seconds :D
+15:54 < genazt_> pffft
+15:54 < genazt_> :D
+15:55 < sashman> haha 'genazt' now i understand ure nick :)
+15:55 < genazt_> wenn du deutscher bist ist der eigentlich klar :D
+15:55 < sashman> apple hat mich genazt
+15:55 < luto> german? nazi!!
+15:56 < sashman> ;)
+15:56 < genazt_> oh no -_-
+15:56 < sashman> not really luto
+15:56 < luto> sure they are
+15:56 < luto> austria is much better. less nazi here.
+15:56 < luto> :D
+15:56 < genazt_> fastest node compile: http://hastebin.com/qaqilukami.txt
+15:56 < genazt_> :D:D
+15:56 < sashman> best isss is cyberspace
+15:57 < genazt_> yes austira
+15:57 < luto> genazt_: make clean
+15:57 < luto> :P
+15:57 < genazt_> pssssst
+15:57 < genazt_> :D
+15:58 < luto> real0m0.741s
+15:58 < luto> HAHA!
+15:59 < genazt_> 1m10s with snapshot ?
+15:59 < luto> 0.10.4 tarball without ./configure
+16:00 < sashman> what DB would u suggest for performance stabileness and features, i freak out so manys are out there
+16:00 < genazt_> so with snapshot
+16:00 < genazt_> :D
+16:00 < genazt_> sashman, depends on your usecase
+16:00 < luto> redis! redis for everything!
+16:01 < sashman> multimedia
+16:01 < luto> not redis
+16:01 < sashman> redis ?? lawl isnt it for only good for hashing?
+16:01 < genazt_> multimedia what ?
+16:01 < luto> genazt_: now it's 1 minute with ./configure... :D
+16:02 < genazt_> real	2m46.484s
+16:02 < genazt_> -_-
+16:02 < genazt_> :D
+16:02 < purr> genazt_: ಠ_ಠ is an IRC client/IRC client framework.
+16:02 < sashman> videos, pictures, user settings, comments, and settings of course
+16:02 < genazt_> so much binary data inside the database ?
+16:02 < luto> genazt_: haha! ;)
+16:02 < luto> genazt_: I assume mac is better.
+16:02 < sashman> lawl no qubit data
+16:03 < luto> genazt_: why not? take some document database
+16:03 < genazt_> i dont say its bad
+16:03 < sashman> so im between postgres and mongodb..
+16:03 < genazt_> i try to search a database for his needs
+16:03 < genazt_> mongodb
+16:04 < genazt_> if you want to store much data (binary or not)
+16:04 < genazt_> postgres can be faster in the fact of searching
+16:04 < sashman> really? pg has alot of goodness too but mongodb is state of the art u say
+16:05 < genazt_> in dbs there is no "state of the art"
+16:05 < sashman> mhh 
+16:05 < genazt_> if your case says it works best with dbms xyz then use it
+16:05 < genazt_> i hate people who says mongodb rocks the shit out of my pants in all cases
+16:05 < genazt_> thats bullshit
+16:06 < sashman> haha ^^
+16:06 < luto> genazt_: in school they told is oracle is the best for everything :)
+16:06 < genazt_> it really depends on the data which should be stored
+16:07 < genazt_> which amounts must be stored, if data should be searched sorted, reduced joined
+16:07 < genazt_> and so on
+16:07 < genazt_> oracle can be nice
+16:07 < genazt_> if you built all the comfort by yourself :D
+16:08 < genazt_> my current favorites in dbms are mongodb(doc based), redis(key val store) and mariasql(relational dbms)
+16:09 < Gabriel403> Arch just replaced mysql with mariasql
+16:09 < genazt_> in their repo ?
+16:09 < genazt_> nice nice :D
+16:09 < RLa> slackware -current also replaced it
+16:09 < genazt_> yes its a dropin so you dont need to change anything
+16:10 < genazt_> you only need to port the data from mysql to mariasql
+16:10 < Gabriel403> https://www.archlinux.org/news/mariadb-replaces-mysql-in-repositories/
+16:10 < genazt_> the api / docs / sql are the same
+16:10 < RLa> sashman, maybe you want to store metainfo in db only and data itself as files on some cdn
+16:10 < sashman> sry what r metainfos?
+16:10 < RLa> not everything is same, i heard driver licenses are different
+16:11 < RLa> sashman, like title, date and comments
+16:11 < genazt_> descriptions, file sizes, file names, gps coords, length of videos
+16:11 < genazt_> amount of shit in a video
+16:11 < genazt_> and so on
+16:11 < sashman> ah ok
+16:11 < sashman> yea these infos should have a fast output
+16:11 < gildean> oracle owns mysql while mariadb is developed by one of the founders of mysql
+16:11 < genazt_> thats not the problem
+16:12 < sashman> cause ofc they will be querried alot
+16:12 < RLa> i would use doc database for metainfo
+16:12 < genazt_> the problem is: do you search for videos / media with these metadata ?
+16:12 < genazt_> gildean, from the old mysql sun team ?
+16:12 < luto> genazt_: afaik, yes
+16:13 < genazt_> nice to know
+16:13 < sashman> yea but ill stick with a search engine like elasticsearch which r querying via json rpc
+16:13 < genazt_> and the json rpc does search in what ?
+16:13 < luto> genazt_: haha :D
+16:13 < sashman> indexed data
+16:14 < genazt_> which is stored where ?
+16:14 < genazt_> so you want to search your data, over and json api
+16:14 < sashman> i probably guess it ill be mongodv
+16:14 < genazt_> for searches any relational database is better
+16:14 < genazt_> mongodb isnt that slow in that cases
+16:15 < sashman> mhh ok
+16:15 < genazt_> depends on the amount of data
+16:15 < ome> I am using browserify and have Backbone with all it's dependencies installed. Despite 'requiring' it, when I try to creat a view with 'tView = Backbone.View.exted({...})' I get an error on the browser: 'ReferenceError: Backbone is not defined [Break On This Error]   tView = Backbone.View.extend({'.
+16:16 < ome> I am using Coffeescript and have configured Coffeely properly for Browserify as other coffeescripts work just fine.
+16:16 < breck7> ome: how are you requiring backbone? can you paste your require statement
+16:17 < ome> percival: Sure, `Backbone = require 'backbone'`.
+16:17 < Harteroider> Is there anybody who knows how to insert values to collection in mongodb? On my local machine I was doing it thus: http://gyazo.com/0d0f3d9e08b840175ee7a2dd78918024.png?1366473186
+16:18 < kiuma> hello, today I decided to play with node.js
+16:18 < genazt_> Harteroider, and whats the problem with it ? it should run
+16:18 < genazt_> kiuma, welcome to nodejs :D
+16:19 < Harteroider> error Sat, 20 Apr 2013 15:50:01 GMT TypeError: Cannot call method 'collection' of undefined
+16:19 < gildean> Harteroider: db.collection('marks').insert(data, function (err) { if (!err) { console.log('ok') });
+16:19 < ome> This is weird. If I put my code in a sperate file and require it where backbone is required before. it fails, but if they are in the same file it works just fine.
+16:19 < genazt_> Harteroider, the db variable isnt set
+16:20 < genazt_> so you cant call the function from it
+16:20 < genazt_> >> test
+16:20 < purr> genazt_: ReferenceError: test is not defined
+16:20 < ome> preck7: Got it working, thanks.
+16:20 < genazt_> >> undefined.collection()
+16:20 < purr> genazt_: TypeError: Cannot call method 'collection' of undefined
+16:21 < kiuma> thanks genazt_. I'm a dojotoolkit user and j2ee experienced . My qustion is: what's the ''best'' framework to create web applications ? A want something not very pervasive  
+16:21 < kiuma> *I want
+16:21 < kiuma> *I'd like ;)
+16:21 < genazt_> well that depends on what the web application should do, a mvc ? a rest api ? a single page app ?
+16:21 < brycebaril1> One might hope the best one was the most pervasive...
+16:21 < Harteroider> But why then in works fine on my local machine?
+16:22 < genazt_> the most webapps are built ontop of expressjs which is the best framework for nodejs
+16:22 < kiuma> ok I'll geive a look at expressjs
+16:22 < RLa> kiuma, you might want to combine smaller libraries
+16:22 < genazt_> Harteroider, maybe the db object sets itself to undefined because of an connection error ?
+16:23 < RLa> express is nice :)
+16:24 < kiuma> RLa, that's myidea. I don't want something that force me. I just need something that at least has defaults for content/type and other commons http headrs
+16:24 < kiuma> I'm trying to try something a bit more agile then java :)
+16:24 < genazt_> kiuma, expressjs does that, but a little hint, try to avoid loops
+16:24 < kiuma> and its painfull deployments
+16:24 < breck7> ome: great!
+16:25 < ome> file bundle.coffee: `$ = require 'jquery' \n require './app.coffe'` Now in file app.coffee how can I access `$`? I am using browserify by the way.
+16:25 < genazt_> ome, you cant because it is not in the scope of app.coffe
+16:25 < genazt_> you either define $ as global or you inject it
+16:26 < breck7> kiuma: i highly recommend express as well. 
+16:26 < kiuma> genazt_, I know. (I'm developing an event based non blocking web server in common-lisp binding Enlightenment ecore library) thanks for the advice anyway
+16:26 < kiuma> I bookmark it
+16:26 < ome> I think DI is clearner, how would I go ahead with that? my understand of Node.js and Javascript is pretty limited. :(
+16:26 < genazt_> kiuma, well much people that start with not come from c/c++/php land so they are familiar with loops :D
+16:27 < txdv> then overcome your limitations and expand your horizon
+16:27 < txdv> genazt_: it is many people
+16:27 < genazt_> ome, if you inject a object into a module the module gets a reference of that object
+16:27 < txdv> kiuma: jesus, what abomination are you creating there
+16:28 < kiuma> txdv, why would you say that ?
+16:28 < ome> txdv: I am trying, sir.
+16:28 < gildean> kiuma: https://npmjs.org is a good place to check out, you can see which modules are popular etc.
+16:28 < kiuma> thank you 
+16:28 < txdv> common-lisp web server based on ecore bindings, sounds pretty crazy to me
+16:29 < ome> genazt_: Well, I understand the concept, but since there is no constructore and the 'app.coffee' is exectued as soon as it's required. I am not sure when or how do I inject the object.
+16:29 < genazt_> btw. npmjs is bundled in nodejs, if you want to install a module in your project just type "npm install <modulename>"
+16:29 < breck7> if my npm module generates user files (logs, folders, etc), what's the best practice for where to store those?
+16:30 < txdv> how is binding ecore going?
+16:30 < breck7> i'm assuming i don't want to be writing them to the node_modules/mypackage/ folder
+16:30 < genazt_> breck7, depends on the things you want to write
+16:30 < genazt_> logs should go in the os log dir, folders and so on should be made configureable
+16:30 < Harteroider> No, I'm using Db.connect("...", function(err, db) and err == false
+16:30 < kiuma> txdv, pretty well. nut now iit has slow down a bit because I'm very busy with java stuff 
+16:31 < txdv> what is java stuff?
+16:31 < ome> breck7 if it's a global module I would go with the operating systems defualt logging hireachy, if not, shouldn't that be handled at an upper level?
+16:31 < kiuma> txdv, see the tests to get an idea of the lib https://github.com/kiuma/CL-ECORE
+16:31 < kiuma> ... If you can read CL
+16:32 < gildean> Harteroider: i'd suggest using a light wrapper on top of the native mongodb driver, my favourite has been mongojs, it'll save you a lot of trouble
+16:32 < kiuma> but I think I'm a bit off topic here
+16:32 < kiuma> txdv, java stuff = my actual job
+16:32 < breck7> genazt_, ome, yes that makes sense. it's a global module. i guess the only thing i don't like about that is it "dirties" the os. i love programs that i can completely uninstall by just rm -rf a folder
+16:33 < genazt_> breck7, in that case you should make anything that goes out of your module configureable
+16:33 < genazt_> like socket.io does it with its logger
+16:33 < genazt_> or with its session store
+16:34 < breck7> oh, great tip, i'll look at how socket.io does it
+16:38 < genazt_> does some of you work with tls ?
+16:38 < genazt_> i have a general question about private keys, in tls would every client get its own private key pair ? and if so how do i select the right one in the server
+16:40 < kiuma> dinner time, thanks for you advises
+16:40 < kiuma> *your
+16:40 < genazt_> np
+16:43 < ome> preck7 That is a valid reason, by the way, you might like this linux Distro, GoboLinux or something like that, it's has a very clean  filesystem hierarchy, everything related to a program will go to a single directory.
+16:43 < ome> %s/reason/concern/g
+16:44 < breck7> ome: interesting idea. 
+16:47 < ome> Ah, so I finally got hang of the Browserify DI, it's based on CommonJS, so module.exports/exports is what I need to take care of. :D
+16:51 < Dearcham> Hi ! I tried to translate C# hex byte array   byte[] header = new byte[] { 0xFF, 0xFF, 0xAA, 0x55, 0xAA, 0x55, 0x37, 0xBA };  into node .js using buffers var headerbuffer = new Buffer([0xFF, 0xFF, 0xAA, 0x55, 0xAA, 0x55, 0x37, 0xBA]);  but it doesn't seem to do the job . any suggestion ?
+16:58 < cyberalien> what's the best way to check if script is being executed in node.js or browser? check typeof exports === 'undefined'?
+17:01 < txdv> cyberalien: http://stackoverflow.com/questions/4224606/how-to-check-whether-a-script-is-running-under-node-js
+17:01 < txdv> typical let me google that for you question
+17:31 < pekim> Dearcham: That looks reasonable, so I guess the problem may lie in what you do with the buffer.
+17:32 < mscdex> anyone know why 'end' wouldn't (eventually) be emitted when doing `push(null);`?
+17:34 < mscdex> isaacs: ^
+17:45 < pekim> Dearcham: That looks reasonable, so I guess the problem may lie in what you do with the buffer.
+17:47 < yields> did someone here tried windows azure hosting ?
+17:58 < Dearcham> @ pekim i'm sending it to serialport via serialport lib to control a robot wich doesn't move when i send it this way
+18:10 <@mbalho> lol @ http://nerds.airbnb.com/weve-open-sourced-rendr "Express is the de facto Node.js web server"
+18:10 <@mbalho> what about require('http') ?
+18:10  * mbalho trolololo
+18:11 < geNAZt> http module is shit 
+18:11  * geNAZt hides
+18:11 <@mbalho> yea thats probably why express doesnt use the http module
+18:12 < geNAZt> but 80%+ of nodejs webapps are based onto expressjs
+18:12 < geNAZt> and not on the pure http module
+18:12 <@mbalho> there is a difference between a web server and a web framework, that is what i was trolling about
+18:12 <@mbalho> but i guess i fail at being a troll
+18:12 < geNAZt> yes true
+18:13 < geNAZt> yes true :D
+18:15 < pekim> Dearcham: I've only got experience sending strings to serialport (to an arduino), but I see from the docs Buffers are supposed to work as well. Can we see the relevant code (maybe in a gist pastebin)?
+18:27  * mscdex shakes a fist at streams2
+18:28 < geNAZt> streams2 are gods working :D
+18:28 < geNAZt> they work like an harming angel
+18:33 < vrlogrs> hey guys ..
+18:33 < vrlogrs> im using socket.io with node.js and nginx ..
+18:33 < geNAZt> hiho
+18:33 < geNAZt> and ?
+18:33 < vrlogrs> I get the "Welcome to socket.io." message in /socket.io/chess/ ... 
+18:33 < vrlogrs> but, i get a 404 error on /socket.io/chess/socket.io.js ..  vrlogrs: any ideas?
+18:33 < Dearcham> @pekim yes sure , thx  https://gist.github.com/anonymous/4524198cb187699f9dc0
+18:34 < geNAZt> the one goes to the socket.io router ?
+18:34 < geNAZt> the other goes to the static server ?
+18:34 < vrlogrs> im using nginx to proxy websockets to node.js server
+18:34 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+18:34 < geNAZt> yes
+18:34 < geNAZt> but socket.io can handle them in a different way
+18:34 < geNAZt> and none of these cases you have described are websockets
+18:35 < geNAZt> they are normal http requests
+18:35 < vrlogrs> right ..
+18:35 < vrlogrs> just not sure why the js isnt found
+18:35 < geNAZt> because it isnt there ?
+18:35 < vrlogrs> :S
+18:35 < vrlogrs> why wouldn't it be :S
+18:35 < geNAZt> why should it be ?
+18:36 < Leeol> Anyone know if there is a way to know if a Connect/Express response has been sent? Eg, if you call `res.send(foo)`, is there any way to look at the `res` object and know that the response was already sent?
+18:36 < Leeol> (In the case of callbacks, so that they know if they need to respond or not)
+18:36 < vrlogrs> http://pastebin.com/t8VpWXNB
+18:37 < vrlogrs> is there something wrong with that setup?
+18:38 < vrlogrs> and nginx  -http://pastebin.com/Y7AVnqF8
+18:40 < vrlogrs> is the socket.io.js file not being served?
+18:41 < Leeol> `res.headersSent` seems like it would inform you if `res.end()` was called, but i'm not seeing it exposed in Express
+18:41 < geNAZt> vrlogrs: can you request /socket.io/socket.io.js ?
+18:41 < cyberalien> vrlogrs: try getting /sotcket.io.js instead of that long url and see if it works
+18:41 < Dearcham_> @ pekim it's not an arduino , robot is attached with usb to serial usb key , i explored driver installation  with lsmod | grep and it seems correct  , ls -l /dev/ttyUSB* confirm device attached but i'v got this error with dmesg http://pastebin.com/rTPxkBWL  
+18:42 < vrlogrs> cyberalien: /socket.io.js doesnt work either
+18:42 < vrlogrs> genazt neither does /socket.io/socket.io.js
+18:42 < vrlogrs> but I get the welcome message at /socket.io/chess
+18:42 < Dearcham_> @pekim Maybe a little far from node.js concerns i'm affraid
+18:44 < geNAZt> well for my understanding it should work like you build it
+18:44 < vrlogrs> :(
+18:45 < vrlogrs> it should be hosted from port 80, right?
+18:45 < cyberalien> vrlogrs: another possibly silly idea: try replacing proxy_pass value with proxy_pass http://127.0.0.1:1337/socket.io/chess
+18:45 < vrlogrs> by node.js or nginx?
+18:46 < vrlogrs> cyberalien: nope, same results
+18:46 < cyberalien> :(
+18:46 < pekim> Dearcham_: The gist looks perfectly reasonable to me (given my relative small experience with serialport). Sorry I can't be of more help.
+18:48 < vrlogrs> any other ideas? :(
+18:48 < Dearcham_> @ pekim ok , that did helped a lot .Sent me to usb configuration wih must be the real pb , thx !
+18:51 < vrlogrs> could it be being served on port 1337 ?
+18:51 < vrlogrs> no, right?
+18:52 < geNAZt> it could
+18:53 < Leeol> How odd.. in Express (Connect), the core bool:`res.headersSent` is undefined, but there *is* a `res.headerSent`.. which is not the same, since it returns the actual headers that were sent. How odd :s
+18:55 < vrlogrs> hmm..
+19:04 < vrlogrs> might have found the issue ..
+19:04 < vrlogrs> socket.io.js is being served on the websocket port
+19:05 < vrlogrs> thats kinda dumb .. 
+19:05 < vrlogrs> is there any way i can make it available statically?
+19:05 < vrlogrs> on port 80
+19:05 < geNAZt> oO
+19:05 < geNAZt> websockets are also port 80
+19:05 < geNAZt> since they a an "upgrade" from the normal http request
+19:05 < gaf> lol, his nick should be issacbwIsNotIssacs
+19:07 < vrlogrs> genazt - but, i need socket.io.js to be hosted from elsewhere
+19:08 < vrlogrs> if it's in that folder, nginx proxys it thinking it's a websocket 
+19:08 < vrlogrs> only way i can access it is if i do :1337/socket.io/socket.io.js
+19:08 < vrlogrs> instead of :80/socket.io/socket.io.js
+19:15 <@konobi> nginx can't proxy websockets without patches
+19:16 < vrlogrs> nginx 1.3.15 can
+19:16 < vrlogrs> thats what im using
+19:25 < vrlogrs> is there any way to have the websocket in a different directory from where socket.io.js is hosted?
+19:36 < draginx> Anyone know how I can just do whitespace optimization in uglifyjs2?
+19:36 < draginx> like which parameters I'll need? :/
+19:43 < sandfox>   Has anyone here done anything like DDD in javascript?
+19:45 <@konobi> ddd?
+19:47 <@mbalho> distributed disco dancing
+19:47 <@mbalho> Nexxy has experience with that
+19:47 < sandfox> hehe
+19:48 < sandfox> domain driven design
+19:48 < sandfox> design pattern FUN!
+20:21 < hackedy> I'm doing such Dark Magic right now
+20:21 < hackedy> I have a function that grabs a given number of records from postgresql
+20:21 < hackedy> but it populates the foreign keys as well
+20:22 < hackedy> so it does a forEach over the rows and calls another async function that looks up the associated foreign row and sets it on the object
+20:23 < hackedy> but every single callback in the forEach has to check if newrows.length === count
+20:23 < hackedy> it's weird
+20:34 < vrlogrs> hey guys ..
+20:34 < vrlogrs> anyone know of a nice terminal command that i could use to determine whether or not a certain node.js server is still running (using the process name) ?
+20:35 < hackedy> vrlogrs: what do you mean "certain"
+20:35 < hackedy> like you can just use pidof
+20:35 < hackedy> example of my weird flow control: https://gist.github.com/hackedy/5427292
+20:35 < vrlogrs> hackedy:  let's say i have 3 node.js servers running .. 
+20:36 < vrlogrs> every now and then, i want to check if each of them is still running through the terminal
+20:36 < vrlogrs> pidof
+20:36 < vrlogrs> ?
+20:41 < hackedy> vrlogrs: ummm
+20:41 < hackedy> pidof will do this for you
+20:42 < hackedy> $ pidof node
+20:42 < hackedy> 12312 123123 23234
+20:42 < vrlogrs> oh ok .. 
+20:42 < vrlogrs> and returns blank if it's not on?
+20:42 < hackedy> yes
+20:43 < hackedy> in a shell script, [ `pidof node | wc -w` = 3 ] will tell you if you have exactly 3 node processes running
+20:43 < hackedy> wc -w counts the words in its stdin
+20:44 < hackedy> so if you pipe pidof to it it counts the number of pids since they are separated by whitespace!
+20:44 < hackedy> and [ is a shell-ism
+20:44 < vrlogrs> im actually going to use it with php
+20:44 < vrlogrs> using eval
+20:44 < hackedy> ah ok I don't know how php works really
+20:44 < vrlogrs> oh np .. ill figure that part out .. thanks hackedy
+20:44 < hackedy> n_n glad to help
+20:54 < lemarc> i have an app running on jitsu, and i have set hooks on github to send callback to my app on jitsu if any commit is made, how do i recieve the object sent by github to my app?
+20:57 < gildean> lemarc: you're better off asking that in #nodejitsu
+20:58 < lemarc> gildean, i dont think jitsu will affect the answer, is there a way to get the object in node
+21:01 < sandfox> lemarc: you need a route handler that listens for a post from github and parses the body
+21:02 < sandfox> in express/restify/whatever something like app.post('/hooks', githubListener)
+21:02 < lemarc> sandfox, thats the thing i want, can you point me to some link, i am just a beginner
+21:02 < pellis> hey all - anyone did parsing of binary data with nodejs using a parser generator of some kind?
+21:03 < sandfox> lemarc: give me a minute I'll gist something up
+21:03 < lemarc> sure
+21:05 < sandfox> lemarc: are you using express, or just plain node?
+21:06 < lemarc> i have just a very basic app which prints hello world ;)
+21:06 < lemarc> sandfox, node
+21:07 < sandfox> then check out this gist (not mine) - it doesn't do anything with the received data but shows how at least catch it :: https://gist.github.com/eladb/2978879
+21:07 < MI6> joyent/node: Ben Noordhuis master * 41b75ca : cluster: clean up lib/cluster.js  Clean up and DRY the cluster source cod - http://git.io/uDYs3A
+21:08 < sandfox> you could swap out the process.exit and timeout stuff, and replace it with some on('data' function()) things
+21:09 < sandfox> lemarc: does that make any sense?
+21:10 < lemarc> what variable will contain the object being sent by github?
+21:10 < sandfox> you'll need to set the github post commit hooks to point the address your nodejitsu app is listening on
+21:11 < lemarc> sandfox, already did that
+21:13 < sandfox> lemarc: you'll need to put all the body data into a big string, then run JSON.parse() on the string, and that you give you the github data,
+21:14 < lemarc> i may be asking lame questions but i just started leaning today, actually m hacking on node js for an app
+21:15 < lemarc> btw how will i get the body data when the github polls on my jitsu URI?
+21:15 < sandfox> lemarc: i'm just knocking up an example for you, that "should" work...
+21:22 < sandfox> lemarc: https://gist.github.com/sandfox/5427445
+21:22 < sandfox> lemarc: does that help?
+21:22 < lemarc> thanks so much, i will check it out
+21:24 < lemarc> sandfox, what exactly is req.url, is it the url requested by some client?
+21:26 < sandfox> lemarc: it's the url that inbound HTTP request was aimed at
+21:26 < sandfox> lemarc: if your browser tried to load  "example.com/index/view" from your app, req.url would == "/index/view"
+21:27 < lemarc> i tried the code you gave me and i tried printing the body on webpage i.e. res.write(body) but it dint work
+21:29 < sandfox> where did you out the res.write?
+21:29 < sandfox> put.. even
+21:30 < lemarc> i added res.write(data) just before the if statement as if wont work because if is expecting a POST request
+21:31 < sandfox> ah-ha, that won't work as you expect it to
+21:32 < sandfox> lemarc: do you have a github account?
+21:32 < lemarc> it dint
+21:32 < lemarc> yes i do
+21:35 < sandfox> can you load this up in your browser? it'll be easier to help :: https://c9.io/sandfox/test
+21:37 < lemarc> done
+21:38 < sandfox> can you see/edit the code at all (i'm a bit new to using cloud9
+21:40 < lemarc> i will have to do a quick signup
+21:40 < sandfox> no prob
+21:41 < lemarc> ya i can index.js
+21:42 < sandfox> i've given you read/write access
+21:43 < lemarc> ok
+21:43 < sandfox> if you open up "view >> dock panels >> group chat" we can chat in there
+21:46 < sandfox> lemarc: you disappeared?
+21:46 < lemarc> m there, was editing the file
+21:51 < Trex005> Hello amigos.  I'm using an https server on an app specific port.  Is there any way if the client tries to connect without https (or with any other domain for that matter) I send them a 301 to the proper URL?
+21:52 < bnoordhuis> Trex005: yes but it's decidedly non-trivial
+21:53 < kenperkins> Trex005: just put nginx (or similar) in front, and let nginx deal with that for you
+21:53 < kenperkins> it's rather trivial with nginx
+21:53 < Trex005> not sure what nginx is.... I'll google :)
+21:53 < Trex005> thanks for pointing me in the right direction.
+21:58 < kenperkins> Trex005: nginx is a comparatively bulletproof web server/reverse proxy
+21:58 < kenperkins> I always do SSL termination in front of node.js and just proxy to my node app
+21:59 < jimmybaker> +1 for nginx
+21:59 < Trex005> kenperkins, wish I had seen that before figuring out the SSL issues :)
+21:59 < Trex005> took me over an hour to get SSL working properly
+21:59 < kenperkins> well, a negative commit is always a good commit :D
+21:59 < kenperkins> now you know for next time
+22:09 < sandfox> lemarc: once you have added the webhook you can just click "test hook"', because none of your friends are online right now.
+22:09 < lemarc> where to click test hook?
+22:10 < sandfox> lemarc: you've disappeard offline from the chat for some reason.
+22:11 < lemarc> i am online, wait i will refresh the page
+22:36 < Jim__> Hi All...
+22:38 < Jim__> Anyone around who can answer some simple node.js newbie questions?
+22:40 < LouisT> Jim__: ask the question
+22:41 < Jim__> Okay thanks! First I just watched a nice video on Node.js, and I am wondering if there is a way to serialize access to a common resource, such as a database for example. If i build a piblic facing web service that access a back end database, I need to limit concurrent connections...
+22:41 < Jim__> So is there a way to serialize access to that database?
+22:42 < gildean> Jim__: most db drivers either re-use the connection or use connection pooling
+22:43 < Jim__> That's just an example. What of there is some generic resource that I can only access with a limited number of threads. 
+22:44 < Jim__> I suppose I coudl build that myself using sockets for the node.js threads?  processes? instancea?? can all talk to each other...
+22:44 < Seventoes> are there any good libraries out there that will build forms based on my mongoose schemas? 
+22:44 < Seventoes> all i've found is mongoose-forms but it's feeling a bit limited
+22:48 < heath> https://gist.github.com/heath/5427713
+22:48 < Jim__> Can a browser get a callback from the node.js server?
+22:48  * heath is wondering if it's because i'm using 0.1.0
+22:48  * heath reverts to a different node version
+22:50 < Aria> Jim__: Yes -- it means doing something network-protocol wise like dnode, or something like that. Nothing perfectly transparent.
+22:51 < Jim__> dnode? Is that an NPM package or other type of addon?
+22:51 < Aria> Yes, it's a library.
+22:52 < Jim__> Aria, thanks, I'll read up on that. 
+22:52 < Aria> It's one of many that do this. 
+22:52 < Aria> In some ways, you might just want Websockets
+22:53 < Jim__> Yah I'm new to JS, but basicially I want to fire a bunch of queries at a back end and have them all processed at the same time, so they don;t have to be one after another
+22:53 < Jim__> My current back end serializes access to a resource, which makes things slow for the customer
+22:54 < Jim__> So i need the browser to be able to not block, and get called back when each one completes
+22:54 < p_l_a_y> anyone use socket.io?
+22:55 < p_l_a_y> cant figure out how to disconnect a client from the server side
+22:58 < heath> yay \o/ switching to 0.9.1 was the solution
+23:13 < Industrial> If I take a look at the stream library landscape i see a lot of nice stuff but I'm not sure how to use them effectively. Say I already have an express app that serves static files and has some JSON REST handlers connecting to a MongoDB database server. I understand that most of the connections at some point are already expressed as streams, but I'm not sure where I could use streams elsewhere effectively to solve a problem.
+23:14 < Industrial> I've tried separating out some stuff into little services like logging and authentication, but then those streaming servers become dnode servers after some time and I'm back into callback land
+23:15 < lemarc> sandfox, thanks for all the help :)
+23:16 < Industrial> I could use a websocket (stream) to replace the ajax/rest API but if I use dnode there (why not?) then its also a callback API :)
+23:16 < sandfox> lemarc: no probe, no idea why this isn't yet working, putting it down to the fact i;m tired and it's late
+23:16 < lemarc> sandfox, same here, will try working by self and see if i can make this work
+23:41 < distilledchaos> I don't understand Streams2
+23:41 < distilledchaos> or rather
+23:41 < distilledchaos> how it's useful
+23:41 < distilledchaos> it seems like a colossal step back for most uses
+23:44 < distilledchaos> let's say i'm creating a youtube video downloader
+23:44 < distilledchaos> the api provides a function to construct a readable stream for the video
+23:45 < distilledchaos> but since the url to fetch the actual video data from isn't known until an info request is complete, the function can't simply return an http request stream
+23:45 < distilledchaos> instead, an object prototype "DownloadStream" must be created
+23:45 < distilledchaos> which inherits from Readable
+23:46 < distilledchaos> and creates the appropriate stream after making the info request
+23:46 < Industrial> Got a question about streams but I couldn't fit it into IRC length so http://stackoverflow.com/questions/16126403/where-in-my-stack-can-streams-solve-problems-replace-parts-and-or-make-it-bette
+23:46 < distilledchaos> then the data should be streamed from the http request stream
+23:46 < distilledchaos> out of the DownloadStream object
+23:46 < distilledchaos> except that the Streams2 api doesn't appear to be designed to do that
+23:50 <@mbalho> distilledchaos: did you ask a question in there somewhere?
+23:52 <@mbalho> Industrial: i find streams in the browser most useful for when you either want to .pipe things into each other, like pipe a file upload into a websocket, or when you want to start reading something before waiting for it to finish downloading (like a huge CSV or something)
+23:53 < Industrial> well my data is csv like, big amounts of numbers, but JSONP formatted from the backend
+23:57 < Industrial> so i was wondering if I could add node as an intermediary step to stream the content over instead
+23:57 < Industrial> so I can start using the data immediately to display it here and there
+23:58 < Industrial> but I was also wondering in which ways (and where client/server) I could filter the streams according to user input, or if thats not really a viable use case for streams at all :)
+--- Log closed Sun Apr 21 00:00:00 2013
