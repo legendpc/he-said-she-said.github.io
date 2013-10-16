@@ -1,0 +1,1168 @@
+--- Log opened Mon Apr 08 00:00:16 2013
+--- Day changed Mon Apr 08 2013
+00:00 < hello_kitty> mbalho, thank you, that works! but what does it do? 
+00:00 <@mbalho> hello_kitty: https://github.com/substack/stream-handbook
+00:01 < garthk> Well, I'm driving it from Node, so I'll ask in here: what are the likely stuff-ups that would make LevelDB write performance suck as badly for me as it is? 
+00:01 < hello_kitty> thanks
+00:01 < rvagg> garthk: are you using put, batch or WriteStream?
+00:01 < garthk> I'm testing on OS X. When I ask for the database to close, it takes minutes for my I/O to flush.
+00:02 < garthk> rvagg: I started with put. I'd see all the put() calls, then AFTER db.close() I'd see all the put callbacks called, then a bloody long wait until the app returned.
+00:02 < rvagg> garthk: that's quite odd, could you possibly put together a simplest-case for us in a gist so we can reproduce?
+00:03 < garthk> With WriteStream, same kind of thing: pretty fast looking, but then I ask for db.close() and the app sits around for a whir.
+00:03 < garthk> rvagg: simplifying it now. Cheers.
+00:03 < rvagg> garthk: is it possible that you're throwing way too much at it simultaneously? remember that libuv only has 4 worker threads so if you have many many put() calls at the same time then they'll just queue up
+00:04 < rvagg> garthk: we're going to fix up writestream very soon to make it work better for cases like this
+00:04 < garthk> rvagg: my application is a little odd. I get 500,000 rows or so at a time, and need to dump them to disk about as fast as I can later read them back. 
+00:05 < rvagg> garthk: can you do them as a batch() call? that would be more efficient
+00:05 < rvagg> or many batch() calls
+00:05 < garthk> rvagg: I'm doing batch() with this version. Same kind of problem, I'm afraid. Is there some pathological worst case with supplying pre-sorted keys?
+00:07 < rvagg> garthk: no, not really, but compaction can be a bit of a pain
+00:07 < rvagg> garthk: but... there's an option you could play with that may make it run faster
+00:07 < rvagg> https://github.com/rvagg/node-leveldown/#options see writeBufferSize
+00:08 < garthk> rvagg: I searched for the leveldown interface that'd let me set the LevelDB async… no dice. 
+00:08 < garthk> Oh! Buf., Hmm.
+00:08 < rvagg> writeBufferSize controls the incoming log file size, by default it's 4MB, but if you have a large amount of data coming in all at once then it may be more efficient to increase that and let it buffer more on write and then handle compaction later when it's not so busy
+00:09 < rvagg> garthk: BUT, the catch is that this is an option in leveldown@0.2.0 which you probably won't be using
+00:09 < syncan> _sh0x: see this
+00:09 < rvagg> but what you can do is hack it in to levelup, replace the leveldown dep in node_modules with the latest leveldown and it should work and accept that option
+00:09 < _sh0x> ok
+00:09 < rvagg> garthk: you can test it's working by watch the .LOG file size inside the leveldb directory, if it's going over 4MB then it's working
+00:10 < rvagg> garthk: by default when it hits 4MB it starts a compaction
+00:14 < garthk> rvagg: I can read my data from XML in ~9.4s, call the batch put in ~7.4 seconds, and then db.close() takes 70s… and this with a 256MB writeBufferSize. It's 7,500 rows/sec, which is bloody good for a database. It's just too slow for my purpose. Wrong tool for this job, I guess.
+00:15 < garthk> I think I'll be better off dumping to CSV, reading back the lot, and filtering it. Again: weird, but this isn't a normal app. :)
+00:15 < rvagg> garthk: yeah, even with a large writeBufferSize it still needs to compact into the levels
+00:15 < rvagg> if you're doing 256MB then you're looking at 3 levels so that's quite a few compactions: http://rvagg.github.io/presentations/nodejsdub/#/5
+00:16 < rvagg> garthk: but where you win will be in read speed, the up-front cost of writing and compacting gives you super-fast read speed
+00:16 < rvagg> garthk: but yeah, if write speed is more important than read speed then it may not be the right tool for the job
+00:17 < owen1> npm install grunt --save-dev   but how do i run grunt? 
+00:17 < owen1> i don't see a binary in node_modules/grunt
+00:18 < rvagg> owen1: I think you need grunt-cli to run it, npm install grunt-cli -g
+00:18 < rvagg> owen1: (I'm not a grunt user so grain-of-salt)
+00:19 < garthk> rvagg: that's what I was hoping for — being able to sort on the way down so I could skip data instead of filtering it. The data I'd need for one job would take 23 days to write at this rate. I'm reading it from the raw source at 8X this rate. My goal is to write it to an intermediate format from which I can read back a lot faster. 
+00:20 < owen1> rvagg: yeah. i just got this advice at #grunt
+00:20 < owen1> thanks
+00:21 < garthk> rvagg: so, that brings me back to my other [non-level*] problem: what best intermediate format for best write and read speeds? I know it's not XML. CSV is bloody tempting. 20MB JSON arrays in utf8? Newline-separated JSON objects so I can stream better? Protocol buffers?
+00:22 < rvagg> garthk: I'd go with a simple new-line separated <something>, depending on exactly what the data looks like
+00:22 < rvagg> there's jsonstream which may come in handy for parsing on the way out
+00:23 < rvagg> garthk: I'm a heavy csv user, mainly because of the data sources & destinations I deal with
+00:37 < garthk> rvagg: plenty of CSV modules; which do you use?
+00:40 < garthk> Dang. ya-csv looks a) good, b) abandoned. 
+00:41 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+00:42 < quang> ok
+00:44 < garthk> I'm not looking forward to storing 13,000,000 CSV files in a directory tree, but it looks like it might beat the alternatives. :)
+00:46 < tinjaw> if I want to use a command, do I need to install the package globally, or is there some way that it is added to the path if it is installed locally?
+00:46 < garthk> tinjaw: look in node_modules/.bin
+00:48 < tinjaw> garthk: 
+00:48 < tinjaw> garthk: thx. do I need to use fully qualified path to reach those?
+00:49 < tinjaw> IOW, that directory isn't added to the path temporarily, correct?
+00:50 < garthk> tinjaw: by what mechanism would Node hijack your command line and change the PATH for you?
+00:50 < tinjaw> garthk: that is what I thought. Just checking.'
+01:03 < M28_> I have a v8 project, how else would it be to drop the v8_typed_array* files in my project and use it?
+01:03 < M28> Does it have many dependencies on the core node.js files?
+01:04 < M28> it seems its only dependencies are node::node_isolate and node::FromConstructorTemplate
+01:05 < M28> that should be easy
+01:05 < M28> where is node::FromConstructorTemplate declared?
+01:36 < garthk> *bangs head on json2csv-stream* https://github.com/zeMirco/json2csv-stream TypeError: Invalid non-string/buffer chunk
+01:39 < garthk> Heh. Something's got to be wrong here. Perhaps it's just util.format being slow, but I'm writing this CSV format at half the rate I can parse the original XML…
+01:43 < someprimetime> I want to use node validator to req.assert(params.comment, 'error message').len(1, 10) but params.comment is coming in as json and req.assert() expects a string
+01:43 < someprimetime> How can I pass in a custom field for it to validate?
+01:43 < someprimetime> s/field/value
+01:50 < garthk> YEEHAR! rfc-csv reads CSV pretty bloody fast. 11s to read XML, 15s to write it to CSV using util.format, 1.9s to read it back from CSV.
+02:42 < ChrisPartridge> garthk: that's a good result, didn't get json2csv-stream working?
+02:43 < garthk> ChrisPartridge: no, but I can swap it in (or any other writer) if it pays off. :)
+02:45 < garthk> I'm also trying the slower but more convenient version of protobuf. It encodes my data 3X faster than I can call util.format(), but I'm having trouble on read-back because I shoved too much data into a single object. :)
+02:47 < garthk> Hmm. Ok, that's ~1d spent poking around ways of making this go fast. Time to write it as fast as I can right now. I can make it go faster again after I ship a beta.
+02:58 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+03:20 < Fishrock123> Does anyone see any substantial problems with writing a game server entirely in node? (Possibly with a dedicated math C++ module)
+03:20 < AAA_awright> Fishrock123: If I can write a TCP game server in PHP you can do it in Node.js
+03:21 < Fishrock123> Ew TCP.
+03:21 < garthk> Fishrock123: sounds like the perfect use case.
+03:21 < AAA_awright> Fishrock123: Ew? Are you expecting to program this using something other than TCP?
+03:22 < Fishrock123> AAA_awright: I like UDP.
+03:22 < garthk> Fishrock123: it's so close to Node's strengths there's even a YouTube educational series on how to do it. http://www.youtube.com/playlist?list=PLAD5A0C028DA09694
+03:22 < AAA_awright> Fishrock123: You can't exactly write servers with UDP
+03:22 < AAA_awright> That's just for communication
+03:22 < tjfontaine> ya dns and sip are lies
+03:22 < Fishrock123> Lol, and of course it;s for communication. >.<
+03:23 < Miezel> hi could someone explain to me why 2==2==2 is false?
+03:23 <@Nexxy> because true !== 2
+03:23 < Fishrock123> ^
+03:23 < AAA_awright> >> true==2
+03:24 < purr> AAA_awright: (boolean) false
+03:24 < tjfontaine> Miezel: it's easier to see if you 2 == (2==2)
+03:24 < garthk> Node.ks multiplayer Asteroids (but not quite): http://seb.ly/2012/04/node-js-experiment-mmo-asteroids/
+03:24 < Miezel> Oh... ok 
+03:25 < Fishrock123> garthk: Thanks, Ima go through the videos, should solidify my existing knowledge. ^_^
+03:25 < Miezel> is there a way to evaluate such expression ? a ==b ==c at once ? or i need to do it each time in different steps ?
+03:26 < AAA_awright> Miezel: (a==b) && (b==c)
+03:26 < Miezel> AAA_awright: thank you i will try that for my parser
+03:26 < AAA_awright> parser?
+03:27 < Miezel> AAA_awright: I'm generating an equation parser and i want to handle 'a+a=b=c+d'
+03:29 < arcanis> why does toLocaleDateString() not work in Node ?
+03:29 < AAA_awright> Equations mean something slightly different than assignment and testing alike
+03:29 < AAA_awright> arcanis: I'm not familiar with that function
+03:29 < Miezel> AAA_awright: Equations in the mathematical term 
+03:29 < AAA_awright> It's not defined in ECMAScript
+03:29 < AAA_awright> Miezel: Right, that's different than testing for equality
+03:31 < Miezel> AAA_awright: yep, but for now tho i'm just worried about testing for equality ^^
+03:32 < arcanis> AAA_awright, is seems to be in ES Internationalization API specs (http://www.ecma-international.org/ecma-402/1.0/#sec-13.3.2)
+03:32 < arcanis> the support for the two optional parameters seems to be pretty low currently, but since it works in Chrome I assumed that node was able to use them too
+03:39 < garthk> Huh. msgpack packing is faster than writing CSV (2.3s vs 14s), but much slower reading back (4.20s vs 1.14s).
+03:47 < ningu> garthk: JSON is faster in v8
+03:47 < ningu> just fyo
+03:48 < ningu> fyi, even
+03:48 < garthk> HAHAHA. Ok, packing tuple-style short arrays rather than objects changed that. 0.63s to encode, just a shade faster than CSV to decode, and the packed output length is shorter. 
+03:48 < garthk> ningu: via what API? JSON.stringify()?
+03:48 < ningu> yes
+03:48 < ningu> and JSON.parse()
+03:48 < ningu> garthk: if there is a fast msgpack library you could probably write a binding for node that was more comparable to v8's speed, but afaik no one has yet
+03:50  * garthk checks.
+03:51 < garthk> JSON packs a little slower, parses a little faster, output is 2.2X the size. 
+03:57 < garthk> … but after gzip, it's only an ~8% disadvantage on size. I might give it to JSON just for the convenience on the command line.
+03:57 < garthk> Thanks for the suggestion, ningu.
+04:50 < sinclair-work> hello
+05:31 < bnarn> hellp
+05:32 < bnarn> hello
+05:32 < ChrisPartridge> hi
+05:32 < Guest40472> Hey
+05:32 < bnarn> I was looking to find any good IDE to be used with Nodejs... any suggestions 
+05:32 < bnarn> ?
+05:33 < Guest40472> Cloud9
+05:33 < bnarn> I will give it a try
+05:37 <@Nexxy> bnarn, SublimeText 2
+05:38 < ChrisPartridge> ^ +1
+05:38 < ChrisPartridge> or 3.. if you live on the edge
+05:38 <@Nexxy> ohh
+05:38 <@Nexxy> ChrisPartridge, have you used 3?
+05:39 < ChrisPartridge> yup, the beta
+05:40 < freon> vim *ducks*
+05:40 <@Nexxy> ChrisPartridge, anything exciting?
+05:40 < JamesMGreene> bnarn: I also like WebStorm
+05:41 < ChrisPartridge> Nexxy: only start up time for large projects, or multiple projects, ST2 would halt for a few ms, that doesn't appear to happen on ST3 - other than that, exactly the same
+05:41 < Guest40472> freon: Stand proud, I use vim more than any editor/ide I've ever used, you could duck if you said nano though.
+05:41 < ChrisPartridge> nano rocks, what are you on about
+05:42 < deoxxa> i use nano basically all the time
+05:42 < bnarn> I like vim but I feel it is going to be more more productive with GUI
+05:42 < MitchW> nano forever! ;)
+05:42  * deoxxa never seems to have a problem with it
+05:42 < Guest40472> uh oh >_>
+05:42 < freon> *nod* I spent time with cloud9, but then one day, stuff hit the fan and I had to spark up vim on a production box, and I decided I wanted to feel completely at home in that environment
+05:42 < bnarn> I like to have autocomplation 
+05:42 < MitchW> nano is fine if all you need to do is simple editing and plain text search/replace :P  anything else is a pain
+05:43 < bnarn> nano is good too 
+05:43  * MitchW likes to have autocompletion too, thus uses real IDEs that build proper DAG/AST of the code you edit in real time for real time warnings/errors/refactoring/autocomplete/etc
+05:44 < ningu> blah... there seems to be no way I can find to _correctly_ search/replace by unicode properties in node :(
+05:44  * Nexxy also enjoys the seemingly arbitrary use of emotes whilst describing personal preferences in development tools.
+05:45  * MitchW feels comfort in Nexxy's sarcastic use of emotes
+05:45 < bnarn> what I am ding know is running the script using node-dev and vim the code from another terminal and see it restarting 
+05:45 < dp_> hi
+05:46 < bnarn> hello 'dp'
+05:46 < dp_> any developers here
+05:46 < ningu> aha! I need xregexp 3.0.0-pre.
+05:46 < deoxxa> nope
+05:46 < ChrisPartridge> i'd say there are a few
+05:46 < MitchW> developers in #node.js - i don't think so
+05:46 < deoxxa> dp_: we're all just fans of the website design
+05:46 < deoxxa> such an attractive grey colour
+05:46 < dp_> i need help on node.js
+05:47 < bnarn> dp_ say what you have then we will see what we got 
+05:49 < dp_> bnarn: am know litle abt web programing ... i want to  know how to use node.js 
+05:50 < MitchW> dp_: first thing's first, you need to learn javascript before you can use node.js
+05:50 < gkatsev> -g eloquent javascript
+05:50 < purr> gkatsev: Eloquent JavaScript: A Modern Introduction to Programming <http://eloquentjavascript.net/>
+05:51 < ningu> deoxxa: this is probably a good question for you
+05:51 < ningu> or anyone else who wants to think of something clever/evil
+05:51 < ningu> basically I have a regexp of the form: 'a|b|c' and I want to change it to match the opposite
+05:52 < ningu> I want to replace everything that's *not* 'a|b|c' with the empty string.
+05:52 < dp_> MitchW: han, i know working with js
+05:52 < ningu> I can't quite think of how to do it.
+05:52 < inolen> [^abc] ?
+05:53 < ningu> inolen: has to be done without ^ in character classes. that was the first thing I tried.
+05:53 < inolen> huh, why?
+05:53 < gkatsev> ningu: [^a]|[^b]|[^c]? can't think of whether it's equivalent to [^abc]
+05:53 < ningu> it's a limitation of XRegExp.
+05:53 < ningu> gkatsev: no character classes allowed.
+05:53 < ningu> assume a|b|c represent longer strings, like foo|bar.
+05:54 < gkatsev> wait, xregexp seriously doesn't let you do that?
+05:54 < gkatsev> what?
+05:54 < ningu> gkatsev: not for searching for unicode properties with the astral extension.
+05:54 < ningu> which is what I need to be able to do...
+05:54 < MitchW> dp_: if you know javascript, then you should have no problem reading the node.js documentation: http://nodejs.org/api/index.html and following a simple introduction: http://nodejs.org/ (bottom half of the page) and/or using google for other samples :)
+05:55 < bnarn> dp_ this guy helped me alot to learn nodejs
+05:55 < bnarn> https://vimeo.com/pedroteixeira
+05:56 < ningu> this is somewhat maddening. there must be a way to do it.
+05:56 < dp_> bnarn: how he ll help, should i go through his videos or wat?
+05:56 < ningu>   var re = XRegExp('\\p{Lo}|\\p{Ll}|\\p{Nd}', 'Ag');
+05:56 < freon> yeah I reckon pedro's vids are a good early-stage resource
+05:57 < ningu> I want the opposite of that. :)
+05:57 < ningu> freon: at stage 3 though you only have a few months to live
+05:57 < ningu> best to catch it early
+05:57 < inolen> ningu: http://www.codinghorror.com/blog/2005/10/excluding-matches-with-regular-expressions.html
+05:57 < bnarn> dp_ yes go through his vedios and read his book 
+05:58 < inolen> However, I'm not sure if JS regex's support negative look behinds
+05:59 < dp_> MitchW: i ll go through documentation , before starting , do i need any pre-requisites
+05:59 < dp_> bnarn: thank u very much for ur help
+06:00 < ningu> inolen: yeah, but I don't want lookahead or lookbehind. I think I'm going to have to adopt a kludgey solution where I do the search/replace myself
+06:00 < MitchW> dp_: a basic understanding of how HTTP works (and what a HTTP server does) would be helpful...  otherwise, there's tons of samples around the web - follow them, and read the reference documentation on things you don't understand :)
+06:00 < ningu> and just evaluate the regex on a per-character basis
+06:01 < ChrisPartridge> ningu: you're using the unicode addon?
+06:01 < ningu> ChrisPartridge: yes
+06:02 < dp_> MitchW: thats wat i wanted ,,,, thank u very much,,, BTW u r M/F
+06:03 < ningu> ChrisPartridge: http://hastebin.com/desacowode.coffee
+06:03 < ningu> I don't see how that can be rewritten as an actual .replace() but be my guest. :)
+06:06 < dp_> thank u all for ur help.... :-)
+06:13 < ningu> ChrisPartridge: it's actually worse than that, here's how you have to do it :) http://hastebin.com/qabecopoya.coffee
+06:18 < ChrisPartridge> ew
+06:18 < ningu> I'm pretty sure there is no better way
+06:18 < ningu> sadly
+06:21 < ningu>   return ucs2.encode(ucs2.decode(str).slice(0, 15));
+06:21 < ningu> that's how you say: make sure this unicode string is no longer than 15 characters.
+06:24 < ningu> it's kind of crazy to me that there isn't another way, but I guess it would break backwards compat... it's really not supported by js
+06:26 < meiwes> is drudge around?
+06:28 < ericelliott> so I've noticed that app.configure() is missing from the express guide.. is the feature deprecated?
+06:28 < ningu> ericelliott: apparently
+06:28 < ningu> the commit removing it said so
+06:29 < ericelliott> ningu: Thanks. =)
+06:29 < ericelliott> I've stopped using it in my code. I was wondering if I should keep it out of my book examples, too. =)
+06:29 < ericelliott> Sounds like the answer is yes.
+06:31 < ningu> yeah, I think so. apparently now they recommend a simple if clause like if(app.get('env') === 'production') { ... }
+06:31 < ningu> I think it confused people that you passed a function to app.configure() because it looked like an async callback
+06:32 < ericelliott> I don't know why. Apparently nobody has seen higher order functions used for synchronous purposes in JavaScript?
+06:32 < ningu> who knows.
+06:32  * ericelliott politely ignores the array extras, and all of underscore
+06:33 < ningu> hrm: Like several other languages, Javascript suffers from The UTF‐16 Curse. Except that Javascript has an even worse form of it, The UCS‐2 Curse. Things like charCodeAt and fromCharCode only ever deal with 16‐bit quantities, not with real, 21‐bit Unicode code points. Therefore, if you want to print out something like 𝒜, U+1D49C, MATHEMATICAL SCRIPT CAPITAL A, you have to specify not one character but two “char units”: "
+06:33 < ljharb> the array extras are amazing.
+06:33 < ljharb> ningu: that should be fixed in ES6
+06:33 < ningu> ljharb: I sure hope so.
+06:34 < ningu> ljharb: any idea when an ES6 capable v8 might emerge?
+06:34 < ljharb> ningu: not fixed in those methods, but new (shimmable!) methods which handle it properly.
+06:34 < ljharb> well, ES6 isn't finalized yet. but some of the features are already in it.
+06:35 < ljharb> once ES6 is finalized, there will be an es6 shim (just like the es5 shim you should already be using in browsers) that you'll be able to use to shim in all the shimmable things
+06:35 < ljharb> it matches the current draft spec already
+06:35 < ningu> the thing is, it won't help me that much if there are just equivalents of charCodeAt and fromCharCode.
+06:35 < ljharb> they're not equivalents, they're new methods that work properly.
+06:35 < ningu> I'd like str.length to correctly report its length.
+06:35 < ningu> rather than ucs2.decode(foo).length
+06:36 < ljharb> i don't think that's likely to be fixed
+06:36 < ljharb> ever
+06:36 < ningu> well, that's very sad
+06:38 < ljharb> it would break too many things
+06:39 < ningu> all I want is a language that treats unicode characters as characters, consistently.
+06:39 < ljharb> python 3?
+06:39 < ningu> maybe.
+06:40 < ljharb> that's why they rewrote it from scratch, i'm told
+06:40 < ljharb> for unicodes
+06:40 < ningu> the ucs2 stuff isn't too bad I suppose but it's really annoying
+06:41 < ningu> it's nice that XRegExp matches codepoints >0xFFFF at all
+06:41 < ningu> at least in 3.0.0-pre
+06:42 < ljharb> i think everything but length will be fixed, shimmably, in es6.
+06:42 < ljharb> or rather, functions provided that work properly.
+06:42 < ljharb> so i'd say just wait for the es6 shim and you'll be able to use it errywhere :-)
+06:42 < ningu> ljharb: it's more than length. you also want foo[0] to work right.
+06:43 < ningu> or foo.substr(...).
+06:43 < ningu> and I don't see how you can change one of those and not the others
+06:43 < ljharb> foo[0] doesn't work in IE, so you shouldn't use that anyways
+06:43 < ljharb> and substr's not standard, you should use slice.
+06:43 < ningu> slice on a string?
+06:43 < ljharb> foo.charAt(0), and foo.slice
+06:43 < ljharb> yep
+06:43 < ningu> hmm ok
+06:44 < ljharb> it's exactly the same as .substr and .substring, but it's standard, and handles negative indices
+06:46 < ningu> there could be a node.js travel guide called "node.js on a byte-string"
+06:46 < SirFunk> anyone know any free node hosting that gives some space for assets (like 100mb of video). I just need to host something for one day. to recieve like 4 hits :-P
+06:47 < ningu> SirFunk: ec2 micro?
+06:47 < zomg> SirFunk: use your pc? :P
+06:47 < zomg> I think heroku had a free tier as well.. or some heroku-like service
+06:47 < SirFunk> zomg: i have to make sure it stays up (slide show for a presentation)
+06:47 < ljharb> SirFunk: amazon has a free tier.
+06:47 < SirFunk> ningu/ljharb: bah, used up all my free stuff.. although it would probably be pretty cheap
+06:47 < ljharb> otherwise, if you have to make sure of something, pay for it.
+06:48 < ljharb> if you aren't willing to pay, then it doesn't have to stay up that much, does it :-p
+06:48 < ningu> what if you are willing toupee?
+06:49 < SirFunk> eh, it's a silly slideshow for school
+06:49 < ljharb> usb stick
+06:49 < meiwes> SirFunk:For $15/yr i can get you 198mb ram,2 core 
+06:49 < meiwes> vps
+06:49 < ningu> meiwes: where?
+06:49 < meiwes> Lowend box 
+06:50 < meiwes> alienvps offers,123systems offers etc
+06:51 < SirFunk> meiwes: I have a linode I could deploy to. I was just hoping for something simpler. I don't want to mess with nginx and everything right now
+06:51 < SirFunk> I guess i'll just use that
+06:52 < meiwes> Okay.
+06:53 < SirFunk> hmm.. I could probably spin up another linode for like $1
+06:53 < SirFunk> for a day I think
+06:54 < ningu> ec2 paid tier is still really cheap for 4 days
+07:02 < ningu> why oh why does utf16 come in both big and little endian?
+07:02 < ningu> I think the world should conform to my requirements ;)
+07:02 < ningu> I suppose it's for efficiency, endianness to match architecture when possible
+07:07 < ningu> "If the BOM is missing, RFC 2781 says that big-endian encoding should be assumed. (In practice, due to Windows using little-endian order by default, many applications also assume little-endian encoding by default.)"
+07:07 < ningu> wow. that's kind of mind-boggling but it explains some things.
+07:07 < ChrisPartridge> haha
+07:08 < ningu> v8 natively uses little-endian: https://github.com/joyent/node/issues/1684
+07:08 < ningu> I think bnoordhuis could make an exception for other unicode encodings, really. that's not arbitrary.
+07:09 < ningu> the punycode ucs2 object actually implements utf-16, which isn't the same thing...
+07:17 < ningu> well, as quirky as this astral plane stuff is, it seems like it actually works fine for a lot of stuff. the exception is things like .length
+07:24 < freon> ?
+07:25 < ningu> freon: eh?
+07:25 < freon> astral plane stuff?
+07:26 < ningu> freon: unicode characters with a codepoint higher than 0xFFFF
+07:26 < freon> ohh..
+07:28 < ningu> aha: https://npmjs.org/package/js-codepoints
+07:29 < ljharb> ningu: interesting, but it modifies the native string prototype :-(
+07:29 < ningu> yeah, I know :/
+07:29 < ningu> this one is cleaner, but it's also less useful: https://npmjs.org/package/codepoint
+07:30 < ljharb> ningu: submit pull requests to make it better :-)
+07:31 < ningu> yeah, perhaps
+07:31 < ningu> I'm still pondering this
+07:31 < ningu> I might just fork it eventually
+07:32 < ljharb> PRs are better than forks
+07:32 < ningu> ljharb: so there is basically no safe/sane/proper way to modify native prototypes, right?
+07:32 < ljharb> there's only one - a spec-compatible shim/polyfill
+07:32 < ljharb> like the es5 shim
+07:32 < ningu> yeah
+07:32 < ljharb> or the es6 codepoint methods :-p
+07:33 < ningu> well, I suppose I could look up the es6 spec but as you said it doesn't change .length and I assume it doesn't define its own thing like .codepoints
+07:33 < ljharb> right
+07:36 < DaMorpheuS> .
+07:36 < ningu> ljharb: I'm reading http://people.mozilla.org/~jorendorff/es6-draft.html but I can't find the methods you refer to.
+07:36 < Nopik> hi, anyone here tried the new CoffeeScript debugger for Node.js in the RubyMine? It seems to work correctly for js app, also can generate source maps, but apparently can't read them properly for me
+07:37 < ljharb> ningu: String.fromCodePoint, String.prototype.codePointAt, String.prototype.normalize
+07:37 < freon> meh: wake me when you find a solution to long stack traces on node running coffeescript in production
+07:38 < ljharb> solution: use javascript? O.o
+07:38 < ningu> hehe
+07:38 < ljharb> also why would you run coffeescript in production, ever? it's not natively executed.
+07:38 < DaMorpheuS> hi I got an question : if I want to do a request to my api but i don't know for sure if my data is complete to send back to the client. how should i send my data. 1) wait for completion? or 2) send when i have data and send the rest later when available. What is the best way of doing this in node
+07:38 < ljharb> thats even sillier than writing coffeescript
+07:38 < gildean> you're not actually running coffeescript now, are you
+07:39 < ljharb> ha, true
+07:39 < freon> thought as much.
+07:39 < ningu> DaMorpheuS: I'm not quite sure what you mean. but normally an API will only respond when it has data available. it could stream the data.
+07:40 < ningu> streaming is better than sending it all at the end, if you can manage it.
+07:42 < DaMorpheuS> the thing is that because of my systems architecture i have more then one datasource for 1 request. what i don't want is that the client gets no data if one of the sources is unavailable. an http request is as far as i know an sync process that enables an node async process. I have some problems switching between those 2.
+07:42 < DaMorpheuS> hard 2 explain myself sorry :)
+07:43 < ningu> DaMorpheuS: well, yeah, you can't really stream two things at once, at least, not with a JSON response
+07:43 < DaMorpheuS> no the result will be a single json object but it will be combined data from different sources
+07:44 < ningu> ok, so you probably have to wait for all of the data before you can send the response
+07:45 < DaMorpheuS> now there comes my issue i don't want my client to have to wait for all data is retrieved but feed it with data if there is something available.
+07:45 < DaMorpheuS> don't know if this work with ember data though but that's the second step ;)
+07:45 < topaxi> "combine" the data on the client? :]
+07:45 < ljharb> DaMorpheuS: then use websockets so you can push data to the client as it comes in
+07:45 < ningu> yeah, you could do it as multiple api requests
+07:46 < ningu> that too
+07:46 < DaMorpheuS> yes ok so you say use a websocket to stream the data
+07:46 < ningu> DaMorpheuS: sockjs + shoe + https://github.com/dominictarr/mux-demux
+07:46 < ljharb> sockets.io
+07:46 < DaMorpheuS> is this also working on mobile devices btw?
+07:47 < ningu> I have no idea how well websockets work on mobile devices
+07:47 < DaMorpheuS> i read some stuff about websockets and 3G not working well 
+07:47 < ningu> DaMorpheuS: anyway mux-demux lets you send multiple streams across one socket simultaneously
+07:47 < `3rdEden> don't do websockets on ssl
+07:47 < ningu> so you could just send what you have, when you have it
+07:47 < `3rdEden> *mobile
+07:47 < `3rdEden> ;%
+07:48 < ljharb> what's wrong with sockets on mobile?
+07:48 < ningu> maybe they get dislocated
+07:48 < `3rdEden> ljharb: providers block them
+07:48 < `3rdEden> as their reverse proxies don't support them
+07:48 < DaMorpheuS> i read that some providers say it just works but they block it on there servers
+07:48 < ljharb> then sockets.io will fall back to long polling
+07:48 < `3rdEden> or crashes your browser..
+07:49 < DaMorpheuS> joy
+07:49 < DaMorpheuS> :)
+07:49 < ljharb> somehow i suspect the library handles that
+07:49 < `3rdEden> no it doesn't
+07:49 < `3rdEden> trust me, i'm an engineer
+07:50 < ljharb> lol
+07:50 < ljharb> do you have a link?
+07:50 < ningu> long polling requires no special setup
+07:50 < ningu> but you could still block that I suppose
+07:50 < ljharb> `3rdEden: https://github.com/LearnBoost/socket.io/issues/976 says it's fixed
+07:50 < Lorentz> silently drop long connections
+07:50 < ningu> anyway I still am partial to sockjs + shoe + mux-demux for this case
+07:50 < `3rdEden> ljharb: it's closed, but it's not fixed
+07:51 < ljharb> it says the problem went away in 0.9.8
+07:51 < ljharb> ie, it was fixed
+07:51 < ningu> I suppose it comes down to the same thing though if you use socket.io
+07:51 < `3rdEden> ljharb: trust me, it doesn't just go away ;0
+07:51 < ljharb> `3rdEden: i do see that you're on that thread tho
+07:52 < ljharb> so why isn't it in the readme?
+07:52 < `3rdEden> ljharb: it's not related to socket.io it's related to websockets
+07:52 < ljharb> right, but your own commit https://github.com/LearnBoost/socket.io-client/commit/8dc031d072dc7f9c6ce9f37c92495c54c2762342 seems to handle it?
+07:52 < ljharb> sorry, a commit you linked to
+07:52 < `3rdEden> ljharb: that's an other crash
+07:53 < `3rdEden> ;D
+07:53 < MI6> joyent/node: Fedor Indutny v0.10 * ff32ecd : net: account encoding in .byteLength - http://git.io/_uQM-A
+07:54 < ningu> hmm, new wikileaks release today
+08:06 < ChrisPartridge> ningu: too bad there is nothing recent
+08:06 < DaMorpheuS> thanks guys i'm going to check these things out..
+08:06 < ningu> ChrisPartridge: yeah was just noticing that
+08:11 < SirFunk> express servers should be able to handle more than one connection at a time.. no?
+08:11 < gildean> SirFunk: yes
+08:12 < SirFunk> yeah.. this is just crapping out. worked fine locally, maybe it's ec2?
+08:12 < ningu> ec2 micro instances have a cpu throttle that kicks in under high load
+08:12 < ChrisPartridge> should be able to handle a few express connections though
+08:13 < ningu> yes
+08:13 < SirFunk> hmm
+08:13 < SirFunk> I'm just serving up a socket.io server of this: https://github.com/hakimel/reveal.js
+08:13 < SirFunk> for a slideshow
+08:20 < SirFunk> chrome inspector just shows all my network connections as pending
+08:20 < SirFunk> grr
+08:22 < nathan7> SirFunk: there's a max on how many connections a browser will make to a single domain
+08:24 < SirFunk> hmm, that might be it, i'm trying to preload some video
+08:24 < SirFunk> chrome is saying 209KB transfered though.. and that isn't increasing
+08:28 < SirFunk> weird
+08:28 < SirFunk> i put it behind haproxy and it's liquid smooth now
+08:29 < SirFunk> nope i lied
+08:29 < SirFunk> I think socket.io is messing it up somehow, getting stuck on switching protocols
+09:25 < codazzo> Hi, I'm trying to serve my app through HTTPS with a self-signed certificate (for testing purposes). I created the certificate as explained here http://nodejs.org/api/tls.html#tls_tls_ssl and am passing the pfx to the server as shown here http://nodejs.org/api/https.html#https_https_createserver_options_requestlistener - I get an "SSL connection error" in chrome and if I do `curl https://localhost:3000` I get "curl: (7) couldn't connect to host" . I'm usin
+09:25 < codazzo> node 0.8.21. Has anybody had a similar experience / might know what's going on?
+09:26 < ningu> that example is on port 8000
+09:28 < codazzo> I do configure the port to 3000 in my case, forgot to mention that
+09:29 < OliverJAsh> i'm trying to read a JSON file, but i'm getting "Unexpected Exception stack=Error: Unknown encoding". my code looks like this: fs.readFileSync(__dirname + '/file.json', { encoding: 'utf8' })
+09:29 < mtsr> codazzo, I'd set stuff like this up using a proxy, personally
+09:29 < codazzo> mtsr: how would you do that?
+09:30 < ryanaz> Hey guys, I'm stuck.     I know how to do this in perl but not javascript.  I'm new ….   In perl:   $data->{'field'} is different than $data->{$field} …    in javascript the first one is:   data.field … how do you do the second one in javascript ?
+09:30 < codazzo> ryanaz: data[field] ?
+09:31 < ryanaz> I bet you're right..
+09:31 < ryanaz> i think I remember seeing that somewhere
+09:31 < ryanaz> let me try that
+09:31 < ningu> OliverJAsh: you can just do require('./file.json') btw
+09:31 < mtsr> codazzo, Take a look at nginx, e.g. first google result for 'nginx https proxy': http://www.cyberciti.biz/faq/howto-linux-unix-setup-nginx-ssl-proxy/
+09:31 < OliverJAsh> cheers ningu 
+09:32 < codazzo> mtsr: thanks I'll take a look at that
+09:32 < ryanaz> codazzo, that's not it
+09:32 < ryanaz> is it  data{field}  ? 
+09:32 < mtsr> ryanaz, It should be data[fieldName]
+09:33 < ningu> ryanaz: data[field] is correct
+09:33 < ryanaz> that's totally working..
+09:34 < ryanaz> thanks guys!
+09:34 < ryanaz> I was getting thrown off because client.escale() isn't being found
+09:35 < ryanaz> client.escape
+10:18 < ryanaz> can you export more than just one function per file?  in module.exports = function1, function2; 
+10:18 < ryanaz> ? 
+10:18 < deoxxa1> ryanaz: module.exports.function1 = function 1; module.exports.function2 = function2;
+10:18 < deoxxa1> ryanaz: or
+10:18 < deoxxa1> ryanaz: module.exports = {function1: function1, function2: function2};
+10:19 < ryanaz> perfect, thanks!
+10:19 < jhgaylor> i want to inflate a string into a mongodb selector.  any tips? 
+10:19 < deoxxa1> jhgaylor: blow really hard into one end of it
+10:19 < deoxxa1> jhgaylor: or provide some more detail. either way.
+10:20 < jhgaylor> deoxxa1: brb air compressor
+10:21 < jhgaylor> I am accepting user input via a text input field. I want to use that input as a mongo selector. Collection.find(input)
+10:21 < ryanaz> deoxxa1: none of that worked.. 
+10:21 < ryanaz> :( 
+10:22 < deoxxa1> ryanaz: 1) paste code 2) ??? 3) profit
+10:22 < ryanaz> hah
+10:22 < deoxxa1> jhgaylor: what does the input look like? is it JSON?
+10:22 < deoxxa1> jhgaylor: or is `Collection' an object from some kind of ORM?
+10:23 < jhgaylor> Collection being a mongodb collection.  i happen to be using meteor which uses minimongo on the client, so really its just an object that adheres to the mongo api
+10:23 < deoxxa1> well, presumably, you'd just want to JSON.parse(input) and you'd be ready to go
+10:23 < deoxxa1> i don't know how meteor or minimongo work though
+10:23 < deoxxa1> so i might be wrong
+10:23 < jhgaylor> deoxxa1: if mongodb selectors were valid json I wouldn't be here
+10:24 < deoxxa1> which part isn't valid?
+10:24 < jhgaylor> {interger_field: {$gt: 5}}
+10:24 < deoxxa1> ah, it's not quoted
+10:24 < jhgaylor> in json would look like {"integer_field": {"$gt" :5}
+10:24 < deoxxa1> yeah that's a problem
+10:25 < deoxxa1> problem there is that it's a javascript object literal, not a json-serialised object... you could... eval()... it
+10:25 < deoxxa1> but... don't do that
+10:25  * deoxxa1 thinks
+10:25 < jhgaylor> this fix wont be going into production.  I'm just trying to write a stub for a feature
+10:25 < deoxxa1> ah
+10:25 < deoxxa1> well, yeah, eval() will get you across the line
+10:26 < deoxxa1> (probably)
+10:27 < jhgaylor> >> eval("{}")
+10:27 < purr> jhgaylor: undefined
+10:27 < JoshLeaves> var query = new Function("return " + your object)(); ?
+10:27 < jhgaylor> >> eval("a={}")
+10:27 < purr> jhgaylor: (object) {}
+10:27 < jhgaylor> what gives
+10:28 < deoxxa1> jhgaylor: apparently an object isn't a valid statement on its own (makes sense when you think about it)
+10:29 < jhgaylor> oh.  eval wants a statement.  yea {} is an expression
+10:29 < deoxxa1> jhgaylor: so javascript tries to treat it as a block (i.e. { fn1(); fn2(); } kind of thing)
+10:29 < JoshLeaves> On 0.8.6, eval({}) return {}
+10:30 < deoxxa1> eval("(function(){return {a:1,b:2};}())") is the neatest i can think of with no side-effects
+10:31 < JoshLeaves> deoxxa1: Why eval a function?
+10:31 < JoshLeaves> Just new Function(function_code_string)();
+10:31 < gildean> ryanaz: why not just: exports.function1 = function () {}; exports.function2 = function () {};
+10:33 < deoxxa1> JoshLeaves: i'm not sure how the Function constructor behaves with scope
+10:33 < ningu> one scope of vanilla, one scope of strawberry
+10:33 < deoxxa1> JoshLeaves: it might be a better move, but i'm not familiar with the intricacies of eval(code) vs (new Function(code))()
+10:33 < jhgaylor> deoxxa1: thanks.  eval helped get the job done
+10:34 < deoxxa1> ningu: no bubblegum, no deal
+10:34 < JoshLeaves> deoxxa1: Try and you'll know ;)
+10:38 < Eust> hi there i am a total newbie to programing JS and ofc node, may i ask a stupid question? i am having issues with running the most basic hello world example from nodejs.org  it says there to paste save the webserver code in a js file and then to run the file form node with  % node example.js, i found simmilar examples around the web and none is working, as if node does not recognise the file, sorry i am aware this is not the sort of qu
+10:39 < ningu> Eust: is the file called example.js and is it in your current directory?
+10:39 < JoshLeaves> deoxxa1: According to the REPL, new Function(code) doesn't do "scope climbing"
+10:40 < JoshLeaves> var a = 42; console.log(new Function("return a * 2;")()); <== gives me a ReferenceError on a
+10:43 < Eust> yes it has the right correct name, and no i havew no idea where to save it, i tried saving it in the root dir from node and in the scripts folder, i am guessing there should be a folder to save it in but i am somehow strugling to find that information 
+10:44 < passcod> Eust: save it anywhere, cd to that folder, and run it using node
+10:49 < MI6> joyent/node: Andreas Madsen v0.10 * 14dec66 : crypto: fix constructor call in crypto streams  When using some stream me - http://git.io/CbSODQ
+10:49 < Eust> thanks you for the help people, sorry for bothering you with stuff like this ;)
+10:49 < MI6> joyent/node: Andreas Madsen v0.10 * fed8cff : crypto: fix constructor call in crypto streams  When using some stream me - http://git.io/3aXypw
+10:50 < funkbox> MI6: figuring out these things can be hard when you're just getting started with something and EVERY tutorial glosses over it
+10:50 < funkbox> thankfully node is super easy
+11:11 < ashnur> yeah. very easy
+11:33 < DaMorpheus2> .
+11:57 < MI6> joyent/node: Fedor Indutny v0.10 * 21f3c5c : crypto: move write_head in bio's Reset() method (+2 more commits) - http://git.io/uawpFg
+12:01 < zenetik> hi, how can i remove non ascii chars from a buffer ?
+12:01 < zenetik> need i make it myself using a loop ?
+12:03 < zenetik> or perhaps use ansibuffer module ?
+13:54 < mablae_> hello
+13:56 < mablae_> Hello I am piping the stdOut of avconv to a http request 
+13:57 < mablae_> Now, when a second request comes in, a second avconv is spawed... 
+13:57 < mablae_> Instead I want to store the output in sth like a circular buffer... 
+13:58 < mablae_> Everytime a request comes in, it should hook on that buffer endless
+13:58 < mablae_> i.e. put out stream chunked response... 
+13:58 < mablae_> On every request it gets... 
+13:59 < mablae_> Is that possible? 
+14:02 < bmatusiak> mablae_ yes its possible
+14:13 < mablae_> bmatusiak, How? 
+14:14 < bmatusiak> mablae, i would go about it a little different using web sockets
+14:14 < mablae_> At the moment I am listening on the [process].stdout.on('data')
+14:14 < bmatusiak> mablae_  ^
+14:15 < mablae_> websockets? 
+14:15 < mablae_> Its video stream data?!
+14:16 < bmatusiak> na
+14:16 < bmatusiak> mablae_  :  checkout   http://socket.io/   
+14:17 < mablae_> I have that already
+14:17 < mablae_> But I need to listen to normal HTTP requests? 
+14:18 < mablae_> Wouldn't be a problem to broadcast that... :)
+14:18 < bmatusiak> are you using telnet or something ?
+14:18 < mablae_> bmatusiak, avconv... 
+14:19 < bmatusiak> Ahh i c you want to convert and stream   A/V   live
+14:20 < mablae_> exactly
+14:20 < mablae_> It works already for one client
+14:20 < mablae_> but the second client needs to get the response the first request initiated
+14:22 < bmatusiak> you can just pool the request to the array
+14:22 < bmatusiak> and send the data to all the client in the array..  just don't end the request :P
+14:22 < mablae_> hmm... want to see my messy code? 
+14:23 < bmatusiak> i can take a peek
+14:33 < mablae_> bmatusiak, Hah, got it
+14:34 < rhannequin> Hi guys, I'm trying socket.io. Do you know how to make internal request to own server? I'd like socket.io to emit content received from a route already defined. For example emit content from /books.
+14:36 < whiskers75> Can anyone spot anything blatantly obviously wrong with this file: https://github.com/whiskers75/jsmc/blob/redstonev3/lib/redstone.js
+14:38 < whiskers75> anyone? :(
+14:39 < euoia> whiskers75: what kind of problem?
+14:39 < whiskers75> euoia, just any general syntax error
+14:39 < whiskers75> anything I've missed
+14:39 < euoia> whiskers75: you mean just general style?
+14:39 < euoia> whiskers75: or is there actually an error?
+14:40 < whiskers75> euoia, I mean stuff like = instead of ==
+14:40 < euoia> whiskers75: well, generally triple equals is preferred to ==
+14:40 < whiskers75> No error, just doesn't function properly
+14:40 < whiskers75> euoia, I can try that, but I doubt that it'll do anything
+14:40 < euoia> whiskers75: you can get some weird bugs using == instead of === for comparisons
+14:41 < whiskers75> euoia, well my bugs are pretty weird
+14:41 < whiskers75> ok, i'll try
+14:41 < euoia> whiskers75: I will run it though JSLint and see if it finds anything
+14:42 < whiskers75> euoia, thanks
+14:42 < mablae_> bmatusiak, here is the code http://pastie.org/7371058#
+14:42 < mablae_> please dont slap me
+14:42 < euoia> whiskers75: https://gist.github.com/euoia/5337269
+14:43 < whiskers75> thanks
+14:43 < whiskers75> I corrected it
+14:45 < spencera> whiskers75: can't find any errors, but you should check out while loops
+14:45 < rhannequin> Hey guys, does anyone know how to make internal requests with express?
+14:46 < thatguydan> Internal requests? Not quite sure what you mean..
+14:47 < rhannequin> thatguydan: I'd like socket.io to emit content received from nested route.
+14:47 < bmatusiak> mablae_ cool. so you solved your problem
+14:47 < euoia> rhannequin: do you already have socket.io and express working together?
+14:48 < euoia> rhannequin: I am using session.socket.io for that
+14:48 < rhannequin> euoia: yes, I defined my app, then created the server, then created io listening to the server. But I have to define my socket emit actions, so I'd like them to render what my REST routes already do.
+14:49 < euoia> rhannequin: sorry I don't really know what you mean by rendering what your REST routes already do
+14:50 < thatguydan> rhannequin: so you'd like data that comes from socket.io events to be accessible via REST endpoints?
+14:51 < meiwes> hello all,i have a question regarding kue job queing.Is there anyone who can answer it
+14:51 < rhannequin_> sorry I've been disconnected
+14:52 < thatguydan> rhannequin_: so you'd like data that comes from socket.io events to be accessible via REST endpoints?
+14:53 < rhannequin_> I'd like => var json = [what get(/books) renders];socket.emit('myEvent', json)
+14:53 < bmatusiak> my base example of    (redis/socket.io) + (mongodb/expressjs)  if anybody want it   @  https://gist.github.com/bmatusiak/4070108
+14:53 < MI6> joyent/node: Rod Vagg v0.10 * ccabd4a : process: expose NODE_MODULE_VERSION in process.versions - http://git.io/o_lljg
+14:54 < euoia> rhannequin: I don't know how you would do that given that the routes deal with request and response objects. I suppose you would have to create fake request and response objects and pass those in.
+14:54 < euoia> rhannequin: there might be an easier way, but I have no idea
+14:55 < thatguydan> rhannequin: if I understand what you want correctly, you need to pass in the `socket` object to your routes
+14:55 < rhannequin> euoia: any way to make external requests to my own server?
+14:55 < euoia> rhannequin: sure, you can use the request library
+14:56 < thatguydan> you can do this with middleware by adding the socket object to the request
+14:57 < thatguydan> so add a middleware function before you .use the routes middleware and so a req.socket = socket; (assuming socket obj is in that scope)
+14:57 < rhannequin> thatguydan: I can't do that (I guess) because I have to create my routes before creating the socket object, as is is listening to the server.
+14:58 < rhannequin> euoia: do you know how to point to the current server url? In order to make it work on localhost and in production.
+14:59 < euoia> rhannequin: would that not always be accessible using localhost? Are you sure you have to create the routes before creating the socket objecT?
+14:59 < MI6> joyent/libuv: Kristian Evensen master * 1e8fe45 : include: updated uv_udp_open documentation  On Unix, uv_udp_open can be u - http://git.io/LHKZfA
+15:00 < bmatusiak> rhannequin, thatguydan    look at  https://gist.github.com/bmatusiak/4070108#file-app-js-L77
+15:00 < rhannequin> euoia: I guess but not sure. As I create the app object which contains my routes, then I create the server object passing it my ap object, and finally I create the socket object listening to the server object.
+15:01 < rhannequin> bmatusiak: I'm kind of new to node.js, I don't understand how to use your example in my case :/
+15:01 < thatguydan> bmatusiak: handy, but race condition if requests come in before authorization is fired. massively depends on rhannequin's implementation
+15:03 < rhannequin> thatguydan: my application is quite simple, auto-generated express server, two routes, one socket object, that's it. I guess I can adapt it to any solution.
+15:04 < thatguydan> rhannequin: just setup your socket stuff before you register your routes?
+15:05 < thatguydan> then pass the socket into your routes, at least that's how I do it with DB connections and the like
+15:05 < bmatusiak> thatguydan, in my example you can add a way to add session and cookies on the socket.io side, incase socket.io get connect first,,  so in a way you can host everything off the sockets if you serve static html
+15:06 < rhannequin> Thank you guys, I'm gonna try this out thatguydan euoia bmatusiak 
+15:08 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+15:08 < gringo123> hi guys
+15:08 < gringo123> can someone help me with a simple post request to the server behind node?
+15:10 < euoia> gringo123: what do you mean the server behind node? what are you trying to do?
+15:11 < gringo123> euoia: posting data to php
+15:11 < gringo123> seems pst_req.write(data) is not working
+15:12 < gringo123> just the path which is given in options is invoked but with not data
+15:12 < euoia> gringo123: I generally use https://github.com/mikeal/request for requests from nodejs
+15:13 < gringo123> its nice
+15:13 < foobar321> Is there node-waf in 0.10.x ? I need it for https://github.com/Motorola-Mobility/node-dbus
+15:13 < gringo123> but its just one simple post request to php
+15:13 < gringo123> its already working
+15:13 < gringo123> but the post data is not forwarded
+15:14 < euoia> gringo123: perhaps you can show us the code
+15:14 < gringo123> its a simple http.request
+15:15 < euoia> gringo123: it may be useful to post to a `nc -l' process instead, so you can see exactly what is being sent
+15:17 < gringo123> mom
+15:17 < gringo123> http://paste.org/63437
+15:18 < medice> redis concurrency stuff is quite evil, gotta be careful with this stuff...
+15:20 < gringo123> euoia: got it?
+15:20 < euoia> gringo123: yep I am looking at it
+15:28 < euoia> gringo123: I just tested that code and it works, but the POST data may not be encoded as you expect
+15:34 < superjoe> I'm piping a large incoming request to a large outgoing request in v0.10.3. The incoming request is over localhost, and the outgoing request is to s3
+15:35 < superjoe> the entire file buffers in memory
+15:35 < superjoe> I thought backpressure was supposed to be handled automatically?
+15:35 < superjoe> is it likely a bug in my code, or is this something that has been observed?
+15:36 < kenperkins> there's so much email in the google group, how do people manage it
+15:40 < euoia> kenperkins: I get the abridged summary and just glance at that occasionally
+15:40 < kenperkins> probably a good idea
+15:41 < nooga> I'm writing a small, private package for internal use. I'd like it to postinstall create an app scaffolding in the directory that it's installed/linked to
+15:41 < nooga> is this possible ?
+15:42 < euoia> nooga: my understanding is that you can add anything you want to postinstall
+15:44 < nooga> euoia: I've added a pwd command there but it returns the package dir instead of the install dir 
+15:45 < nooga> I would have to somehow obtain the path in which npm was ran
+15:45 < euoia> nooga: ah I see... so within a module's postinstall you want to install something in the parent
+15:45 < zenetik> hi all, how can i remove non ascii chars from a Buffer ? need i do it myself ? use ansiBuffer (module) ?
+15:45 < nooga> euoia: yepp
+15:45 < nooga> euoia: probably just touch one or two files
+15:46 < euoia> nooga: sorry, don't know :<
+15:46 < nooga> i know that it's not the best practise but the package is intended for internal use
+15:46 < nooga> and will not be published
+15:46 < euoia> nooga: if it's not windows, what does echo $0 give?
+15:47 < nooga> sh :D
+15:48 < euoia> nooga: in the postinstall?
+15:48 < ericelliott> Warning: postInstall can cause problems.
+15:48 < zenetik> hi all, how can i remove non ascii chars from a Buffer ? need i do it myself ? use ansiBuffer (module) ?
+15:48 < ericelliott> Particularly if you try to require that module in other modules..
+15:49 < nooga> euoia: yes
+15:49  * zenetik wondering if create a new buffer and then loop on the original one char by char to see if the ascii code is < 255
+15:49 < MI6> joyent/node: Fedor Indutny v0.10 * 037bcac : crypto: dh secret should be left-padded  DH_compute_secret() may return k - http://git.io/4MaiEw
+15:52 < nooga> or maybe there's a way to neatly run a binary from the package (non-global), like: mkdir foo ; cd foo ; npm link barlib ; barlib init-here 
+15:52 < nooga> probably not ;/
+15:52 < MI6> joyent/libuv: Fedor Indutny v0.10 * 9e87974 : stream: account _SC_IOV_MAX  Write no more than `sysconf(_SC_IOV_MAX)` ch - http://git.io/XuYS7w
+15:53 < kam187-rMBP> hey guys
+15:53 < kam187-rMBP> anyone use node-redis?  I'm pulling my hair out with the eval command
+15:53 < kam187-rMBP> how do i pass parameters to it :/
+15:54 < MI6> joyent/libuv: Fedor Indutny v0.10 * c967406 : stream: account IOV_MAX  Write no more than `IOV_MAX` chunks with `writev - http://git.io/rCPGdA
+15:55 < MI6> joyent/libuv: Fedor Indutny v0.10 * 895e776 : unix: don't write more than IOV_MAX iovecs  Write no more than `IOV_MAX`  - http://git.io/_qX__w
+16:00 < zenetik> hi all, how can i remove non ascii chars from a Buffer ? need i do it myself ? use ansiBuffer (module) ?
+16:00 < zenetik> je le bute tout de suite ou j'attend ?
+16:00  * zenetik wondering if create a new buffer and then loop on the original one char by char to see if the ascii code is < 255
+16:00 < zenetik> oups
+16:01 < zackiv31> does anyone know how to put CDATA into a jade template?
+16:02 < nathan7> zenetik: a buffer just contains bytes
+16:03 < zenetik> nathan7: thx, and so ?
+16:03 < bnoordhuis> zenetik: in 0.10, new Buffer(str, 'ascii') will strip the high bits from characters > 127
+16:04 < bnoordhuis> which may or may not be what you want
+16:04 < bnoordhuis> else you'll have to filter the yourselves
+16:04 < nathan7> zenetik: bytes are all <256
+16:05 < zenetik> bnoordhuis: because i'm receiving a buffer from a node callback (network read), i suppose i have to filter myself
+16:05 < superjoe> I think "encoding" should be an option to stream.pipe
+16:05 < gildean> zackiv31: there is no cdata in html
+16:06 < zenetik> bnoordhuis: but i wonder how to do that, like nathan7 said, a buffer contains bytes so i can not loop byte by byte
+16:06 < nathan7> zenetik: I'd .toString()
+16:06 < nathan7> zenetik: then filter
+16:07 < zenetik> nathan7: mm okey ;)
+16:07  * zenetik trying
+16:08 < nathan7> zenetik: [].filter.call(buf.toString(), function(char) { return char.charCodeAt(0) < 0xFF }).join('')
+16:08 < zenetik> nathan7: wow
+16:08 < nathan7> zenetik: or if you want a new Buffer, then do new Buffer([].filter.call(buf.toString(), function(char) { return char.charCodeAt(0) < 0xFF }))
+16:09 < zenetik> nathan7: the current one is perfect, i will never think at something like you suggest *1
+16:10 < zackiv31> gildean, what do you mean? I need to export a <CDATA> block from my template... without touching the underlying code... surely there must be a way
+16:10 < zackiv31> i see a reference to :cdata in the docs, just not sure how it works
+16:13 < gildean> zackiv31: yeah, there seems to be a cdata filter, doesn't really change the fact that html doesn't have cdata
+16:13 < zenetik> nathan7: bnoordhuis: thanks a lot men, now got my old poor telnet scanner working like a charm
+16:13 < gildean> zackiv31: but it should be just like using any of the filters, put the :cdata there and indent the text under it
+16:19 < dukedave> Could someone give this a once over for me: https://gist.github.com/dukedave/5338014
+16:19 < dukedave> Question in the comments
+16:20 < dukedave> Also all comments on how I'm doing it wrong are welcome, I'm newbie, be brutal :)
+16:22 < zackiv31> gildean, something screwy with it: https://gist.github.com/zivester/5338084
+16:27 < combataircraft> hi all. I've created a new tool that would replace Makefile and GruntJS; https://github.com/azer/indev
+16:27 < combataircraft> let me know what your feedback. I started using it on my own project, it works seamlessly. fast, easy to maintain
+16:33 < draginx> combataircraft: is ur project backed up by any company?
+16:33 < combataircraft> nope, it's my saturday project
+16:34 < draginx> and how is this better than gruntjs? or replaces it?
+16:34 < draginx> GruntJS seems to be a bit to... big for me tbh so im looking for a thinner alternative
+16:34 < combataircraft> GruntJS requires you to write and read too much for simple tasks
+16:34 < combataircraft> index is based on Devfiles
+16:35 < combataircraft> and a Devfile have access to many shell commands, thanks to ShellJS
+16:35 < combataircraft> you can use either coffee script or javascript for writing a Devfile
+16:35 < draginx> right
+16:35 < combataircraft> and it's really simple. check out the examples
+16:35 < combataircraft> when you start running your server
+16:36 < combataircraft> it re-executes your specific tasks without restarting the whole process again
+16:37 < combataircraft> I don't know if grunt does this but some other tools like Rake can't do it.
+16:37 < combataircraft> and the main reason I gave up with writing Makefiles is, they are really hard to maintain
+16:37 < combataircraft> BTW I submitted this to HN; https://news.ycombinator.com/item?id=5512668
+16:38 < NuZZ__> why would one need to use cake/make/jake/grunt?
+16:38 < MI6> joyent/node: isaacs v0.10 * e4b716e : http: Support write(data, 'hex')  We were assuming that any string can be - http://git.io/Oibc9g
+16:38 < NuZZ__> mfw dat nickname of mine
+16:38 < combataircraft> NuZZ__: check out the examples
+16:38 < NuZZ__> i did, but i want to know why you need it
+16:40 < combataircraft> NuZZ__: I want to abstract my build process
+16:40 < NuZZ__> what are you building and why
+16:40 < combataircraft> it's both very useful and also documentation 
+16:41 < combataircraft> CSS files, JS files and also, don't you want your server to restart it automatically once you change a file?
+16:41 < NuZZ__> what kind of file would you have it restart for?
+16:42 < combataircraft> a source code file?
+16:42 < NuZZ__> you watch files and restart on change or do yiu just mean manually?
+16:43 < voliveirajr> Hi guys, Im facing some problems with node.js and selinux, anyone could help me please?
+16:43 < combataircraft> NuZZ__:  yeah, check the examples
+16:44 < NuZZ__> Yeah i get it, but cant you do this crap inside your app anyway? I dont get these build processes persay
+16:45 < NuZZ__> i get that you abstract and can port around the file to other projects. is that the main reason?
+16:47 < NuZZ__> but dont mind me I'm just an edgy fuck who's poking you for insight into something I havent attatched value to
+16:54 < Borja> a library to detect if an ip is a proxy? thanks.
+17:11 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+17:22 < superjoe> isaacs, if you have some time to spare I would really appreciate some consulting on this formidable fork project. I'm trying really hard to make this a good example of streams2 usage
+17:38 <@isaacs> superjoe: i don't have lots of time to spare, unfortunately
+17:40 < superjoe> understood
+17:41 < booyaa> hey guys, is string.replace the best way to censor a sentence based on a blocklist? i've got sample code https://gist.github.com/booyaa/5338668
+17:42 < booyaa> i've used porter-stemmer module to reduce words to their stems
+17:42 < booyaa> i'm expecting small volumes 8 sentences, no larger than 130 characters per sentence
+17:43 < asterick> booyaa: you might try compiling that down to a single regexp
+17:43 < asterick> so you can do the match once.
+17:43 < booyaa> i've already looked at word module and it looks abandon and doesn't do stemming or tokenize well i.e. bar! !== bar
+17:43 < deoxxa> superjoe: i've been doing streams2 pretty much constantly for like 2 months now, i'd be glad to take a look-see at things and offer input
+17:43 < asterick> like:  string.replace( /badword1|badword2|badword3/, "****" )
+17:44 < asterick> putting the case insensitive and global flags on that first, of course
+17:45 < superjoe> deoxxa, please do! https://github.com/superjoe30/node-multiparty
+17:45 < deoxxa> superjoe: anywhere in particular i should start?
+17:46 < booyaa> asterick: is that not what i've done in the code? /\w+/gi
+17:46 < deoxxa> oh, index.js
+17:46 < deoxxa> haha
+17:46 < superjoe> deoxxa, perhaps this commit: https://github.com/superjoe30/node-multiparty/commit/117feac6e86ccf4d076e99f0ffec556ef55a22d2
+17:46 < superjoe> if that raises any eyebrows, I'd love to know a cleaner way to do it
+17:46 < asterick> booyah: yes, and no.  I suggested using the regexp itself to match the entire blocklist
+17:47 < asterick> rather than tokenizing and iterating
+17:47 < deoxxa> superjoe: run me through it?
+17:47 < luckysmack_> has anyone in here familiar with scala? i know its a node channel. but a friend and I are wanting to start a business on an idea i have based around some web and mobile apps. i like node. he likes scala. i was wondering if anyone in here was actually familiar with it.
+17:47 < deoxxa> superjoe: backpressure seems works on its own now much better than it did in old-style streams
+17:47 < superjoe> deoxxa, a Form is a Writable stream. it emits 'part' events where each 'part' is a Readable stream
+17:47 < luckysmack_> the app is gaming related. so it would have some real time player to player interaction.
+17:48 < deoxxa> ah
+17:48 < asterick> luckysmack_: I do, but probably not enough to be helpful
+17:48 < asterick> and if you're asking for an unbiased "which is better", you're going ot have a big pros/cons table
+17:48 < superjoe> meeting, bbl
+17:49 < deoxxa> superjoe: i'll take a look over it while i drink my first coffee of the day :)
+17:49 < asterick> luckysmack_: my recommendation would be just to write in whatever you both can develop quickly in.  Getting a working prototype is significantly more important than doing things right the first time.
+17:49 < luckysmack_> asterick: ok. well im still at the basic point now. but im just trying to figure out why I would use one over the other for something gaming related.
+17:50 < luckysmack_> yea that is true.
+17:50 < Raynos> owen1: why would I /
+17:50 < cjflory> have a user installing less globally (npm install -g less).  less installs, but lessc isn't found
+17:51 < asterick> Scala is intended for concurrency, much like most functional languages.  If you are handling a large number of concurrent processes, it is probably not a bad language.  It can be clunky though.  Node is great is because it's a familiar language, but it doesn't really do concurrency persay (just async callbacks).  The benefit there is no locking.  It can also abstract away code flow.
+17:51 < luckysmack_> and i understand that. but in the long run, this is something i want to make a living off of. so im trying to come up with some ideas as to why i would use node over scala. already the fact its not strongly typed and quicker to write is probably the best point. that and async and sockets seems easy enough.
+17:52 < asterick> If you want to expand a company, you're going to have a harder time finding scala experts.
+17:53 < luckysmack_> yea thats a good point. theres a lot of people doing node right now.
+17:53 < asterick> Like I said, just pick something and see what works
+17:53 < Havvy> Scala is a complex (but powerful) beast.
+17:53 < Havvy> Node is a simple (but powerful) beast.
+17:53 < totallymike> I love some of Scala's features
+17:53 < asterick> Premature optomization is really the worst thing you can do to yourself.
+17:54 < totallymike> like case classes
+17:56 < luckysmack_> yea im trying to go with a lean startup. i am not too worried about optimization early in the game. i want to get even just a basic working example, that just works well first. and build from a solid working platform.
+17:56 < deoxxa> less lip flapping, more key tapping
+17:56 < deoxxa> get to work son
+17:56 < luckysmack_> totallymike: yea i saw some features i liked to. and functional programming has intrigued me for a while now too.
+17:57 < totallymike> like said above, your most important goal is to get a working *something*
+17:58 < totallymike> it's easy to convert/change later; most of the edge cases you run into will be things that are language-agnostic, so converting to a different language later (as long as your specs are well-defined) doesn't have to be so costly
+17:58 < totallymike> But getting something out there and learning about your product is the important part
+18:03 < ryo> 3/part
+18:05 < mablae_> hello
+18:05 < mablae_> I use spawn to start a process ... 
+18:05 < ljharb> substack: do testling HTML pages stick around? http://git.testling.com/work/raynos/repos/61955070b704fe53ecf70eb91b44fea2ea553fac.1365012658275/1365012658503.41d9db9a.html says "EACCES" for example
+18:06 < mablae_> Now I need to pipe that output to another process and a third ... ? 
+18:06 < mablae_> can I call that Line in One spawn ? 
+18:07 < mablae_> like: avconv (....)  pipe:1 | MistFLV2DTSC | MistBuffer -t 60000 tvheadend
+18:08 < luckysmack_> totallymike: yea i have a fairly detailed spec for the app already. and totally agree on getting a working proof out quickly is key.
+18:20 < Daiz> is npm link still unavailable on windows?
+18:24 < th3seaw0lf> hi everyone
+18:26 < hallas> hey
+18:31 < FellowMD> Daiz: I've used it on windows, although I believe it works differently under some circumstances
+18:36 < Purefan> Hello all. I have a little issue and hoping to find some help here. Im using socket.io and just for testing I stopped the nodeJS app, then from the web browser reloaded the page, it tries to connect and as expected it fails, meanwhile it keeps trying to connect and I start the nodeJS app but it still loops between the connect,disconnected,reconnecting,reconnect events and never really connects. If I start the app and then reload the p
+18:38 < gildean> Purefan: your text got clipped
+18:40 < Purefan> Sorry about that, I will repost since about half of it
+18:40 < Purefan> it tries to connect and as expected it fails, meanwhile it keeps trying to connect and I start the nodeJS app but it still loops between the connect,disconnected,reconnecting,reconnect events and never really connects. If I start the app and then reload the page it works right away though
+18:43 < MI6> joyent/node: Ben Noordhuis master * 7357bcb : v8: reapply floating patches (+1 more commits) - http://git.io/A5Oq7A
+18:59 < owen1> Raynos: sorry. what's the context for your question? 
+19:00 < ryanaz> When using passport how can I add more than just "user: email" in the session?
+19:00 < ryanaz> serializeUser only accepts email 
+19:03 < deoxxa> ryanaz: that's what serializeUser is for
+19:03 < deoxxa> ryanaz: you give it a pair of functions that load/store user information
+19:03 < deoxxa> ryanaz: serializeUser takes a user object and returns some kind of unique identifier for it, and deserializeUser does the reverse
+19:04 < chuwiey> is it possible to use socket, to pipe js and css files to a browser? (asking here, because I am using node to create a static file server)
+19:05 < ryanaz> deoxxa:  Makes sense, how do I add another field?  I'm using redis
+19:06 < deoxxa> ryanaz: well, you could do something like passport.deserializeUser(function(id, done) { redis.get("user-" + id, function(err, doc) { return done(err, doc); }); });
+19:06 < deoxxa> ryanaz: then whatever you store in that document will be your user object
+19:06 < deoxxa> ryanaz: so you can put whatever you like in there
+19:18 < jcollum> hey can anyone tell me where my v8 folder is if I just installed node on a fresh Ubuntu VM? 
+19:19 < jcollum> assumed it would be /usr/bin/node-js-0.10.3 or something 
+19:19 < asterick> "which node" ?
+19:20 < deoxxa> jcollum: node doesn't install v8
+19:20 < asterick> (that is also true)
+19:20 < jcollum> oh? i was told it did
+19:20 < asterick> it uses V8, but it's static linked inside the the binary
+19:21 < jcollum> do i have to download & make v8 separately to get the linux tick processor? 
+19:21 < jcollum> was told: "You don't have to download V8, it's bundled with node"
+19:21 < deoxxa> jcollum: if you download the node source, the v8 source is in there
+19:22 < deoxxa> jcollum: but binary distributions of node don't include the v8 tools or whatever
+19:22 < deoxxa> jcollum: so i guess that's something that needs to be answered - did you download source or binaries?
+19:22 < jcollum> ah, ok my source told me wrong
+19:22 < jcollum> binaries
+19:22 < deoxxa> ah, yep, you want to grab the source then
+19:22 < jcollum> sudo apt-get install nodejs
+19:22 < deoxxa> it's in like deps/v8 or something from memory
+19:22 < jcollum> right? 
+19:22 < deoxxa> ah
+19:22 < deoxxa> um
+19:22 < deoxxa> no
+19:23 < asterick> don't use apt-get for node.  it's going to be way behind.
+19:23 < jcollum> that's what the joyent wiki says to do
+19:23 < jcollum> https://github.com/joyent/node/wiki/Installing-Node.js-via-package-manager
+19:23 < deoxxa> well, it might not be behind, but it's definitely going to be different to the official source
+19:23 < asterick> yes, that's how you would if you absolutely want to install using a package manager.
+19:23 < jcollum> well that's weaksauc
+19:23 < jcollum> e
+19:24 < mjijackson> Are there any request-like libraries that don't buffer the response?
+19:24 < deoxxa> jcollum: good news is that node is super easy to build
+19:24 < deoxxa> mjijackson: request doesn't buffer the response unless you ask it to - you can .pipe() to/from the return value of request(options)
+19:24 < tmpvar> mjijackson: mikeal's request returns a stream
+19:24 < jcollum> ok I will see if that helps 
+19:25 < mjijackson> deoxxa, tmpvar: i want to see the response headers before pipe()'ing somewhere. request doesn't let me do that
+19:26 < mjijackson> using request, i need to call pipe() immediately
+19:26 < tmpvar> yeah this is true
+19:26 < tmpvar> http.request ;)
+19:26 < mjijackson> :) yeah, that's what i've been using
+19:27 < tmpvar> it's really not that bad, and much lighter on deps than request
+19:27 < mjijackson> i'd like a souped-up http.request that does http/https, and auto-follows redirects
+19:27 < jerrysv> tmpvar: florida for jsconf this year?
+19:27 < tmpvar> jerrysv: yessir
+19:27 < jerrysv> tmpvar: awesome!
+19:28 < tmpvar> yasss!
+19:28 < jerrysv> tmpvar: good good. thinking that i might check my bag, so may bring extra beer.
+19:29 < tmpvar> mjijackson: i believe that's how request started, haha
+19:29 < tmpvar> jerrysv: nice, beer is good
+19:29 < jerrysv> or bad, depending
+19:29 < tmpvar> heh heh
+19:30 < mjijackson> tmpvar: yeah, i thought i remembered it doing that as well...
+19:30 < mjijackson> maybe i'll just check out an old version ;)
+19:37 < der_On> hi. does someone know if there is an opencollada writer for node.js?
+19:47 < dobedobedoh> Is this the best place to ask about issues with npmjs.org? I've been trying to create an account but keep getting 'There was a problem! The server said: Failed creating account. CouchDB said: conflict'
+19:48 < dobedobedoh> Ah... I already have an account. Nice error message
+19:50 < chrisan> trying to shorten build times on CI server, is there a best practice for getting `npm install` to skip checking the registry if the local version matches what is in shrinkwrap?
+19:56 < Industrial> Can I make a Transform stream that either rejects or accepts a message? so it becomes 2 outputs instead of 1? so I can collect rejected messages somewhere else.
+19:57 < Industrial> or is that more a use case for a thing that you would put between streams, it having 2 output streams one acc one rej ?
+20:09 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+20:12 < ryanaz> deoxxa: had a phone call -- what's the difference between serializeUser and deserializeUser?
+20:15 < sirvon> is it possible to change the url in the browser through javascript?
+20:15 < sirvon> if i have a remote machine and i want to remote change the url in the browser and make the browser show another page... is this possible through js
+20:16 < ryanaz> sirvon: http://stackoverflow.com/questions/4744751/javascript-redirect ? 
+20:18 < sirvon> no more like cross-domain pushState
+20:19 < deoxxa> sirvon: magic.changeUrl("http://yourbank.com/login"); document.write('<form><input type="password"></form>');
+20:20 < fermo> Does anyone know how the node bcrypt module pads keys?
+20:20 < fermo> I need to decipher passwords enciphered using node bcrypt in Java, and don't know how it pads keys that are too short.
+20:20 < fermo> This is using AES-256-CBC
+20:20 < sirvon> yea deoxxa but im not loing to use this for malicious reasons
+20:20 < sirvon> looking*
+20:21 < sirvon> i understand the harm but if i own the machine i should be able to do what i want
+20:22 < sirvon> im basically trying to do the equivalent of in mac terminal --- open http://google.com but using js
+20:26 < euoia> sirvon: how is that not just location.href = 'http://google.com' ?
+20:26 < sirvon> not when its done from remote
+20:26 < sirvon> you if u click the link within the browser
+20:26 < euoia> what do you mean from remote?
+20:27 < sirvon> but i want a script thats being executed from "user" physically near the browser to change the url
+20:28 < sirvon> not near*
+20:29 < euoia> sirvon: I totally don't get what you're on about. If the browser executes location.href = 'http://google.com' it will go to google.com
+20:29 < euoia> if you want to be able to redirect the web browser of a user who is connected to your site, then you'll need to set up some kind of polling on the page
+20:29 < webdesserts> sirvon, if you don't want to use this for malicious purposes, what DO you want to use it for?
+20:30 < webdesserts> I could never see anything good coming from lying to the user what url they're actually requesting
+20:30 < sirvon> remote advertsing and allowing people to change displays from thier phone
+20:30 < sirvon> there is no single "user"
+20:30 < sirvon> the display/browser is public
+20:30 < webdesserts> there is never a single "user"
+20:31 < sirvon> i want people to be able to send a url to the browser from thier phone and change the browser simple
+20:31 < sirvon> i have it coded using php/python scripts and http
+20:31 < sirvon> i jus want to see if there is a pure browser way
+20:31 < sirvon> no shell scripting
+20:32 < zfjohnny> I am having a bit of trouble trying to set up a node.js proxy.
+20:32 < asterick> sivoais: what OS?
+20:32 < zfjohnny> Following a simple example, I have been able to setup a proxy which listens on port 8009 of one of my servers. Works great and I can use Curl to request web pages through it.
+20:33 < zfjohnny> However, when I try to access "https" (SSL) connections, it fails.
+20:33 < zfjohnny> What am I doing wrong?
+20:33 < sirvon> asterick if ur talking about me.... i want it os independent browser only
+20:34 < asterick> sirvon: I don't think there is a 100% independant way to do that.
+20:34 < asterick> every browser and OS does that kind of signalling differently.
+20:34 < asterick> you'd either need to write a different solution on an OS, or create browser extensions.
+20:35 < sirvon> ahh browser extensions... so it would have to be in someway dependent on a specific browser ... like im coding a chrome based solution
+20:35 < sirvon> it isnt all about js... its about the browser itself.
+20:35 < sirvon> hmmmm
+20:38 < sirvon> wat about changing the url of an iframe
+20:39 < sirvon> can i "push" a different url to display in an iframe from the backend
+20:47 < sirvon> btw thanks asterick for the inspiration
+20:50 < Industrial> Is this reasonable pseudo-code for a streaming comment stripper? https://gist.github.com/Industrial/d1ef320eb45ebc8f29f9 (only the comment part (the irony))
+20:51 < Industrial> Trying to get a grip on streams, thought I'd make something I found usable. maybe for some part in a deployment chain :)
+20:52 < deoxxa> coffeescript
+20:52 < deoxxa> lol
+20:54 < Industrial> deoxxa: its livescript
+20:57 < deoxxa> w/e
+20:57 < niggler> wtf is livescript?
+20:58 < superjoe> niggler, don't even
+20:58 < superjoe> it's not worth it
+20:58 < niggler> according to wtf: "livescript: nothing appropriate"
+20:58 < superjoe> that about sums it up.
+20:58 < jsmonkey> Hi, what lib do you usually go for utility functions? I am after deep equality and object difference functions but anything good is nice to hear about
+20:58 < jsmonkey> at the moment I am using lodash for a more  functional approach but it does not have so much
+20:58 < superjoe> niggler, how did you get your wtf to be more useful? mine says Gee...  I don't know what livescript means...
+20:59 < niggler> lol superjoe what version are you using?
+20:59 < superjoe> uh
+20:59 < niggler> man wtf
+20:59 < superjoe> bsdgames 2.17-19 from ubuntu
+21:00 < nkcmr> hello?
+21:00 < niggler> ah I'm using brew
+21:00 < niggler> wtf-20111107 
+21:00 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+21:00 < superjoe> that explains it
+21:04 < Industrial> /gist.github.com/37f423bea933ba801768
+21:04 < Industrial> o hey look it works
+21:04 < Industrial> and uses recursion
+21:04 < MACscr> is it ok for me to ask npm install questions there? Im trying to use node-xmpp-bosh with a third party app and it appears that nmp install ltxt is finishing its install, but has  couple warnings and when i try to run the bosh proxy, i get an error that it cant find the ltx module. Here is the output of the install and error http://pastie.org/pastes/7375900/text?key=b6k6gaa2rgbtflqyvbmnew
+21:04 < Industrial> functional decomposition to the rescue!
+21:05 < nkcmr> hey, anyone know of a dead simple observables package?
+21:05 < Industrial> oops forgot some stuff
+21:13 < ousado> hi. the API docs v. 10 are missing the 'error' event for stream.Writable 
+21:17 < Domenic__> So. IRC noob. How can I use both IRCCloud and LimeChat but with the same username.
+21:17 < asterick> Don't start them at the same time?
+21:17 < myndzi> er?
+21:17 < myndzi> lol
+21:17 < myndzi> how do you register accounts at hotmail with firefox and chrome but with the same username?
+21:17 < myndzi> :P
+21:18 < context> domenic__: you use a bnc
+21:18 < Domenic__> context: ugh that sounds so hard.
+21:19 < context> znc is pretty easy to set up
+21:19 < Domenic__> ah hmm yeah. i think the wikipedia article just scared me.
+21:51 < ryanaz> I'm stuck trying to understand how to use express & passport to add one more variable to the session in redis.  I have it all working great, but I just can't bloody call  req.session.id_user = user.id_user … 
+21:52 < ryanaz> can't figure out where to put that because passport doesn't have the req object in it
+21:53 < Industrial> Trying to test this program https://gist.github.com/8613fdd72649b9a3fa86 with input `echo foo/*lol*/bar/*abc*/baz | lsc -d app` yields foobarbaz like I expect. The only case that is not yet covered is when I am in a comment and there is no match for an end-comment until the end of the current chunk, in which case I'd like to drop the chunk. I dont want to emit this data. What do I do here? call the callback
+21:53 < Industrial> without values? or not at all?
+21:54 < ryanaz> anybody here know how to use passport? 
+21:55  * Pentium  Visite This WebSite Please Wait To Open  wWw.AlbCom.Org
+21:55 < zfjohnny> OT: Where could I find help with setting up Monit?
+21:56  * Pentium i wont One DDoS-er`d have anyone here ?
+21:56 < JohnMcLear> ryanaz: sure
+21:58  * Pentium  Visite This WebSite Please Wait To Open  wWw.AlbCom.Org
+21:58 < ryanaz> JohnMcLear: Hey man, i'm stuck.  I'm using redis and have it all working, session, everything…. but I want to add user.id_user to the session as well.
+21:58  * Pentium  Visite This WebSite Please Wait To Open  wWw.AlbCom.Org
+21:58  * Pentium  Visite This WebSite Please Wait To Open  wWw.AlbCom.Org
+21:58  * Pentium  Visite This WebSite Please Wait To Open  wWw.AlbCom.Org
+21:58 < Industrial> deoxxa: I included the JS now. How long is a Buffer? i.e. how long do I need to make my input comment in order for it to trigger line 20 in app.js ? https://gist.github.com/Industrial/8613fdd72649b9a3fa86#file-app-js-L20
+21:58  * Pentium  Visite This WebSite Please Wait To Open  wWw.AlbCom.Org
+21:59 < Industrial> Also, is there a faster way then indexOf and substring?
+21:59 < ryanaz> JohnMcLear: It should be as easy as doing req.session.id_user = user.id_user -- but I can't figure out where to put it
+21:59 < JohnMcLear> Industrial: Regex?
+21:59 < Industrial> I thought 'primitive' functions were faster
+22:00 < Industrial> jsperf to the rescue
+22:00 < JohnMcLear> ryanaz: #passport.js
+22:00  * JohnMcLear nods
+22:01 < ryanaz> JohnMcLear:  well, how about this question.   If I have the session already in place but I only have the express "app" object, how do I get to the "req" object?  
+22:02 < ryanaz> what about something like :   app.request.session.id_user = user.id_user  ? 
+22:02 < ryanaz> (that doesn't work, I tried it) 
+22:03 < JohnMcLear> just look into what's available in the app object, funnily enough I don't remember the contents of every object from every node module..
+22:03 < JohnMcLear> console.warn(app.request) will probably help but you might want to use some sort of node inspector so you can navigate through the object in a consoley style
+22:07 < Industrial> How long is a Buffer? How many characters must an input string contain to become two process.stdin data events?
+22:08 < ryanaz> JohnMcLear:   app.get('/', function(req,res) { …. });  how does that get from the app object  to req and res ? 
+22:08 < JohnMcLear> :?
+22:09 < JohnMcLear> "get from" :?
+22:09 < Industrial> ryanaz: it does not go from app to req/res. there is no to. req and res are new objects, passed by the internals for each request to your callback
+22:10 < ryanaz> Industrial:  ok but it seems like every function works the same where req.session.user_id = "testing" would add that to the session.
+22:10 < Industrial> ryanaz: http://www.senchalabs.org/connect/session.html
+22:11 < Industrial> ryanaz: the session middleware is called on each new req and res object before your callback, and passes it down to your callback
+22:12 < Industrial> most of these connect middleware <- in the middle of request callbacks
+22:12 < Industrial> work like this
+22:12 < Industrial> ryanaz: the session is set on your app, so it has scope info there
+22:13 < ryanaz> so would it be app.connect.session.user_id = "info"; ?
+22:13 < Industrial> the app contains a http server which creates the initial req, res pair for each request, so the app also has scope to req and res before the callback gets fired
+22:13 < Industrial> no. req.session.user_id = 'info';
+22:14 < MI6> joyent/node: isaacs v0.10 * c93af86 : stream: call write cb before finish event  Since 049903e, an end callback - http://git.io/C_1NQg
+22:14 < Industrial> the session middleware places a session object (with existing session values) in each req object and then your callback gets fired, so req.session always exists.
+22:15 < ryanaz> Industrial:  except there's no 'req' object in this function from what I can tell
+22:16 < ryanaz> ReferenceError: req is not defined
+22:16 < Industrial> ryanaz: pastebin your code
+22:17 < Industrial> ryanaz: supply it with each question, its easier.
+22:17 < ryanaz> http://pastebin.com/DUkzTJx1
+22:17 < ningu> vat is ze kvestion? I meesed eet
+22:17 < ryanaz> so userRepositoryfindByEmail gets me the user info
+22:18 < Industrial> see I thought we were talking about connection session middleware
+22:18 < ryanaz> inside user I have user.id_user  …. i just want to add that. 
+22:18 < ningu> ryanaz: btw you can just write userRepository.findByEmail(email, done);
+22:18 < ningu> since done takes the same args as findByEmail's callback
+22:19 < ryanaz> Industrial:  right now the session from redis looks like this:  "{\"cookie\":{\"originalMaxAge\":null,\"expires\":null,\"httpOnly\":true,\"domain\":\".domain.com\",\"path\":\"/\"},\"passport\":{\"user\":\"name@domain.com\"}}"
+22:19 < ningu> also, I'm not sure why you have the null error + message passing thing rather than just passing the error through the error argument
+22:20 < ningu> ryanaz: you haven't shared the code where you set the session.
+22:21 < Industrial> ryanaz: looks like passport.authenticate is a middleware, so you can add your own callback behind it to access req, res
+22:21 < ryanaz> Industrial:   app.get('/api/auth', passport.authenticate('local', { successRedirect: "/", failureRedirect: "/" }));
+22:21 < ryanaz> can I just do a callback there to add req, res ? 
+22:22 < Industrial> yes, and remove the successRedirect
+22:22 < Industrial> req.user_id = req.user.id
+22:23 < Industrial> actually no, look at Custom Callback on http://passportjs.org/guide/authenticate/
+22:23 < ningu> ryanaz: at https://github.com/jaredhanson/passport there's an example under Authenticate Requests
+22:23 < ningu> probably the same as what Industrial pointed you to
+22:24 < Industrial> After successful authentication, Passport will establish a persistent login session.
+22:24 < ningu> I wrote my express app that authenticates users before passport existed and I just wrote it myself, which was pretty easy too
+22:24 < Industrial> so dont set a session user id, use req.user everywhere :P
+22:24 < ningu> sounds reasonable
+22:25 < Industrial> so can anyone help me on my streaming comments filter?
+22:25 < ryanaz> Industrial:  but I don't want to constantly have to re-query the database if I already get the info from the session
+22:25 < ryanaz> i'm able to pull the info from redis instead of mysql
+22:25 < Industrial> omg ! dude
+22:25 < Industrial> the lib does it for you
+22:25 < Industrial> it manages the session
+22:26 < Industrial> just do a login and try to access req.user somewhere else after logging in
+22:26 < ryanaz> Industrial:  Yah I see that.. it's working like that too .. but i just want to add one more field to the session.
+22:26 < Industrial> upon logging in?
+22:26 < Industrial> which isnt any of the user info already present in req.user now?
+22:28 < ryanaz> Industrial:  right now the user is the emailaddres 
+22:28 < ryanaz> and I want to also be able to store id
+22:29 < windsurf_> i normally start my server locally with 'node app.js'. Is there a different syntax or mechanism to having that run on startup on linux (raspberry pi, init.d)
+22:29 < ningu> windsurf_: use jesus
+22:29 < ningu> and yes you could use init.d or upstart or whatever
+22:29 < windsurf_> haha. ok googling. 
+22:30 < windsurf_> ningu: what would you do, personally?
+22:30 < ningu> windsurf_: actually there are several solutions like forever, but I think jesus is the best :)
+22:30 < ningu> I currently have a user upstart script on a couple of my ubuntu servers
+22:30 < ningu> $HOME/.init/node.conf
+22:30 < defaultro> hey guys, I tried the sample HTTP server app from here but it's not responding although it's able to setup a listener on port 8080. http://net.tutsplus.com/tutorials/javascript-ajax/node-js-for-beginners/
+22:30 < ningu> windsurf_: but I don't know really what's the "best" answer
+22:31 < windsurf_> ningu: link for jesus? as you can imagine, it's coming up with a lot of unrelated results.
+22:31 < defaultro> damn, looks like iptables issue
+22:31 < ningu> windsurf_: google deoxxa + jesus
+22:31 < windsurf_> ningu: got it,thx
+22:31 < deoxxa> hm?
+22:31 < deoxxa> http://npm.im/jesus
+22:32 < ningu> deoxxa: just evangelizing
+22:32 < deoxxa> yay!
+22:32 < deoxxa> <3
+22:32 < defaultro> still doesn't work
+22:32 < ningu> defaultro: are you connecting locally or what?
+22:32 < ningu> if you're on the same machine as the node app it shouldn't matter for iptables
+22:32 < ningu> unless you have a realy weird config
+22:32 < defaultro> i tried both, 127.0.0.1, localhost and ip address
+22:33 < ningu> and you did http://localhost:8080?
+22:33 < defaultro> yes
+22:33 < defaultro> i did an netstat -na|grep 8080 and it's listening on that port
+22:33 < defaultro> tcpdump can't see anything
+22:33 < windsurf_> do i need to run jesus with some other dependency?
+22:33 < defaultro> i also tried netcat localhost 8080
+22:33 < Guest24974> And telnet?
+22:33 < windsurf_> what would run the commands that are shown in the readme?
+22:33 < defaultro> telnet too
+22:33 < ningu> windsurf_: npm install -g jesus, that will pull in whatever you need. oh but you *do* need v0.10
+22:33 < defaultro> same response
+22:33 < defaultro> even lynx
+22:34 < ningu> windsurf_: jesus is the name of the command
+22:34 < defaultro> is the code from that site good?
+22:34 < ningu> it installs itself if you do -g
+22:34 < ningu> defaultro: it looks fine to me.
+22:34 < defaultro> k
+22:34 < defaultro> do I have http module? is it installed by default?
+22:34 < ningu> defaultro: so you made foo.js and cd'd to that directory and did node foo.js?
+22:34 < ningu> yes
+22:34 < ningu> what version of node?
+22:34 < defaultro> yes
+22:34 < defaultro> i just git'd today and it's a new install
+22:35 < ningu> ok... but v0.10.x I assume and not v0.11.x?
+22:35 < defaultro> when I stop node http.js. tcp 8080 goes away
+22:35 < ningu> hmm
+22:35 < defaultro> tcp        0      0 0.0.0.0:8080                0.0.0.0:*                   LISTEN      24993/node
+22:35 < windsurf_> thx
+22:36 < defaultro> my http.js is listening on all interfaces
+22:36 < defaultro> i already killed iptables too
+22:36 < ningu> hmmmm it might have something to do with new streams
+22:36 < windsurf_> ningu: v0.10 of what?
+22:36 < ningu> windsurf_: of node :P
+22:36 < windsurf_> ningu: i have 0.8.14
+22:36 < ningu> sorry if that wasn't clear
+22:37 < windsurf_> so too low
+22:37 < ningu> windsurf_: oh. well then use forever
+22:37 < windsurf_> ningu: so does forever just keep a process running or does it start it on startup?
+22:37 < defaultro> this is my version -> v0.11.1-pre
+22:37 < windsurf_> i need the latter at least.
+22:37 < ningu> windsurf_: it just keeps it running
+22:37 < ningu> to start it up you'd just do, forever <app.js>
+22:37 < ningu> filling in the path
+22:38 < windsurf_> ningu: maybe it's more of a linux question then.. how do i make my server start my app when i won't be the one running 'node app.js'
+22:38 < windsurf_> just wondered if there was a different paradigm or if i put 'node app.'s' (or forever..) in a script in init.d
+22:39 < ningu> defaultro: try adding this line after request.on(....) i.e. at the very end of the callback for http.createServer: request.resume();
+22:39 < defaultro> ok
+22:39 < ningu> defaultro: it's a bit of strange example because you just ignore the http request data entirely and I think you're hitting one of the things that v0.10 broke backwards compat for
+22:39 < defaultro> k
+22:40 < ningu> windsurf_: init.d would be the traditional way but I'm sure there are others
+22:40 < ningu> I used upstart cause it was less of a hassle
+22:40 < ningu> but it doesn't really matter
+22:41 < ningu> with some of my apps I don't even have an automatic startup script because I restart so rarely
+22:41 < defaultro> That worked!
+22:41 < ningu> defaultro: cool
+22:41 < defaultro> you're awesome man!
+22:41 < ningu> defaultro: if you had a request.on('data', ...) you wouldn't need the resume()
+22:41 < ningu> defaultro: context: http://nodejs.org/docs/latest/api/stream.html#stream_compatibility
+22:41 < defaultro> maybe I shouldn't follow that tutorial i found
+22:42 < ningu> defaultro: it would be fine for v0.8, this is relatively minor
+22:42 < ningu> most normal code will not break in v0.10 but because it's a pared down example it did
+22:42 < ningu> you would normally not just throw out the http request data :)
+22:43 < ningu> defaultro: however, I would recommend you run v0.10 rather than v0.11
+22:43 < ningu> since v0.11 is development/unstable
+22:44 < windsurf_> ningu: thanks
+22:46 < faceleg|work> 3go team!
+22:47 < ningu> faceleg|work: team?
+22:48 < deoxxa> 3go!
+22:48 < defaultro> thanks ningu 
+22:48 < ningu> oh, I thought 3go was a typo
+22:48 < defaultro> I'll uninstall .v11
+22:53 < defaultro> i'm installing .10 3 now
+22:56 < kornnflake> ny idea what's causing this error: http://paste.pm/650.js trying to connect via ssl, and it works in our old server
+22:57 < ningu> kornnflake: eh? are you compiling node, or what?
+22:58 < kornnflake> no, compiled it form source this time. but that error shopw up wile running my app and connecting via ssl
+22:59 < kornnflake> may some thing got fu**** up while compiling
+22:59 < ningu> dunno
+23:00 < defaultro> ningu, I downgraded to v.10 3, the code failed
+23:00 < defaultro> i added the code again and it work
+23:00 < kornnflake> gonna delete the bin and compile it again
+23:01 < ningu> defaultro: yes, that's what I told you :)
+23:01 < ningu> defaultro: I suggested using v0.10 just because it's stable
+23:01 < ningu> the code will be the same
+23:01 < ningu> defaultro: the streams change happened between v0.8 and v0.10
+23:01 < ningu> that's why you need that extra line
+23:01 < defaultro> I am on v0.10 now
+23:01 < ningu> right, so you still need the request.resume()
+23:01 < ningu> for that example
+23:01 < defaultro> ah
+23:01 < ningu> not in general
+23:02 < ningu> if you listen to 'data' you don't need it
+23:02 < defaultro> so that example I found is for v0.8
+23:02 < ningu> yeah
+23:02 < defaultro> got it
+23:02 < kornnflake> ningu is v10.0 more stable? i'm on 10.3 now
+23:02 < ningu> defaultro: if you read up on streams2 it will make more sense. v0.10 gives you (the programmer) a lot more flexibility in how you handle streamed data but it broke backwards compat in some edge cases
+23:02 < ningu> kornnflake: by v0.10 I meant any v0.10.x
+23:03 < defaultro> k
+23:03 < ningu> unstable is v0.11.x
+23:23 < sitapati_> what's the best way to include javascript in an Express view?
+23:24 < sitapati_> I want to bind a click event to an element in a view
+23:24 < kornnflake> sry for repost: any idea what's causing this error: http://paste.pm/650.js trying to connect via ssl, and it works in our old server
+23:24 < kornnflake> tried node 10.3 10 and 9.9
+23:24 < ljharb_> kornnflake: is your system clock accurate?
+23:26 < kornnflake> ljharb_ yea just checked
+23:27 < MI6> joyent/node: Łukasz Walukiewicz v0.10 * 2e28832 : buffer: fix offset checks  Fixed offset checks in Buffer.readInt32LE() an - http://git.io/b4jKjw
+23:30 < MI6> joyent/node: isaacs v0.8 * b2587b2 : http: Avoid EE warning on ECONNREFUSED handling  This is a back-port of t - http://git.io/-aO6pw
+23:52 < MI6> joyent/node: isaacs created branch v0.8.23-release - http://git.io/gAIv4Q
+23:55 < MI6> joyent/node: isaacs v0.8.23-release * c67f8d0 : 2013.04.09, Version 0.8.23 (maintenance)  * npm: Upgrade to v1.2.18  * ht - http://git.io/V2avDA
+--- Log closed Tue Apr 09 00:00:46 2013
