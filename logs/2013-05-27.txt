@@ -1,0 +1,1929 @@
+--- Log opened Mon May 27 00:00:14 2013
+00:00 < niggler> but then every module needs to read the env Nexxy 
+00:00 < niggler> at the moment ningu that's the most tempting option
+00:14 < Leeol2> Mildly off topic, but for anyone who is familiar with Promises (and Promise oriented design) look at https://gist.github.com/leeolayvar/d65cf979fcf08d235719 and tell me why the promises are chaining in such a fashion?
+00:15 < lvivier> niggler: debug is probably good place to start, uses an environment variable: https://npmjs.org/package/debug
+00:16 < Zolmeister> Leeol2: its chaining off of the rejected response it seems
+00:16 < Leeol2> Zolmeister: Is that to be expected? Working as intended? I would expect a "broken link in the chain" not to continue the chain, if that makes sense. 
+00:17 < Leeol2> Zolmeister: My only theory is that the library implemented Promises oddly, or i severely misunderstand the goal of promise chaining
+00:18 < Havvy> A broken link should cascade the break all the way down.
+00:18 < Leeol2> Havvy: So it should be "success, error, error, error" ?
+00:18 < Havvy> Yes.
+00:19 < Zolmeister> Havvy: Are you sure? I thought that was only if you put .fail() at the end
+00:19 < Leeol2> Hmm, so it seems that i need to discuss this with the library (Sequelize) tracker and see what's going on
+00:20 < Leeol2> Either way, calling success, after a failure, seems *horrible* to me. 
+00:20 <@isaacbw> it seems like you don't actually understand promises
+00:20 < Zolmeister> Leeol2: Look for a 'stop propogation" in the library
+00:20 < Leeol2> Very likely :P
+00:22 < Leeol2> isaacbw: Can you explain to me my incorrect understanding? Why should a "broken link" successfully call the next link. 
+00:23 < Zolmeister> Leeol2: a failed promise is still a promise, and a 'then' call can thus be made on it
+00:23 < Havvy> Somebody should write a graphical guide to promises.
+00:24 < Leeol2> Zolmeister: Hmm, how would i correct that design so that an error breaks the whole thing?
+00:24 < Leeol2> Zolmeister: Note that all of the "promise" work is done by Sequelize, i'm simply consuming it... and trying to properly handle failures from the library, heh.
+00:24 < Zolmeister> I think instead of having and error catch for each 'then(callback,err)', just have a .fail() at the end
+00:25 <@isaacbw> Leeol2: don't think of promises as a means of chaining operations
+00:25 <@isaacbw> promises are containers for unfulfilled data
+00:26 <@isaacbw> using them to chain procedures is (in my opinion) a hack at best
+00:27 < Leeol2> hmm
+00:27 < Zolmeister> isaacbw: Not entirely true, promises help with nested callbacks, and depend on previous resolution responses
+00:27 < ningu> I prefer promooses
+00:28 < ckknight> hmm, anyone have any ideas on why when I run some code with the exact same arguments in a grunt task it takes about 60% longer?
+00:28 < Leeol2> Even if they didn't help with nested callbacks, my unfullfilled data needs to be done in a specific order
+00:28 <@isaacbw> but anyway, I think it's more useful to be able to handle previous failure
+00:29 <@isaacbw> this is a pretty good explanation: https://gist.github.com/domenic/3889970
+00:30 < Zolmeister> from that: ' More importantly, if at any point that process fails, one function in the composition chain can throw an exception, which then bypasses all further compositional layers until it comes into the hands of someone who can handle it with a catch.'
+00:32 <@isaacbw> Leeol2: what you probably want to do is not specify failure handlers
+00:32 <@isaacbw> until the end
+00:33 <@isaacbw> which is what Zolmeister was referencing
+00:33 < Leeol2> isaacbw, Zolmeister: Yea i think that is correct. It doesn't help when seemingly everyone has different implementations of Promises as well
+00:33 < Leeol2> (naming conventions, what is available, etc)
+00:33 < Leeol2> What i need to do, i think, is .success().success().success().error()
+00:35 < Havvy> Leeol2: Read the Promises/A+ spec.
+00:35 < ckknight> being able to yield promises is a very nice feature, makes code read almost synchronously
+00:35 < Leeol2> Havvy: Yea, going over that now
+00:35 < Havvy> ckknight: Yeah, but a synchronous throw/catch system is just weird.
+00:36 < ckknight> Havvy: how do you mean?
+00:36 < Havvy> Usually when you throw something, it goes up.
+00:36 <@isaacbw> promises are most useful in UI development where you can defer resolution until you actually add it to the screen
+00:36 < Havvy> With promises, when you throw something, it goes forward.
+00:36 < Havvy> Though...hmmm...
+00:37 < ckknight> Havvy: well, it goes to the next then sequence, which you can see as a try-catch wrapper.
+00:37 < ckknight> isaacbw: ooh, I can see that
+00:37 < Havvy> Yeah.
+00:37 < Havvy> It's still an inversion of control though. Right?
+00:39 < ckknight> Havvy: technically, but given the right sugar, it can appear as though it isn't
+00:39 <@isaacbw> promises would be way cooler in a language with operator overloading
+00:39 < ckknight> isaacbw: how so?
+00:39 < Havvy> isaacbw: I'm designing a language like that.
+00:39 <@isaacbw> you could manipulate them like values
+00:39 < Havvy> *that has that*
+00:40 < ckknight> GorillaScript already has that :P
+00:40 <@isaacbw> Havvy: sounds weaome
+00:40 <@isaacbw> *awesome
+00:40 < ckknight> http://ckknight.github.io/gorillascript/#promises
+00:40 < ckknight> actually, not really overloading, you can just add new operators ad-hoc
+00:40 < Havvy> https://gist.github.com/Havvy/5654593
+00:40 < ckknight> I think doing (yield promise) + whatever isn't too bad
+00:40 < Havvy> For what I have so far.
+00:40 < ckknight> as compared to primose + whatever returning another promise
+00:41 < Havvy> Unfortunately, I have no plans of actually implementing this language.
+00:44 < ckknight> Havvy: why's that?
+00:44 < Havvy> I've got higher priorities.
+00:44 < ckknight> fair point.
+00:44 < a__remie> when thinking about a multimillion scalable websocket/comet solution, what do you recommend, whats the most massively scalable way of doing comet.
+00:54 < progrock`> man, I feel stupid, i cant find how to set the gruid to be fluid (width 100%) in broubon/neat ... how is this not one of the most common examples, or in the comments or somehting
+00:54 < progrock`> getting real close to going back to Salsaa
+00:56 <@isaacbw> dependency bloat
+00:56 < progrock`> well guess $max-width: 100% works... tho weird considering the grid/gutter sizes are set to pixels.. will have to test some things out
+01:00 < ashnur> what kind of nodejs thing that is?
+01:00 < ashnur> burboun/neat?
+01:01 < ashnur> grid/gutter?
+01:01 < ashnur> i've never heard of it
+01:02 < Teja> Hello everyone
+01:03 < nathan7> ashnur: bourbon
+01:03 < nathan7> ashnur: http://bourbon.io/
+01:03 < Guest25201> Has anyone worked with nodejs + socketio?
+01:03 < nathan7> Guest25201: Plenty of people. What's your question/problem?
+01:03 < ashnur> thanks nathan7 
+01:05 < ashnur> heh. i don't see why people are still using things like sass
+01:06 < nathan7> 03:04:16 <Guest25201> Hi, I'm new on this, and I'm reading a book called Node in Action
+01:06 < nathan7> 03:05:02 <Guest25201> maybe you've heard about it... the problem is, that In the book there is a chat application to understand how node works
+01:06 < nathan7> Guest25201: Let's continue here
+01:06 < nathan7> Guest25201: see, I'm not all-knowing, and the rest of the channel is knowledgeable too
+01:06 < Guest25201> sure
+01:06 < nathan7> Okay, so there's a chat app in the book
+01:07 < nathan7> Guest25201: What's up with the chat app?
+01:07 < Guest25201> and I followed all the steps in the book, and the application works, but I'm trying to troubleshoot a part.
+01:08 < nathan7> Guest25201: Symptoms?
+01:08 < Guest25201> in the chat application I can send commands like "/join" or "/nick"
+01:08 < nathan7> Guest25201: Yep
+01:08 < Guest25201> it the application splits the string sent, and if it has a slash... it recognizes that is a command
+01:09 < Guest25201> and the executes different functions depending on the command itself.
+01:09 < nathan7> Guest25201: mhm
+01:09 < Guest25201> for some reason, I cannot do that... and I'm trying to follow the execution flow
+01:09 < Guest25201> (sorry for my english by the way)
+01:10 <@isaacbw> tried using hammer didn't work halp
+01:10 < nathan7> Guest25201: Could you gist your code? http://gist.github.com
+01:10 < nathan7> isaacbw: lol
+01:11  * nathan7 attacks streams1 compat with a hammer
+01:11 < Guest25201> I tried with alerts, and console.logs... but for some reason they don' t show up neither on the browser's console nor the cmd window which I use to start the server.js instance
+01:11 < Guest25201> let me see
+01:11 < NotMyself> anyone have a favorite tool or method for testing express request handlers?
+01:12 < ashnur> i am pretty sure that the hammer worked.
+01:12 < nathan7> hammers are among the most reliable of tools
+01:12 <@isaacbw> no it didn't work hammers are stupid
+01:13  * nathan7 pushes a button
+01:13 < nathan7> [MC Hammer appears.]
+01:13 < Guest25201> here you have a gist
+01:13 < Guest25201> https://gist.github.com/anonymous/5654667
+01:14 <@isaacbw> what's going on on line 22
+01:14 <@isaacbw> whitespace insanity
+01:15 < nathan7> They're tabs, isaacbw 
+01:15 < Lorentz> I went to a hackathon thing last weekend
+01:15 < nathan7> so the way they're displayed is.. close to random
+01:15 < Lorentz> ended up with a nodejs cms
+01:15 < nathan7> Did your hair catch fire, Lorentz?
+01:15 < Lorentz> hair on fire might've been a better idea
+01:15 < nathan7> oh. That's a much less interesting outcome.
+01:16 <@isaacbw> Lorentz: did you ask AAA_awright permission before doing it?
+01:16 < Lorentz> nope?
+01:16 < Guest25201> it starts in chat_ui: $('#send-form').submit(function(e){ 	alert("Hey!"); 	processUserInput(chatApp, socket); 	return false; });
+01:16 <@isaacbw> bastard
+01:17 < Lorentz> why, he working on one too?
+01:17 < Guest25201> then the processUserInput function is also in chat_ui
+01:17 < nathan7> Lorentz: he's the resident.. everything nazi.
+01:17 <@isaacbw> Guest25201: I don't understand whether you're making a node application or a browser app
+01:18 < Guest25201> is a browser app
+01:18 < Guest25201> is a chat app example to start understanding how nodejs works
+01:18 < nathan7> well, your HTML is missing
+01:18 <@isaacbw> it's a browser app to teach you how nodejs works? how's that
+01:19 < Lorentz> mine needs major refactoring to get plugins working, but it shooould be done soon
+01:19 < nathan7> isaacbw: every node book feels the need to do a chat app first
+01:19 < nathan7> isaacbw: socket.io, nice and far from what's actually going on
+01:19 <@isaacbw> which is odd imo. The most inuitive first app should be a simple api
+01:19 < Guest25201> I don't know... I just follow the book :P
+01:19 < nathan7> My first app was.. a proxy to save me from school homework
+01:20 <@isaacbw> Guest25201: do you understand that nodejs is separate from the browser?
+01:20 < Guest25201> yes
+01:20 < nathan7> Because HTTP MITM in Python was *slow*
+01:20 < nathan7> (and Twisted is no fun)
+01:21 <@isaacbw> python has always felt a little dirty to me
+01:22 < nathan7> isaacbw: It's a blunt knife.
+01:22 < nathan7> isaacbw: You can't do anything that might hurt.
+01:22 < Guest25201> well... I need to output any kind of message to see if goes or not into any function
+01:23 < Guest25201> because for some reason, the "nick" command is not working
+01:23 < nathan7> I carry a sharp knife in my pocket. If I leave it at home in the morning I'm insane by the time it's evening.
+01:24 <@isaacbw> lol
+01:26 < nathan7> isaacbw: You have a piece of packaging.
+01:26 < nathan7> isaacbw: solution a) carefully open it
+01:26 < nathan7> isaacbw: solution b) knife the shit out of it
+01:27 < Guest25201> Wut?
+01:27 < Guest25201> hahahahaha
+01:31 < Guest25201> Nathan, Isaac, any way to troubleshoot the server.js, chat_server.js??
+01:32 < nathan7> I'm sorry, I'm really falling asleep, it's past 3AM here
+01:32 < Guest25201> oh, ok, well, have some rest, I'll try to figure this out someway
+01:33 < Guest25201> Thanks guys!
+01:58 < vampi-the-frog> hi guys. I'm trying to figure out why connection: keepalive isn't working properly with http.request()
+01:58 < vampi-the-frog> the node client sends the Connection: Keep-Alive header to the server (the server is written in C++), and the server then replies with Connection: Keep-Alive, but the client still closes the connection
+02:02 < vampi-the-frog> it actually seems to be opening up two connections, even though I make sure I make the second request after the first response
+02:03 < vampi-the-frog> it seems to have something to do with the connection pool
+02:04 < vampi-the-frog> http://pastie.org/7965960
+02:06 < vampi-the-frog> I've tested my server with ab, and the connection is reused properly
+02:06 < noobee> what is the difference between connect-session and express session
+02:07 < rvagg> Domenic_: you haven't run in to issues about random random EBAD, ENOENT, ENOTEMPTY, EMMFILE errors when installing *lots* of dependencies in your travels through npm-issues-land?
+02:08 < ningu> rvagg: what's become of the plan to split out components from restify>
+02:08 < ningu> ?
+02:08 < vampi-the-frog> and on second look, the client seems to be sending the TCP FIN and ACK packets, so it is the one that's closing the connections :(
+02:08 < rvagg> ningu: I've done it an am using lots of the components for my own web stuff, I haven't kept up to date with the latest restify though
+02:08 < rvagg> ningu: hang on, lemme give you some links
+02:09 < ningu> just wondering, cause on nodeup 44 the author of restify said he wanted to split things out but hadn't gotten around to it
+02:09 < rvagg> ningu: https://github.com/rvagg/node-restify/tree/modularise/modularise
+02:09 < rvagg> see the "build" directory there, each of those is in npm
+02:10 < rvagg> e.g. https://npmjs.org/package/restify-plugin-gzip
+02:10 < ningu> cool, thanks
+02:11 < rvagg> ningu: thb, I haven't spoken to mark about this, it's a purely selfish exercise at the moment but I probably should document it more and get back to him
+02:11 < ningu> hmm ok
+02:11 < ningu> I figured maybe it was somethign you were doing to help him out
+02:12 < ningu> the question I have is how you can split it out without making the pieces dependent on restify itself
+02:12 < ningu> since it modifies req/res prototypes
+02:14 < rvagg> ningu: yeah, that's awkward, but I've solved that by making those separate too
+02:15 < ningu> rvagg: btw, what's your view on the design decision in restify to have both .use and .pre?
+02:15 < rvagg> ningu: so there's restify-request and restify-response in npm too
+02:15 < ningu> ah, ok
+02:16 < rvagg> ningu: meh, not something I'm to worried about because I don't actually use restify directly, I like its components but not it as a monolith
+02:16 < ningu> ah ok
+02:17 < ningu> I'm just a bit confused what the design intention is behind it
+02:43 < mscdex> quick poll: given a query string "?foo&bar=baz", would you consider 'foo' to be a key with no value or a value with no key?
+02:43 < ningu> it's not a valid string
+02:44 < mscdex> eh?
+02:44 < ningu> I'm pretty sure the = is required
+02:44 < ningu> but if not, it would be a key with no value
+02:47 < mscdex> it may be required according to the RFC, but many places do things like that
+02:47 < deoxxa> mscdex: key with no value
+02:47 < deoxxa> at least, that's how i've always interpreted that kind of thing
+02:48 < deoxxa> the other way is arguably more useful though
+02:49 < mscdex> yeah
+02:50 < ningu> there should be a spec (of sorts) for how to implement HTTP to comply with actual behavior
+02:50 < deoxxa> "http for the real world"
+02:50 < deoxxa> (not a thing; should be)
+02:50 < ningu> I guess you can reverse engineer it from implementations
+02:51 < mscdex> ningu: hopefully http 2.0 fixes things ;-)
+02:51 < ningu> someone on nodeup said that iOS adds "/?" to all urls, I was somewhat baffled by that
+02:51 < ningu> I can't really believe it
+02:51 < deoxxa> wow, really?
+02:51 < deoxxa> that's kind of terrible
+02:51 < ningu> maybe I misunderstood
+02:51 < ningu> they were giving examples of horrible things you don't want to worry about on your own
+02:52 < deoxxa> ha
+02:52 < ningu> basically why connect is useful despite sucking
+02:52 < ningu> or something like that
+02:53 < deoxxa> lol
+02:53 < deoxxa> makes sense
+02:54 < ningu> I didn't really understand the point they made that connect breaks streams
+02:55 < ningu> i guess they mean you can't use the chain as a set of methods in a transform stream
+02:55 < ningu> but it was assumed rather than explained
+03:13 < garthk> Hmm.
+03:14 < garthk> Wondering how far one can take job queueing. 
+03:18 < ningu> garthk: about 500 miles
+03:19 < chilts> ## But I would walk 500 miles an' I would walk 500 more ... :)
+03:19  * chilts puts the song into everyone's head
+03:21 < garthk> Yaargh! 
+03:21  * garthk hates chilts.
+03:22 < someprimetime> I'm looping through a mongo collection with forEach… `comments` is the collection and I'm using `comments.forEach(function(comment) { //do stuff }); but I'm getting TypeError: Cannot call method 'forEach' of undefined at runtime
+03:22 < someprimetime> do I need to do a toJSON() on that collection or something?
+03:22 < garthk> Well, I'm planning to hook up an OAUTH2 thingy, and a… naah, you're right. No point hiding another API behind a REST API. Just use REST as the bloody API. :)
+03:22 < ningu> someprimetime: it isn't a mongo collection. it's undefined ;)
+03:23 < someprimetime> ningu: when I console log it, it prints out the collection contents
+03:23 < someprimetime> e.g. 3 records
+03:23 < ningu> someprimetime: hmm... that's a bit odd.
+03:23 < someprimetime> I'm using async.waterfall()
+03:23 < ningu> I don't understand why you'd get that error unless it was undefined
+03:23 < ningu> is the console.log in the same place as the forEach?
+03:24 < someprimetime> ningu: http://pastebin.com/3B1khVYE
+03:24 < someprimetime> it's right above it
+03:24 < deoxxa> god damn it chilts
+03:24 < chilts> deoxxa: :-p
+03:24 < chilts> sing it with me?
+03:25 < someprimetime> Error I get it: 				comments.forEach(function(comment) {  ^ TypeError: Cannot call method 'forEach' of undefined
+03:25 < chilts> man, that's better than a Rick-roll
+03:25 < deoxxa> when i wake up! yeah i know i'm gonna be! i'm gonna be the man who wakes up next to you!
+03:25 < chilts> ewwww
+03:25 < deoxxa> you asked for it
+03:25 < deoxxa> literally!
+03:25 < chilts> I'm gonna be the man who comes back home to yooou!
+03:26 < deoxxa> wooo
+03:26 < ningu> someprimetime: incidentally I have no idea why you're using async.waterfall since none of that is async
+03:26 < someprimetime> ningu: this is a method being called from another async.waterfall I have and the event loop fires too quickly so I needed it to do it in a serial manner
+03:26 < someprimetime> maybe I'll use async.serialize()
+03:27 < someprimetime> bu
+03:27 < ningu> err... huh?
+03:27 < someprimetime> s/bu//
+03:27 < ningu> that doesn't make any sense
+03:27 < someprimetime> s/serialize/serial
+03:27 < ningu> you can call this method in a callback, sure
+03:27 < garthk> someprimetime: shove it into a stream?
+03:27 < ningu> but the method itself is not async
+03:28 < ningu> that is, there is no need in the code you've pasted for async.waterfall
+03:28 < ningu> just do the forEach's
+03:28 < someprimetime> ningu: no
+03:28 < someprimetime> one sec i'll explain
+03:28 < ningu> someprimetime: you're missing something basic here
+03:28 < ningu> if you show me the code where you call nestChildComments I'll be able to help
+03:28 < someprimetime> k one sec
+03:29 < ChrisPartridge> not to mention callback is never called, in either of those methods
+03:29 < someprimetime> ChrisPartridge: it's not even done yet
+03:29 < someprimetime> it's becoming huge though since this is for my view
+03:29 < someprimetime> an
+03:29 < ningu> yeah, I was assuming that was an oversight
+03:29 < someprimetime> one sec
+03:29 < someprimetime> posting all code
+03:29 < ChrisPartridge> dooo it
+03:29 < ningu> and the real issue is how nestChildComments is being called
+03:30 < ningu> I count myself fortunate that I don't recognize chilts's song
+03:31 < ningu> at least, not by those lyrics
+03:31 < chilts> ningu: you're missing out! :)
+03:31 < chilts> it's a classic
+03:31 < someprimetime> http://pastebin.com/xx65KT7Z
+03:31 < someprimetime> that's all the code for my render view
+03:32 < someprimetime> i switch between fn and callback for my callbacks fwiw
+03:33 < garthk> someprimetime: I try to stick to callback if it can take err as the first argument; else fn.
+03:33 < ningu> line 181 should be if (err) to test for error
+03:33 < someprimetime> ningu: +1 yeah i plan to go back and do something about handling all my errs before i deploy
+03:34 < someprimetime> probably will write some shitty logging system
+03:34 < someprimetime> but i wanted to normalize them all
+03:34 < ningu> as for your nestChildComments thing you definitely don't need the async code
+03:34 < someprimetime> usually i'll just if(err) throw err;
+03:34 < ningu> but I don't see why comments is showing up as undefined
+03:34 < deoxxa> someprimetime: http://npm.im/leg :>
+03:34 < deoxxa> someprimetime: re: shitty logging system :P
+03:34 < someprimetime> deoxxa: cool thx
+03:35 < ningu> someprimetime: the reason I mentioned that is you do kinda test for errors w/ if (comments) but that isn't really how you should do it
+03:35 < someprimetime> ningu: without it, it seemingly wasn't executing it
+03:35 < someprimetime> ningu: ah k so just test for err and then do my callback
+03:35 < someprimetime> then in the caller check for comments
+03:35 < ningu> right, if (err) fn(err, comments); else { ... }
+03:36 < someprimetime> k
+03:36 < ningu> but I doubt that's the source of the issue
+03:36 < ningu> no idea what you mean when you say it wasn't executing it
+03:36 < ningu> anyway, that code is not async and you don't need async.waterfall
+03:37 < ningu> if something is going wrong it could be due to some other incorrectly written async code
+03:37 < someprimetime> ningu: i'll investigate that more
+03:37 < ningu> oh, also
+03:37 < someprimetime> i think i may have something else then messed up elsewhere
+03:37 < ningu> with it being async there's no way you can do, comments = nestChildComments(comments);
+03:37 < ningu> since you can't return from an async method that way
+03:38 < ningu> but if you make it sync you can just do return comments; or whatever
+03:38 < ningu> I mean, async will work but it's kind of pointless complexity
+03:38 < someprimetime> ok
+03:38 < ningu> you'd have to do nestChildComments(comments, function(err, comments) { ... }) or whatever
+03:39 < ningu> but without gaining anything
+03:40 < ningu> also, why do you  declare all those vars at the top like that?
+03:40 < ningu> you could just do function getComments(...) { ... }
+03:40 < ningu> it would work the same
+03:41 < someprimetime> ningu: eh idk habit from jshint
+03:41 < ningu> function declarations don't have to be at the top level
+03:41 < ningu> well, the way you did it is pretty nasty
+03:41 < deoxxa> ah, linters
+03:41 < someprimetime> i like it nasty
+03:41 < deoxxa> i swear they do more harm than good
+03:41 < ningu> whatever gets you off
+03:42 < deoxxa> this 48oz bag of reese's pieces was a bad idea
+03:42 < ningu> for who?
+03:42 < deoxxa> me
+03:42 < deoxxa> :<
+03:42 < ningu> I'm sure it was a good idea for someone
+03:42 < ningu> your task: identify that person
+03:42 < ningu> or animal
+03:43 < deoxxa> presumably the person and/or animal who profited from my ill-conceived purchase
+03:43 < ize> New to node.js, please let me know if there is a better forum for this question. Is there any node framework that auto generates a CRUD admin interface (the way Django does)?
+03:44 < ningu> ize: afaik, not to the same level of detail
+03:44 < ningu> there is a pretty decent form generator called newforms2
+03:45 < ChrisPartridge> someprimetime: why not break that out into middleware, so each method in that file attaches relevant data to the request - would be a lot more readble/managable in the end
+03:45 < ningu> but the node community is generally against large, monolithic frameworks
+03:45  * ningu out
+03:45 < someprimetime> ChrisPartridge: yeah probably but i'm farily new to noe
+03:45 < someprimetime> node
+03:45 < someprimetime> and wanted to get this site up
+03:45 < someprimetime> could always refactor later
+03:45 < someprimetime> been kind of learning as i go
+03:46 < ize> thanks, ningu
+04:55 < jbergstroem> just got a crash on 0.10.8 which I can't reproduce with 0.10.7: ./deps/uv/src/unix/stream.c:726: uv__write: Assertion `stream->write_queue_size == 0' failed.
+04:55 < jbergstroem> will investigate further
+04:57 < jbergstroem> looks like https://github.com/joyent/libuv/commit/c53fe815442559fe58f362279bdc63f5483d6fdb
+05:09 < innociv> http://www.youtube.com/watch?feature=endscreen&v=D8kK1SG3TnM&NR=1
+05:09 < machrider> hey, i'm creating a new package from scratch, package.json lists a couple dependencies (ember and dropbox), but npm install doesn't install them. is there something special i have to do to make that happen?
+05:10 < machrider> npm install just silently returns
+05:16 < Shawk> Can anyone help an idiot for a sec?
+05:17 < ChrisPartridge> Shawk: IRC 101, just ask, don't ask to ask :)
+05:18 < ChrisPartridge> machrider: so zero output from npm?
+05:18 < Zolmeister> anyone listening to some good music that they want to suggest? (no dubstep/rap)
+05:18 < EvRide> explosions in the sky and mogwai if you haven't heard of either yet, great late night and programming music
+05:18 < ChrisPartridge> Zolmeister: I've resorted to spotify, 80/90's hits ftw :)
+05:18 <@mbalho> relevant answer https://soundcloud.com/substack
+05:19 < machrider> ChrisPartridge: yeah, zero output
+05:20 < Shawk> Sorry, I just need help getting started with installing a specific irc bot for my twitch channel, https://github.com/SupremoRTD/LoyaltyBot
+05:20 < Zolmeister> mbalho: wow.. thats.. um.. quite something 
+05:20 < ChrisPartridge> machrider: weird, perhaps start with gist/pastebin'ing your package.json
+05:20 < ChrisPartridge> Zolmeister: put on the last one "wubby", volume high
+05:21 <@mbalho> Zolmeister: its 100% generated by node
+05:21 < machrider> ChrisPartridge: http://pastie.org/7966506
+05:22 < machrider> oops, ignore the <> brackets around the email. that's not causing the issue though.
+05:22 < Zolmeister> mbalho: do you actually listen to this? or was it just a node experiment
+05:23 < machrider> LOL ... helps if you spell dependencies correctly
+05:24 < ChrisPartridge> machrider: check your spelling mate :-)
+05:24 < ChrisPartridge> haha
+05:24 < machrider> talking to the rubber duck always helps
+05:25 < ChrisPartridge> i thought you were trolling for a moment there :P
+05:25 < mscdex> woot! new module release! \o/
+05:34 < ChrisPartridge> mscdex: spill the beans
+05:37 < mscdex> ChrisPartridge: html form data parser
+05:37 < mscdex> all streaming
+05:37 < mscdex> no saving to disk
+05:38 < ningu> you mean uploaded files?
+05:38 < mscdex> not just files
+05:38 < ningu> ok but not sure why disk would be relevant otherwise
+05:38 < chilts> mscdex: a replacement for formidable?
+05:38 < mscdex> the saving to disk park was in the context of files, yes
+05:38 < ningu> I don't recall why but I was never very happy with formidable
+05:38 < mscdex> s/park/part
+05:39 < mscdex> chilts: well, at the very least, an alternative
+05:39 < chilts> good to know
+05:39 < ningu> btw have any of you used bitbucket.org?
+05:39 < chilts> ningu: I use it
+05:39 < ningu> seems like a good alternative to github for private repos
+05:39 < gkatsev> yes, bb is good
+05:39 < ningu> any hidden catch?
+05:39 < chilts> yeah, $10/mth and unlimited repos is why I use it
+05:39 < px> it's good
+05:40 < ningu> ok :)
+05:40 < ningu> I don't need unlimited repos (for now)
+05:40 < mscdex> i've never cared for bitbucket's user interface
+05:40 < px> not as much momentum as github
+05:40 < gkatsev> it's free for up to 1GB of storage, or something like that
+05:40 < chilts> none that I'm aware of ... great for private use since you don't mind that it doesn't have lots of users
+05:40 < chilts> I don't like the itnerface either, but I just use it for storing my repos :)
+05:40 < chilts> it's great for that small and limited use-case
+05:40 < ningu> this may seem an odd question but can you have public issue reporting on a private repo?
+05:40 < gkatsev> also, bb gives you mercurial, if you like
+05:40 < chilts> ningu: dunno
+05:40 < gkatsev> ningu: doubt it.
+05:40 < ningu> like, if the private repo provides a public api and someone wants to report a bug
+05:41 < gkatsev> ningu: you could just make a secondary repo that is just for the issues
+05:41 < ningu> yeah, I might
+05:41 < chilts> true dat
+05:41 < ningu> seems a bit silly but whatever
+05:41 < kuja> i love bb only for its free private repos
+05:41 < Zolmeister> ningu: or.. make it public :)
+05:41 < gde33> rodyhaddad would like to note that he fixed his irc client and he would like to be unbanana
+05:41 < ningu> Zolmeister: it doesn't seem that advisable to make my backend api code public
+05:42 < Zolmeister> ningu: Oh really? how come?
+05:43 < ningu> I don't know. no one else has direct access to the database so no one else can directly use it unless they make a new database. so I don't really see the point, and it might make it easy for people to figure out weaknesses.
+05:43 < sinclair|net> http://pastebin.com/2fiB415a <--- quite nice FTP client if anyone is interested
+05:43 < ningu> but I guess, security through obscurity and all that...
+05:43 < Zolmeister> ningu: exactly
+05:43 < gkatsev> yes, having people find weaknesses is a good thing
+05:44 < gde33> anyone who can help that guy?
+05:44 < ningu> Zolmeister: is it actually normal practice to release api code?
+05:44 < Zolmeister> ningu: idk, thats a good question
+05:44 < ningu> yeah, I don't know either but I assumed it was not
+05:44 < gkatsev> newsblur is fully open source
+05:44 < gkatsev> you can run it yourself if you want
+05:44 < gkatsev> but it's also available on newsblur.com
+05:45 < Zolmeister> ningu: there are a good number of public services with their source available on GitHub
+05:45 < ningu> I mean, you *could* run our api yourself but you wouldn't have the data to do it, unless you used the api to extract most of it :)
+05:45 < ningu> ok, I'll keep that in mind
+05:46 < ningu> ultimately isn't my call but it's good to know what is the norm
+05:47 < ningu> oh another api question, is there any sensible/standard/whatever way of providing a way to programmatically introspect an api, or do people just provide web docs?
+05:47 < ningu> it's accessible from api.domain.com and I might just make GET api.domain.com provide a redirect to the api docs
+05:48 < Zolmeister> ningu: there is, its called SOAP
+05:48 < ningu> sigh
+05:49 < Zolmeister> ningu: https://developers.helloreverb.com/swagger/
+05:49 < Shawk> Can anyone help me understand how to install this, https://github.com/SupremoRTD/LoyaltyBot - it's a bot for my twitch channel, no clue how to get started
+05:49 < sinclair|net> Zolmeister: i have another way
+05:50 < sinclair|net> Zolmeister: SOAP isn't all bad, the best part about soap was the WSDL format
+05:50 < ningu> Shawk: doesn't have a package.json so that's annoying
+05:50 < ningu> Shawk: I would just git clone the repository I guess
+05:51 < sinclair|net> Zolmeister: and SOAP and WSDL are not mutually inclusive
+05:51 < ningu> WSDL on nodeup 44 was a punchline
+05:51 < sinclair|net> ningu: what is wrong with WSDL?
+05:51 < sinclair|net> nothing, that's what
+05:51 < ningu> sinclair|net: I wasn't on nodeup 44
+05:51 < ningu> I'm just informing
+05:51 < Zolmeister> sinclair|net: its XML...
+05:52 < sinclair|net> Zolmeister: doesn't have to be tho
+05:52 < Shawk> I downloaded it, just not sure where to go from there. Like I don't even understand the basics of installing something like this. 
+05:52 < Zolmeister> sinclair|net: yes it does, otherwise you wont be following spec
+05:52 < ningu> Shawk: you mean you did git clone https://github.com/SupremoRTD/LoyaltyBot.git ?
+05:52 < sinclair|net> Zolmeister: no, what i am saying is the principle behind WSDL is correct, but the format need not be XML
+05:53 < ningu> Shawk: anyway, it's clearly intended for someone who has some knowledge of node already
+05:53 < sinclair|net> Zolmeister: im currently working on such things atm
+05:53 < Shawk> Oh ok, yeah I don't even know what git clone means =P
+05:53 < sinclair|net> Zolmeister: you know why WSDL is good tho right?
+05:53 < Zolmeister> sinclair|net: Oh, yeah definitely, there was a post on HN a few weeks ago about a spec
+05:54 < sinclair|net> Zolmeister: there are legacy application stacks that rely on WSDL in its XML state formalize RPC, as well as enable the rich tooling around it
+05:54 < sinclair|net> Zolmeister: however !!!
+05:54 < Zolmeister> http://jsonapi.org/
+05:55 < sinclair|net> there is no way to "infer" a WSDL document from JS but it is entirely possible in other languages
+05:55 < sinclair|net> in JS along, the best you could hope for is hacked up JSDOC comments
+05:55 < sinclair|net> *alone
+05:55 < Zolmeister> sinclair|net: check the link i posted
+05:56 < sinclair|net> Zolmeister: its not really all that impressive 
+05:57 < ningu> simple things are often the best
+05:57 < sinclair|net> Zolmeister: it doesn't really address the type of things its passing 
+05:58 < sinclair|net> Zolmeister: see http://jsonapi.org/format/ "Compound Documents"
+05:58 < Zolmeister> sinclair|net: well, then what about swagger?
+05:59 < sinclair|net> Zolmeister: still not solving the problem
+05:59 < ningu> what problem?
+06:00 < sinclair|net> Zolmeister: assume you write a REST-ful API in nodejs, and all of a sudden, people want to consume that API
+06:00 < Zolmeister> sinclair|net: ok, go on
+06:01 < sinclair|net> Zolmeister: 1) not everyone codes in nodejs, 2) most languages (and programmers) prefer having a Typed operational contract between their code and whatever the server expects
+06:02 < px> wsdl is just dreaming
+06:02 < sinclair|net> Zolmeister: let's say, for example, i was writing a client of "your" API in Java, and i need to talk to your JSON API
+06:02 < sinclair|net> in Java
+06:02 < Zolmeister> sinclair|net: Oh... I understand now
+06:02 < px> do you even have a operational contract for your internal apis
+06:02 < sinclair|net> px: it would be wise to
+06:02 < px> why should a remote api have one
+06:02 < Zolmeister> outside of web is what your talking about
+06:02 < px> pipe dreams
+06:02 < sinclair|net> px: how so?
+06:03 < px> like what does wsdl actually help vs an API document: it just helps with an IDE to autofill methods
+06:03 < sinclair|net> px: i have been using wsdl with and without SOAP for years, and have gotten an extraordinary amount of mileage out of it.
+06:04 < px> that's just b/c the normal SOAP is so painful without wsdl
+06:04 < px> if you were using rest you wouldn't need it
+06:04 < sinclair|net> px: i don't really think you know what you are talking about, but no matter, keep on not using wsdl
+06:05 < ningu> sinclair|net: you haven't really explained what problem it solves
+06:05 < px> you'd have to pay me a million bucks to use soap again
+06:05 < ningu> using a RESTful API from Java is not exactly more of a challenge than from node
+06:05 < sinclair|net> px: wsdl is not SOAP, learn the difference
+06:05 < brainproxy> yin-yang puzzle and callCC for JavaScript
+06:05 < brainproxy> https://gist.github.com/michaelsbradleyjr/5655300
+06:05 < brainproxy> :D
+06:05 < px> pretty much only used with soap
+06:05 < ningu> I don't think a well designed API should require a client other than an http agent
+06:05 < sinclair|net> ningu: well, how is a Java developer going to construct the messages?
+06:06 < brainproxy> well callCC built atop Continuation monad, kind of like Haskell's callCC
+06:06 < ningu> sinclair|net: if they are JSON, it isn't hard to construct them in JSON
+06:06 < ningu> sorry in Java
+06:06 < sinclair|net> ningu: what happens if the message format changes
+06:06 < sinclair|net> ?
+06:06 < ningu> sinclair|net: versioned API on the server end, with Accept-Version header
+06:07 < sinclair|net> ningu: so, how are you going to document each version?
+06:07 < ningu> human-readable documentation unless you can convince me otherwise
+06:07 < sinclair|net> ningu: what means are you going to provide to your clients to allow them to upgrade easily, are you going to make them work for it to use version 2?
+06:08 < paradoxquine> anyone mind advising me on how to properly spy on winston calls with sinon? winston is doing some dark magic that is breaking the spy
+06:08 < ningu> sinclair|net: if it's an upgrade worth using I don't see how it could be done without some code changes on the client side
+06:08 < brainproxy> hypermedia APIs ftw :D
+06:09 < sinclair|net> ningu: with WSDL, ive been able to dynamically build client API for several different languages at the click of a button, in fact, its completely automatic, as the builds are based entirely off the wsdl
+06:10 < sinclair|net> so, you can offer clients a updated API without having them, or you, actually have to code a thing
+06:10 < sinclair|net> ningu: powerful stuff
+06:10 < ningu> ok but that just sounds like an API on top of the API
+06:10 < ningu> then you have to use the WSDL generated thingy and whatever it provides you
+06:11 < sinclair|net> ningu: there is a huge amount of tooling that already exists for clients to generate proxies based on wsdl, offering a wsdl document lets them create proxies with their tools
+06:12 < sinclair|net> ningu: or, if you want control over how the client api should be structured (and have it be consistent) you can read into wsdl on your own to generate the code
+06:13 < sinclair|net> ningu: note that WSDL tooling often has varying ideas on what the client proxy should look like.
+06:13 < ningu> it just makes more sense to me to use the server API directly
+06:13 < ningu> one less layer
+06:13 < sinclair|net> its not a layer
+06:13 < brainproxy> sinclair|net: did you ever check out Amundsen's book on hypermedia APIs
+06:13 < chilts> it's a description of the API, that's all
+06:13 < sinclair|net> brainproxy: ill take a look after this conversation, thanks
+06:13 < brainproxy> explores the subject in terms of Nodejs
+06:13 < brainproxy> sure, sorry for butting in
+06:14 < ningu> ok, but it sounds like when you say "generate a client API" you are generated a layer which accesses the server API
+06:14 < ningu> and has its own protocol that you determine
+06:14 < ningu> generating*
+06:14 < sinclair|net> the "layer" or proxy is something that runs on the client
+06:14 < ningu> right, I know
+06:14 < sinclair|net> ningu: its given to a client so they don't have to bust their ass writing and formatting json, especially if their language isn't gear up for it
+06:15 < ningu> but it means the client is not dealing directly with the server API but is accessing it via an intermediary that can be relatively complex
+06:15 < ningu> I have never heard of someone having to bust their ass writing and formatting JSON. ever.
+06:15 < sinclair|net> ningu: most languages require types
+06:16 < sinclair|net> and messages (json) in those languages would need to be typed in order to be useful 
+06:16 < brainproxy> ningu: have you looked at some json-based hypermedia formats, e.g. HAL, JSON-LD, Siren?
+06:16 < ningu> sure, but an associative array is a type, number is a type, etc.
+06:16 < ningu> brainproxy: nope, not yet
+06:17 < brainproxy> sadly, json on it's own isn't really hypermedia
+06:17 < brainproxy> well maybe sadly isn't the right qualifier
+06:17 < sinclair|net> ningu: anyway, as it stands, there is no way to automatically introspect the request, response and methods of a service
+06:17 < ningu> well, it isn't really anything on its own besides data with a low level structure
+06:17 < sinclair|net> ningu: in JavaScript
+06:17 < ningu> sinclair|net: yes, that much seems clear
+06:17 < sinclair|net> ningu: which is yet another reason i don't code in JavaScript, and use TypeScript instead
+06:18 < sinclair|net> but lets not go there
+06:18 < Zolmeister> sinclair|net: WHAT?!
+06:18 < Zolmeister> sinclair|net: say it ain't so!
+06:18 < ningu> I should put you in touch with my friend who works on visual studio so you can get the latest gospel from MS straight from the source :P
+06:18 < sinclair|net> Zolmeister: i really dislike JavaScript, and i like static typing, so.....
+06:19 < ningu> I like dynamic skyping
+06:19 < sinclair|net> Zolmeister: TS eases my pain when developing on node, and gives me a type system i can use for things like this (generating service contracts / wsdl)
+06:19 < brainproxy> static typing is nice, but if I had to choose between that and persistent data structures, I would choose the latter
+06:19 < Zolmeister> ^
+06:19 < brainproxy> and now, thankfully, you can do persistent data structures w/ plain vanilla js
+06:19 < brainproxy> ala "mori"
+06:20 < ningu> but mori means "you will die"
+06:20 < ningu> doesn't sound persistent
+06:20 < brainproxy> no, it's from some japanese word
+06:20 < brainproxy> for forest
+06:20 < sinclair|net> brainproxy: sorry, i don't see the comparison between persistent data structures and static typing
+06:21 < brainproxy> they're apples and oranges
+06:21 < brainproxy> I mean if I had to choose one or the other
+06:21 < ningu> fuji apples apparently
+06:21 < sinclair|net> brainproxy: they server completely different purposes, vastly different, i don't know how they could be compared is what i am saying
+06:22 < sinclair|net> ningu: have you noticed a trend in JS tho?
+06:22 < sinclair|net> ningu: backbone models, mongoose models etc?
+06:22 < brainproxy> i was just throwing it out there... i have hopes that somehow we can get a la carte stronger typing for js
+06:22 < brainproxy> but we'll see
+06:22 < sinclair|net> ningu: why do you suppose backbone and mongoose models exist ?
+06:23 < ningu> sinclair|net: sure. imo it hasn't really been done well in JS yet. maybe in backbone, haven't looked at it
+06:23 < sinclair|net> ningu: those "models" are just trying to compensate for the fact that JS doesn't have a type system
+06:23 < ningu> sinclair|net: anyway, there is a big difference between imposing constraints on collections of primitive types, and expanding the number of types
+06:24 < ningu> no, in mongoose it's compensating for the fact that mongo doesn't
+06:24 < ningu> RDBMS's do have a type system, but ORMs still have models
+06:24 < sinclair|net> ningu: yesss, and for people who like being consistent about they data they persist to data stores, a ORM is important..
+06:24 < ningu> because part of their job, rightly or wrongly, is to move that logic into the application code
+06:25 < ningu> actually, I prefer to define as many constraints in one place as possible
+06:25 < sinclair|net> but a ORM in other languages a ORM model is just a class, in JS, they hack it all up to compensate
+06:25 < ningu> and since an RDBMS is among other things basically designed to enforce constraints, I put them there
+06:26 < sinclair|net> ningu: what i would like to see, if some consensus on how to model data structures with JS
+06:26 < sinclair|net> *is some
+06:27 < sinclair|net> ningu: you don't "need" a class, you just need a library that enables you to define a class, and "EVERYTHING" should be using it
+06:27 < sinclair|net> ningu: such that a backbone model should be exactly the same as a mongoose model
+06:28 < ningu> yeah, it's kind of frustrating that there is variation in how classes are implemented in JS
+06:28 < ningu> although there are only a couple ways it's done
+06:29 < sinclair|net> ningu: the biggest benefit here is that you could then reflect into the models properties, methods and types
+06:29 < sinclair|net> ningu: but i ask you, how would one in JS go about describing the following in one of those models...
+06:30 < sinclair|net> public string method(int number, string name, byte[] data ) {} <-- describe that with JS syntax , in the context of a JS model framework
+06:31 < sinclair|net> ningu: those model frameworks do well at describing properties, but fail at describing method signatures 
+06:31 < Zolmeister> Backbone.Model.extend({number: null, string: null, data: []})
+06:31 < ningu> sounds plausible given how types work in JS
+06:31 < Zolmeister> :)
+06:32 < sinclair|net> Zolmeister: missing the return type
+06:32 < sinclair|net> Zolmeister: also, data is an array of bytes
+06:33 < sinclair|net> Zolmeister: but, lets say instead of byte[]data, replace it with string[]data.
+06:33 < Zolmeister> sinclair|net: I know, it was more of a statement that dynamically typed languages are the best
+06:33 < syskk> is there a tuto out there on managing your own private repo?
+06:33 < syskk> (npm repo)
+06:34 < sinclair|net> Zolmeister: well, dynamically typed languages are ok, but they throw a lot of good things out, i think i like optional typing better
+06:34 < Zolmeister> syskk: you mean releasing  lib?
+06:34 < JamesMGreene> isaacs: Do I need to verify a dir exists before I use rimraf on it?
+06:34 < syskk> no, hosting your own alternative repository for private modules
+06:34 < sinclair|net> Zolmeister: ever used C#?
+06:35 < deoxxa> syskk: https://github.com/isaacs/npmjs.org
+06:35 < syskk> deoxxa: thanks
+06:35 < Zolmeister> sinclair|net: nope
+06:35 < sinclair|net> Zolmeister: you know, C# is the inverse to TypeScript in terms of typing
+06:35 < JamesMGreene> isaacs: *rimrafSync
+06:35 < sinclair|net> its kinda interesting in a way
+06:36 < medice> javascript is a bit troublematic in that abstraction and information hiding isn't so well done and it can make it difficult to see how some library was meant to be used
+06:36 < sinclair|net> Zolmeister: in TS, you have the option to type, but by default its dynamic in all the ways JS is dynamic
+06:36 < sinclair|net> Zolmeister: in C#, you have the option to to go dynamic, but by default its statically typed.
+06:37 < Zolmeister> sinclair|net: how does that work?
+06:37 < Zolmeister> (C#)
+06:37 < JamesMGreene> medice: GENERALLY that is a result of the ignorance/lazyness of the author, not of JS as a language
+06:37 < sinclair|net> Zolmeister: do you know about ES6 Proxies?
+06:37 < Zolmeister> yes
+06:37 < sinclair|net> C# has something similar, but there, its call the DLR (Dynamic Language Runtime)
+06:37 < syskk> Would be cool to have a npm registry that uses authorization for private modules.
+06:37 < ningu> syskk: make a private repo
+06:38 < mdel> syskk, you could add your own of course
+06:38 < ningu> the npm code is open source
+06:38 < paradoxquine> anyone know about spying on winston?
+06:38 < sinclair|net> Zolmeister: basically what it means is that things that are "typed" as dynamic don't get caught up in the compiler, and calls made on that dynamic thing are resolved at runtime, not compile time...
+06:38 < sinclair|net> Zolmeister: so for example...
+06:38 < sinclair|net> dynamic obj = new {}; <-- new dynamic object 
+06:38 < syskk> right. I guess one solution for now is to use private git repos to reference dependencies in your package.json
+06:39 < paradoxquine> or why there would be an object that stringifies to "some string" but toString()s to...undefined
+06:39 < sinclair|net> Zolmeister: the compiler would not complain if you had the line....
+06:39 < sinclair|net> obj.method();; // directly under that line
+06:39 < Havvy> sinclair|net: You probably won't like this:  https://gist.github.com/Havvy/5654593
+06:39 < Havvy> (With an example at the bottom.)
+06:39 < sinclair|net> Havvy: you showed me this mate :)
+06:40 < Havvy> I did?
+06:40 < sinclair|net> yeah, the other day
+06:40 < Havvy> Well, I expanded upon it quite a bit.
+06:40 < sinclair|net> you wrote it in frustration
+06:40 < sinclair|net> if i recall
+06:40 < Havvy> Yeah.
+06:40 < sinclair|net> Havvy: ill have a scan through in a bit
+06:40 < Havvy> If anything, the example at the bottom should be fun.
+06:41 < sinclair|net> Zolmeister: so, conceptually, the DLR is just the ES6 Proxies, as the proxy (dynamic object) attempts to resolve the call while things are in flight
+06:41 < Zolmeister> sinclair|net: interesting
+06:42 < sinclair|net> Zolmeister: yeah it is isn't it
+06:43 < sinclair|net> Zolmeister: just went you thought all the amazing dynamic stuff was limited to JS
+06:43 < Zolmeister> sinclair|net: Actually, I prefer Python (Strong + dynamic)
+06:44 < Havvy> Give Python actual closures and we'll talk. ;)
+06:44 < Zolmeister> Havvy: you mean generators?
+06:45 < Havvy> Generators are nice, but they aren't the only use for closures.
+06:45 < Zolmeister> such as....
+06:45 < Zolmeister> ?
+06:45 < sinclair|net> yeah, python is kinda nice
+06:46 < Zolmeister> I just wish python was more functional
+06:46  * garthk cackles.
+06:46 < Zolmeister> (functional as in functional programming style)
+06:46 < sinclair|net> Zolmeister: python doesn't support lambda's nowadays
+06:46 < Zolmeister> sinclair|net: says who?
+06:46 < sinclair|net> er
+06:47 < sinclair|net> i mean, it does 
+06:47 < sinclair|net> (typo)
+06:47 < Zolmeister> oh
+06:47 < Zolmeister> yeah, but their not the same
+06:47 < garthk> >>> OrderedDict(sorted(d.items(), key=lambda t: t[0])) # from http://docs.python.org/3.1/whatsnew/3.1.html
+06:47 < purr> garthk: SyntaxError: Unexpected identifier
+06:47 < jkz> i wanna capture the request of websockets ws:// in an express route, to proxy to socketio server running on other port - but doesn't work! Any middleware for express to support this? Would really hate having to do io.listen(app) or putting node-http-proxy on the outside, i wanna proxy it cleanly from inside an app.route for lot of flexibility. Any ideas how to do this?
+06:47 < Zolmeister> and it also needs an event loop
+06:47 < sinclair|net> so, it can support first class functions by way of lambda 
+06:48 < sinclair|net> so, its kinda functional
+06:49 < Zolmeister> yeah, kinda
+06:49 < sinclair|net> Zolmeister: why does everything need to have an event loop?
+06:49 < Zolmeister> jkz: why not just have it be on a separate port?
+06:49 < Havvy> Zolmeister: Twisted is Python's Event Loop.
+06:50 < sinclair|net> Zolmeister: ^
+06:50 < sinclair|net> its also bolted on, in the same way as Ruby's thing (i can't remember what its called)
+06:50 < ChrisPartridge> EventMachine
+06:50 < Havvy> EventSomething
+06:51 < jkz> socketio IS on separate port, and express app on port 80. that seems to be the problem. If I connect direct to port 10000, socketio work in websockets mode. if i try to proxy it from inside app.route and then socketio connect on port 80, it only works in xhr mode. i wanna route it, AND for it to work on websocket mode. how to do this? is there a middleware to support listening for websocket connection in express?
+06:51 < jkz> i want to do it where socketio connect on port 80 and a route proxies it to the socketio server iw ant
+06:51 < jkz> idea how to do it?
+06:51  * sinclair|net also doesn't like the bad press that threads get
+06:51 < sinclair|net> i like threading, it solves problems
+06:52 < ashnur> i don't even know what they are and I hate them
+06:52 < garthk> The Twisted crowd have been sneering down from their ivory tower for so long, nobody wants to listen any more. Hence, http://www.gevent.org et al.
+06:52 < Zolmeister> sinclair|net: theading is great, just not for webapps
+06:52 < sinclair|net> ashnur: a lot of node bloggers claim threads suck, i facepalm each time i read them
+06:52 < Havvy> garthk: I think you mean the #twisted crowd. ;)
+06:53 < sinclair|net> Zolmeister: why are threads not great for web apps ?
+06:53 < garthk> Don't mention their name a third time. Before you know of it, there'll be a weird noise and the smell of sulphur and they'll BE HERE.
+06:53 < ashnur> sinclair|net: I am sure I saw the "threads suck" statement way before I started reading about nodejs
+06:53 < Zolmeister> jkz: I mean, just have another server listen on that port with socket.io. no need to 'proxy' anything
+06:53 < sinclair|net> ashnur: yeah, i just happen to see the message a lot more nowadays
+06:53 < ashnur> garthk++
+06:53 < Havvy> garthk++
+06:54 < Havvy> sinclair|net: Probably because the Event Loop shows an alternative.
+06:54 < sinclair|net> its still single threaded
+06:54 < Zolmeister> sinclair|net: watch http://www.youtube.com/watch?v=ztspvPYybIY
+06:54 < ashnur> sinclair|net: don't read blogs :)
+06:54 < Havvy> But yeah...there are times when threads are nice.
+06:55 < ningu> the problem with threads is to make anything you need a loom
+06:55 < Havvy> ningu: Same with async.
+06:55 < sinclair|net> ashnur: well i don't so much anymore, but those blogs were a roadblock for me to take node seriously 
+06:55 < Havvy> Anything async. **
+06:55 < gildean> jkz: you could just listen on the same server instance on both express and socket.io, and use namespaces for socket.io if necessary
+06:55 < jkz> dont want it to have :10000 every time, and i want to change the url of it. theres really no way to do this other than having node-http-proxy on outside? Also I wanna avoid having dedicated proxy for this, wanna do it simply from inside nodejs app.route handlers. i want to proxy it from inside an app.route the way i want to, node-http-proxy ok but i want it from inside app route not having to have node. maybe its impossible, bbut i hope i
+06:55 < garthk> I wouldn't mind an easier way to get more CPUs involved in some of my Node code. The problem is that a lot of the CPU time is marshalling millions of tiny objects. I suspect that pushing them to a child process is going to involve more marshalling, defeating the process. 
+06:55 < Havvy> With Node, we have the 'async' module and 'promises' as our looms.
+06:55 < jkz> i probabyl will use io.of() but i want it as if if im not going to do it
+06:56 < jkz> so that it feels more flexible
+06:56 < sinclair|net> Havvy: i was ranting on about this the other day, but node really should let me spawn new processes in proc
+06:56 < Havvy> Yes.
+06:56 < Havvy> I was there for both.
+06:56 < sinclair|net> Havvy: don't you think so?
+06:56 < Havvy> Please don't rant about it again.
+06:56 < jkz> so like app.all("whatever"){proxy my connect websockets here in this handler}
+06:56 < Havvy> And I don't.
+06:56 < jkz> doesnt work when i do it, just work on xhr. how to make it work websockets too?
+06:56 < sinclair|net> Havvy: i don't understand why you don't
+06:57 < Havvy> Because I believe that it would lead to an increase in bugs in the Node core.
+06:58 < sinclair|net> perhaps it requires a branch
+06:58 < sinclair|net> or a fork
+06:58 < sinclair|net> Havvy: node is like those old browsers that didn't support tabs
+07:00 < sinclair|net> and you have one browser open for every page you are on, and spawning a new node process is like a annoying pop up ad
+07:00 < ashnur> here we go again? :D
+07:00 < sinclair|net> sometimes its nice to have two browsers windows open, but 99% of the time, you just want one...
+07:00 < sinclair|net> yeah, ill shush about it
+07:01 < sinclair|net> still feel pretty strongly about it tho
+07:01  * sinclair|net mumbles under his breath
+07:01 < ningu> stick a fork in that branch
+07:07 < gildean> sinclair|net: i don't think that's an unreasonable request, the browser has webworkers, so imo node could have some kind of workers as well
+07:08 < sinclair|net> gildean: yay, someone in here agrees with me \o\   /o/ 
+07:08 < sinclair|net> on a somewhat unrelated note, here is a song i wrote https://s3-ap-southeast-2.amazonaws.com/sinclair-media/music/sinclair_shreds_volume_2.mp3
+07:10 < Zolmeister> gildean: require('child_process').fork
+07:10 < Zolmeister> sinclair|net: that is some serious shredding
+07:11 < gildean> Zolmeister: yeah, but that spawns a whole new node process
+07:12 < Zolmeister> gildean: which is exactly what you want
+07:12 < sinclair|net> i have lots of crazy post nodejs, 3 glasses of scotch, evening guitar crazyness, 
+07:13 < sinclair|net> for example, i wrote this one when i failed to get node terminating sockets https://s3-ap-southeast-2.amazonaws.com/sinclair-media/music/sinclair_plays_the_blues.mp3
+07:13 < Zolmeister> sinclair|net: where do you get the drums?
+07:13 < JamesMGreene> Any Linux users around?  If so, I'd love to ask a favor
+07:13 < sinclair|net> Zolmeister: http://www.virtualdrumming.com/drums/windows/jimmy-the-rev-sullivan.html
+07:14 < Zolmeister> JamesMGreene: Dont ask to ask, just ask
+07:14 < JamesMGreene> Can some Linux user execute a `npm install flex-sdk`?
+07:15 < JamesMGreene> Works great for me on Windows, works great on Travis-CI for Node 0.10 but is failing on Travis-CI for Node 0.8
+07:15 < JamesMGreene> *** Can a Linux user with Node 0.8 execute a `npm install flex-sdk`?  =)
+07:15 < GreenDog> what is travis-ci?
+07:15 < gildean> Zolmeister: i think sinclair|net was talking about creating new threads within the same process, as in sharing all the state etc.
+07:15 < JamesMGreene> GreenDog: https://travis-ci.org/
+07:15 < sinclair|net> gildean: yup, that is right
+07:15 < Zolmeister> gildean: right, and you were talking about web workers
+07:16 < sinclair|net> Zolmeister: fork() spawns a new process
+07:16 < Zolmeister> yes, yes it does
+07:16 < sinclair|net> Zolmeister: that is undesirable 
+07:16 < Zolmeister> so do web workers
+07:16 < Zolmeister> why is that undesirable?
+07:16 < JamesMGreene> GreenDog: (or this page is more informational: http://about.travis-ci.org/docs/ )
+07:16 < gildean> Zolmeister: yeah, a bad example in that sense
+07:17 < sinclair|net> Zolmeister: ..... when you open a new tab, does that create a new system process ?
+07:17 < Havvy> sinclair|net: Am I using Chrome?
+07:17 < Havvy> :P
+07:17 < sinclair|net> Zolmeister: when you create a web worker in a browser, does that spawn a new process ?
+07:17 < Zolmeister> yes
+07:17 < ChrisPartridge> JamesMGreene: worked fine
+07:17 < GreenDog> Thanks
+07:17 < JamesMGreene> ChrisPartridge: Specifically with Node 0.8?
+07:17 < ChrisPartridge> JamesMGreene: yep
+07:17 < Zolmeister> JamesMGreene: can you point us to the error maybe?
+07:18 < sinclair|net> Havvy: yup, and because chrome spawns in proc, you get fancy things, like a chrome task manager
+07:18 < JamesMGreene> Zolmeister: That's just it, it doesn't error where it should
+07:18 < Zolmeister> JamesMGreene: which is...
+07:18 < JamesMGreene> It appears to be dying during the install but instead it keeps going, so the build only fails because my unit tests verify the install
+07:18 < JamesMGreene> e.g. https://travis-ci.org/JamesMGreene/node-flex-sdk/jobs/7525903
+07:19 < Zolmeister> sinclair|net: you know whats cool? not having to deal with mem locks
+07:19 < JamesMGreene> Line 291 is the last thing that comes out of the custom installer
+07:19 < sinclair|net> Zolmeister: dead locks?
+07:19 < Zolmeister> mem locks
+07:20 < sinclair|net> thats why we have mutex and semaphores 
+07:20 < JamesMGreene> Whereas we should be seeing more lines, like Lines # 289-303 from https://travis-ci.org/JamesMGreene/node-flex-sdk/jobs/7525904
+07:20 < ningu> it was a conscious design decision of node that dealing with locking in threads is really hard to get right and to code, so should be avoided
+07:21 < ningu> I suppose the main goal was to handle in one process/thread what had formerly only been possible in many
+07:21 < sinclair|net> well, that's why "other" languages have them, node doesn't need them, it simply needs to fork child processes in proc, (at least provide the ability to spawn a new process, or a new worker in proc)
+07:21 < Zolmeister> JamesMGreene: Error: ENOENT, no such file or directory '/home/travis/build/JamesMGreene/node-flex-sdk/lib/flex_sdk/bin'
+07:22 < Zolmeister> I would look into that
+07:22 < JamesMGreene> Zolmeister: What line?
+07:22 < Zolmeister> 447
+07:22 < JamesMGreene> Oh yeah
+07:23 < JamesMGreene> Like I said
+07:23 < JamesMGreene> the unit tests fail because they rely on the installer
+07:23 < JamesMGreene> which is not finishing, yet somehow not throwing an error
+07:23 < greelgorke> morning
+07:23 < Zolmeister> JamesMGreene: perhaps a race condition?
+07:24 < JamesMGreene> Zolmeister: Not terribly likely but maybe
+07:24 < JamesMGreene> If I specify a `install` script hook in my package.json, it DOES exist AFTER the primary `npm install`, right?
+07:25 < JamesMGreene> (i.e. particularly with whatever version of NPM 1.2.14)
+07:25 < deoxxa> JamesMGreene: donnnnn't do that unless you really know what you want
+07:25 < JamesMGreene> (i.e. particularly with NPM 1.2.14)
+07:25 < JamesMGreene> deoxxa: I do know what I want
+07:25 < deoxxa> what you really really want?
+07:25 < JamesMGreene> lol
+07:25 < deoxxa> i'm a bad person
+07:26 < ChrisPartridge> oh no, was that spice girls?
+07:26 < JamesMGreene> deoxxa: It has to download a ZIP file and extract the contents before the module is usable
+07:26 < JamesMGreene> Basically the same idea as the "phantomjs" module if you've ever used that
+07:26 < deoxxa> JamesMGreene: ah... licensing restrictions stop you from distributing the files yourself?
+07:27 < deoxxa> i somewhat remember this
+07:27 < JamesMGreene> No? Just doesn't seem as practical to download a big ZIP from NPM vs. an open source mirror server
+07:28 < JamesMGreene> In the case of the "phantomjs" module, it is because you need to download a different ZIP per architecture
+07:28 < JamesMGreene> for this module, there actually is only 1 ZIP, so I COULD theoretically check it into NPM
+07:28 < JamesMGreene> (git)
+07:29 < deoxxa> you could potentially make it a preDeploy task
+07:29 < deoxxa> or whatever that's called
+07:29 < deoxxa> prePublish?
+07:29 < deoxxa> then it ends up in npm, but not git
+07:29 < deoxxa> there are a few packages like that on npm
+07:29 < JamesMGreene> What's a practical size for pushing into NPM, though?
+07:29 < cristian_> alguien habla español?
+07:29 < JamesMGreene> This adds another 22+ MB to the module
+07:30 < deoxxa> there was one (which i think has been remedied now) that included the entire spidermonkey runtime... that was like, a couple of hundred megs
+07:30 < deoxxa> cristian_: english please
+07:30 < sinclair|net> someone should write a translate IRC bot
+07:30 < sinclair|net> plug it into google translate
+07:31 < deoxxa> sinclair|net: then have it say "english please" in another language?
+07:31 < sinclair|net> sure, why not
+07:31 < deoxxa> lel
+07:31 < sinclair|net> deoxxa: google auto language detection is pretty good
+07:33  * sinclair|net wonders if he inspired anyone to write something useful
+07:33 < JamesMGreene> deoxxa: Hmph... so `prepublish`, eh?
+07:33 < deoxxa> JamesMGreene: yeah, i can't think of a reason why not
+07:34 < deoxxa> JamesMGreene: maybe if you really want to be sure, ping mr isaacs here
+07:34 < cristian_> any bookstore on socket.io for to make a crud with express + mongoose?
+07:35 < cristian_> sorry, my inglish is very bad
+07:35 < JamesMGreene> isaacs: Would you prefer that a module gains ~25 MB from a `prepublish` step vs. downloading that ~25 MB in an `install` hook instead?
+07:36 < JamesMGreene> isaacs: Based on the NPM docs and the facts that I _can_ actually do that in this case (as there is only 1 ZIP for all architectures), I am thinking that IS probably the best approach in this case
+07:36 <@mbalho> why the crap is your module 25 mb?
+07:36 < JamesMGreene> mbalho: My MODULE is tiny :)
+07:37 < ChrisPartridge> mbalho: because it downlodas stuff from adobe.com, thats why :p
+07:37 <@mbalho> the entire creative suite??
+07:38 < JamesMGreene> mbalho: My module is ~22KB but it wraps the Adobe/Apache Flex SDK
+07:38 < JamesMGreene> Which is about another ~25 MB
+07:38 < ChrisPartridge> mbalho: the entire creative suite in 25MB would be impressive though
+07:38 <@mbalho> i dont think flex users will mind a manual install step
+07:38 < JamesMGreene> ChrisPartridge: Indeed
+07:38 < JamesMGreene> mbalho: LOL
+07:39 < JamesMGreene> You're missing the grand scheme :)
+07:39 < JamesMGreene> This module will a dependency of other modules
+07:39 <@mbalho> you accidentally a whole word
+07:39 < [AD]Turbo> hi there
+07:40 < JamesMGreene> manual install steps for submodules is lame
+07:40 < JamesMGreene> Thus why I also wrote a `dos2unix` module
+07:40 < JamesMGreene> Can't even rely on Linux and Mac users have that installed, let alone Windows users
+08:02 < JamesMGreene> Any guides to best practices for .npmignore ?
+08:03 < Havvy> JamesMGreene: Anything you'd put in a .gitignore
+08:03 < JamesMGreene> Havvy: Yes but more, too, I'd wager
+08:04 < JamesMGreene> e.g. exclude `tests`/`test` dir, etc.
+08:05 < JamesMGreene> Travis config, Gruntfile, JSHint config, etc.... doesn't seem like any of those should need to go into NPM
+08:06 < JamesMGreene> ChrisPartridge deoxxa mbalho: Any tips?
+08:07 < deoxxa> i'd keep the tests in there
+08:21 < JamesMGreene> deoxxa: Why? Seems silly. They can download the source if they want to run the tests
+08:22 < JamesMGreene> deoxxa: btw, `prepublish` doesn't fix my Travis-CI problem since Travis isn't grabbing the module from NPM
+08:22 < JamesMGreene> But it will fix it for any downstream consumers
+08:31 < ChrisPartridge> ugh, S3 still doesn't support content-range?
+08:42  * JamesMGreene gives up
+08:43 < JamesMGreene> I'm just going to remove Node 0.8 from my Travis config, FML
+08:43 < ChrisPartridge> JamesMGreene: perhaps lodge something with them
+08:44 < henrikhodne> JamesMGreene: Is this an error on our (Travis') side?
+08:46 < JamesMGreene> henrikhodne: See #travis
+08:59 < JamesMGreene> So what's the "best" Node version manager?  nvm, nave, n?
+09:00 < greelgorke> it depends on your environment and how you're using it
+09:00 < greelgorke> i'm pretty happy with nave
+09:00 < henrikhodne> I use nodenv, although I'm not really a heavy node user, so it may fail under "load".
+09:01 < frankblizzard> i use nvm but i heard good things about n
+09:01 < frankblizzard> so you have already all 4 :D
+09:03 < JamesMGreene> nvm looks like it requires a compiler, so that's kinda silly
+09:03 < JamesMGreene> I'm thinking nave or n
+09:03 < greelgorke> they all install from source as far as i see
+09:03 < greelgorke> or may be i'm wrong on this point :D
+09:03 < JamesMGreene> n says "Simple flavour of node binary management"
+09:04 < JamesMGreene> So I'd say no
+09:04 < greelgorke> just check the issues of them
+09:07 < JamesMGreene> Why does everyone hate Windows? :(
+09:07 < JamesMGreene> bash-3.1$ nave install 0.10.8
+09:07 < JamesMGreene> Nave only supports zsh and bash shells.
+09:08 < greelgorke> yes, i said it depends on your environment :D
+09:08 < timoxley> JamesMGreene because it's unnecessarily hard to make things work on it
+09:09 < JamesMGreene> timoxley: Eh, generally disagree
+09:09 < JamesMGreene> Just depends on the subject
+09:09 < JamesMGreene> You know what is TERRIBLE on Linux? Clipboards. W.T.F.
+09:10 < syskk> clipboards?
+09:10 < JamesMGreene> Clipboards.
+09:10 < SomeoneWeird> since when?
+09:10 < timoxley> JamesMGreene huh
+09:10 < SomeoneWeird> works absolutely fine for me
+09:10 < SomeoneWeird> better than windows even
+09:10 < JamesMGreene> https://github.com/zeroclipboard/ZeroClipboard/issues/78
+09:10 < greelgorke> can you just skip the os talk? :D
+09:10 < JamesMGreene> ^ Clipboards.
+09:10 < JamesMGreene> It has _3_ clipboards, W.T.F.
+09:11 < timoxley> greelgorke agree.
+09:11 < syskk> imo, unix/linux is more elegantly designed than windows
+09:12 < JamesMGreene> imo, they're all a wasteland :)
+09:13 < syskk> also, clipboards are  most likely distribution specific issues
+09:13 < JamesMGreene> Generally disagree as Linux/Unix clipboards theoretically follow the ICCCM standard, which dictates 3+ clipboards ("selection atoms")
+09:14 < JamesMGreene> i.e. the standard is jacked
+09:14 < JamesMGreene> http://www.x.org/docs/ICCCM/icccm.pdf
+09:14 < JamesMGreene> (See section 2.6.1 if you care)
+09:15  * greelgorke he#s talking about standards in a nodejs chat...  
+09:15 < zomg> JamesMGreene: I would suspect the issue is more with Flash doing something stupid than with the OS itself ;)
+09:15 < zomg> Knowing Flash compatibility on non-Windows platforms..
+09:16 < JamesMGreene> zomg: Yes/no
+09:16 < JamesMGreene> Flash made a debatably incorrect choice, but I'd imagine that is easy to do when there are 3 clipboards instead of 1  o_O
+09:17 < zomg> I would imagine there to be more than one on windows as well, for copying plaintext and binary at least
+09:18 < zomg> Since there's a lack of detail to what the three options actually are for, it's kind of hard to judge whether there would really be a difficulty in choosing which one to use
+09:19 < zomg> never had any probs with clipboards when using any linux window managers so hard to say really.
+09:19 < JamesMGreene> Generally, each clipboard has the same sets of buffers/formats (plain text, RTF, HTML, image, URL, binary, etc.)... Linux just has 3x that many
+09:39  * inimino upgrades to 0.10
+10:11 < JamesMGreene> NPM being super slow for anyone else right now?
+10:13 < syskk> god I love async module
+10:14 < basss> hello, i'm trying to log actions to my couchdb database using the winston module, how can i link winston to couchdb ?
+10:18 < jesusabdullah> basss: my advice: look at some other logging modules before you settle on winston.
+10:19 < substack> process.stdout
+10:19 < jesusabdullah> basss: but if your heart's set, you have to write a "transport" for it
+10:19 < substack> best logging module
+10:19 < substack> node yourprogram.js > logfile
+10:20 < basss> jesusabdullah: what would you recommend as logging modules
+10:20 < jesusabdullah> well
+10:20 < jesusabdullah> I've heard good things about bunyan and I liked minilog
+10:20 < substack> basss: what do you need a logging module for?
+10:21 < jesusabdullah> a lot of times I throw together something that just adds logging levels in front of stdout logging
+10:21 < jesusabdullah> like that's 20 lines
+10:21 < jesusabdullah> if that
+10:22 < jesusabdullah> you can also do something like, var log = through(); [ 'info', 'warn', 'error' ].forEach(function (lvl) { log[lvl] = function () { log.write(lvl + ': ' + util.format.apply(null, arguments)); }; });
+10:22 < jesusabdullah> Like
+10:23 < jesusabdullah> that's the essence of a "logging module" right there
+10:23 < jesusabdullah> missing a + '\n' but you get the idea
+10:24 < basss> jesusabdullah: i'd prefer using a library for it 
+10:25 < basss> substack: i need to log user actions to my db
+10:25 < substack> why not just a text file?
+10:25 < substack> makes log rotation much easier
+10:25 < substack> and you can search your logs with grep really easily
+10:25 < basss> substack: i need to filter the information using my db
+10:26 < jesusabdullah> You can still follow the same general pattern of taking a stream and doing something on data
+10:27 < substack> basss: do you have some particular purpose? maybe you should be storing structured data instead of logs?
+10:27 < jesusabdullah> except instead of doing log.pipe(process.stdout)
+10:28 < basss> jesusabdullah: im trying to do both, data on text and db
+10:28 < jesusabdullah> well then do both
+10:28 < basss> substack: im storing it as json
+10:28 < substack> basss: http://npmjs.org/package/json-scrape
+10:29 < jesusabdullah> basss: just make your logger an event emitter or a stream, intercept the events and either write them to stdout or create/modify a document somewhere
+10:29 < jesusabdullah> basss: are you sure you want to persist to couch?
+10:29 < basss> jesusabdullah: yes
+10:29 < jesusabdullah> basss: isn't that going to create a lot of touches? like a LOT of touches?
+10:30 < jesusabdullah> like, not mongodb, filesystem, etc..?
+10:30 < jesusabdullah> couch just seems like a terrible fit even if a database in general is a good idea
+10:31 < basss> jesusabdullah: why isn't couch fit ?
+10:33 < jesusabdullah> well like, you're dealing with streaming data, and couch is about RESTful interactions, like each change is a round trip request and you don't get to incrementally update documents like you do files
+10:33 < jesusabdullah> I honestly bet sql or mongo would be a better fit
+10:36 < owen1> with mongo u can export a json file once in a while. might be better than tiny and frequent inserts. i guess it depends on the numbers.
+10:36 < owen1> i meant import
+10:45 < Acconut> Hello
+10:46 < Acconut> Why is there fs.readFileSync (upper case) but fs.readdirSync (lower case)?
+10:48 < RLa> Acconut, to confuse programmers
+10:49 < Acconut> RLa, at least it works. I'm confused
+10:50 < RLa> hm, maybe isaacs or other node devs can answer better
+10:50 < RLa> i have noticed that small inconsistency too
+10:51 < Acconut> Is it worth to open an issue on GitHub?
+10:52 < machrider> sounds like the kind of thing that is unlikely to be changed
+10:53 < Acconut> They won't remove it but maybe add fs.readDirSync which does exactly the same as fs.readdirSync
+10:53 < Acconut> Of course, this isn't a problem
+10:56 < demierre> Hello everyone! 
+10:57 < tuhoojabotti> hi
+10:57 < bnoordhuis> Acconut: fs.readdir*() is modeled after the libc function with the same name
+10:58 < Acconut> bnoordhuis: Ahh ok, didn't know that.
+10:58 < Acconut> tuhoojabotti: Hello
+10:59 < Acconut> bnoordhuis: Is fs.readFile*() also modeled after the libc function?
+10:59 < bnoordhuis> Acconut: no, because there isn't one :)
+11:00 < Acconut> bnoordhuis: Ok. :D
+11:07 < demierre> So, I'm a noob when it comes do Node.js but I'm told it should help me with what I want. We have made a website that is javascript based and we want it to talk to a MySQL database. I installed node.js on the server but now I don't know what the next step is? 
+11:08 < bnoordhuis> demierre: start writing your application?
+11:08 < px> try npm
+11:09 < demierre> so in the application I write the connection to the mysql database?
+11:09 < gildean> demierre: first of all, do you have a basic understanding of node itself?
+11:10 < demierre> nope, can't say that I do. I thought I did… =/
+11:10 < gildean> demierre: i'd start by running the basic http-server example from the frontpage of http://nodejs.org/
+11:10 < demierre> Already did and I responds
+11:10 < demierre> it*
+11:11 < demierre> quick, question…how do I restart node? 
+11:11 < gildean> you kill it and start it again
+11:12 < demierre> theres no quick /node restart command?
+11:12 < px> you can get this thing nodemon
+11:12 < px> it auto restarts
+11:12 < gildean> demierre: in node, no, but different platforms have different means to accomplish that
+11:13 < demierre> ok
+11:13 < demierre> so in linux I must first figure out the PID and then kill it?
+11:13 < gildean> demierre: but what you're probably after is how to create a json-based api for your frontend application?
+11:14 < demierre> yup
+11:14 < gildean> demierre: i'd go for express, it's the most used framework for such applications, here's a very simple example for an express server: https://gist.github.com/gildean/5559948
+11:15 < bnoordhuis> demierre: if you're running node from a shell, you can just ctrl-c it
+11:16 < demierre> yea that worked ^
+11:18 < demierre> glidean I feel like I'm in a hurry and I have time to look into another solution
+11:18 < syskk> does anyone know if its possible to get a diff on github between a commit  and master?
+11:18 < gildean> demierre: by another solution you mean what?
+11:19 < bnoordhuis> syskk: https://github.com/user/project/compare/master...commit
+11:19 < demierre> express? or did I get confused now? :O
+11:19 < gildean> demierre: express is a node module, and using it will make your developing a lot faster than starting from zero
+11:19 < syskk> bnoordhuis: thanks :)
+11:19 < demierre> ahh ok
+11:19 < bnoordhuis> syskk: you can also diff against other forks like this -> fork:master...commit
+11:19 < syskk> cool thanks!
+11:20 < syskk> is that even documented somewhere?
+11:21 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+11:21 < bnoordhuis> syskk: i don't know. truth be told, i don't even know how i know about /compare :-/
+11:22 < syskk> bnoordhuis: haha ok :) 
+11:24 < demierre> I found this, seems pretty straight forward. Would you recommend it? http://blog.luksidadi.com/mysql-nodejs-socketio-tutorial/
+11:41 < jscoder> how open source projects or any library are made popular across the world ?
+11:42 < bnoordhuis> jscoder: marketing
+11:43 < jscoder> these are open source libs, who pays for doing marketing ?
+11:43 < demierre> how so I launch the app.js ? is it "node app.js" Cause that does nothing
+11:45 < bnoordhuis> demierre: yep, `node script.js`. define 'does nothing'?
+11:45 < demierre> I just saw I forgot to install socket.io
+11:45 < demierre> nothing, as I saw no change. No message
+11:46 <@isaacbw> did you write a message
+11:47 < demierre> nope =) hehe. But I mean, when I do this..nothing seems to be written to the mysqlDB
+11:56 < demierre> when I run the app.js , what does it actually do? I feel like I see no actual change
+11:57 < bnoordhuis> demierre: depends on what your app does, of course
+11:57 < bnoordhuis> most node scripts bind to an interface/port and wait for incoming connections
+11:57 < demierre> bnoordhuis I pretty much just copied this straight off http://blog.luksidadi.com/mysql-nodejs-socketio-tutorial/
+11:59 < bnoordhuis> demierre: have you read and understood the source?
+12:00 < gildean> demierre: that example is a year old, there's no guarantee the modules he's using have't changed
+12:00 < gildean> and they probably have
+12:00 < leehambley> hi all, does anyone know what the meaning of `-d` is on `npm install` - it's not documented, and I'm refactoring an old install script, but it seems npm install accepts a bunch of options
+12:01 < demierre> ahh, ok
+12:01 < leehambley> (ie it doesn't complain when you pass a non-existent flag
+12:54 < beeant> how come redis commander is returning Redis error Error: Ready check failed: ERR operation not permitted 
+13:02 < beeant> its working fine now
+13:56 < HSL> any socket.io experts in here?
+13:58 < nathan7> HSL: Ahoy
+13:58 < nathan7> HSL: Don't ask to ask - what's your *actual* question?
+13:59 < deoxxa> nathan7: maybe he was just conducting a survey
+14:00 < nathan7> deoxxa: if you're doing a survey, you link to a fucking survey, dear
+14:00 < SomeoneWeird> deoxxa, lol
+14:00 < deoxxa> nathan7: it was a single-question survey
+14:00 < deoxxa> nathan7: and so far he's got no data... poor dude.
+14:01 < HSL> nathan7: well,.. I have the most annoying problem since I've updated to 0.10.8
+14:01 < HSL> I get this warning on the serverside:  websocket parser error: reserved fields must be empty
+14:01 <@mbalho> please don't ask questions until someone permits you to - http://nodejs.org - http://logs.nodejs.org - http://stackoverflow.com/questions/tagged/node.js
+14:01 < HSL> I only get this when I try to run the server as SSL
+14:01 <@mbalho> OOPS
+14:01 -!- mbalho changed the topic of #Node.js to: please don't ask questions until someone permits you to - http://nodejs.org - http://logs.nodejs.org - http://stackoverflow.com/questions/tagged/node.js
+14:01 <@mbalho> there :D
+14:01 < deoxxa> lol
+14:02 < HSL> Lol,.. well I've tried to ask the question a couple of times over the last 2 days, but noone seems to know how to fix it :)
+14:03 < deoxxa> HSL: 1) post code + logs 2) ??? 3) profit
+14:04 < HSL> this is the serverside code (which I completely stripped to find the cause)
+14:04 < HSL> https://gist.github.com/hsleewis/718077aa8c3657cbc8f8
+14:04 < nathan7> HSL: AH
+14:04 < nathan7> HSL: That's my fault!
+14:04 < nathan7> HSL: well, not exactly
+14:04 < nathan7> HSL: my patch broke other things
+14:05 < nathan7> HSL: https://github.com/joyent/node/issues/5557
+14:05 < HSL> nathan7: :)
+14:05 < SomeoneWeird> nathan7, !!!!!!!!!!
+14:06 < HSL> nathan7: Thanks for the link,.. I googled my ass off since saturday ;)
+14:06 < SomeoneWeird> "node: ../deps/uv/src/unix/stream.c:726: uv__write: Assertion `stream->write_queue_size == 0' failed." < i've managed to trigger that a _lot_ the last couple of days
+14:07 < SomeoneWeird> oh that's been fixed
+14:07 < SomeoneWeird> well then
+14:07  * SomeoneWeird upgrades
+14:11 < Antony_> Hi 
+14:12 < Antony_> I am trying to run simple application that uses Node.js
+14:13 < Antony_> but have errors < which are caused by not finding some modules like node-static
+14:13 < SomeoneWeird> so install them?
+14:14 < deoxxa> !next
+14:14 < Antony_> i think, npm modules was not configured good enough
+14:14 < SomeoneWeird> "npm install node-static"
+14:14 < SomeoneWeird> type exactly that, and try again
+14:15 < Antony_> yes, i have installed them using   " npm install node-static -g"
+14:15 < nathan7> HSL: My apologies for that
+14:15 < deoxxa> not -g, Antony_
+14:15 < nathan7> HSL: I'm trying to track it, it's really fucking weird
+14:15 < SomeoneWeird> Antony_, no, try exactly what i said
+14:15 < tuhoojabotti> HSL: Helsingin Seudun Liikenne?
+14:15 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+14:16 < Antony_> i have win7 x64
+14:16 < SomeoneWeird> Antony_, type "npm install node-static"
+14:16 < Antony_> already done
+14:16 < deoxxa> where?
+14:17 < deoxxa> like, where did you run that?
+14:17 < Antony_> in console
+14:17 < deoxxa> which directory?
+14:17 < Antony_> cmd
+14:17 < SomeoneWeird> Antony_, did you type it WITHOUT the -g?
+14:17 < Antony_> yes
+14:17 < SomeoneWeird> and did you try running it again?
+14:18 < Antony_> i installed them in c:\users\Anton
+14:18 < SomeoneWeird> you have to install them where your project is
+14:19 < Antony_> my folder is in c:\program files\nodejs\hello.js
+14:19 < Antony_> in this folder is a big subfolder node modules
+14:19 < Willox> Does anybody know of an amazing resource that can explain javascript objects to me?
+14:20 < SomeoneWeird> Willox, json.org
+14:20 < Willox> I mean specifically in javascript, I know they aren't simple key-value lists
+14:20 < guor> but they are
+14:20 < SomeoneWeird> 6
+14:20 < SomeoneWeird> *^
+14:20 < guor> except for the prototype thing
+14:21 < Willox> A resource for prototypes then :)
+14:21 < Willox> Hm
+14:22 < Willox> You've helped me with my googling, found something. thanks
+14:22 < guor> you're welcome, I guess
+14:22 < guor> just to be sure. I was *not* talking about the prototype library.
+14:23 < guor> google for prototype inheritance
+14:23 < Willox> Yeah, I've got the right thing
+14:23 < HSL> nathan7: no worries, I'm happy it's not my code :P
+14:23 < HSL> tuhoojabotti: nope, it's my initials :)
+14:25 < tuhoojabotti> HSL: Oh well
+14:25 < Antony_> doesnt work simply copying folders node-install  &&  node-static into  c:/program files/nodejs/node-modules/npm/node-modules     ?
+14:25 < Antony_> they are in this folder
+14:27 < Antony_> after launching node.exe and  writing  .load hello.js   i see amount of code where are 2 Errors:
+14:27 < Antony_> Cannot find module 'node-static'
+14:28 < Antony_> and error caused by variable which uses node-static library
+14:30 < Antony_> Please, help 
+14:30 < gildean> Antony_: first of all, you should create a separate directory for your projects, and dir for each of the projects there
+14:31 < Antony_> i have it in c:\program files\nodejs\
+14:31 < gildean> iirc that's the program dir for node itself?
+14:32 < Antony_> how to look that?
+14:32 < gildean> i mean more like c:\projects\someproject
+14:32 < gildean> just create a whole new dir, it's a lot easier
+14:32 < Antony_> i created 3 directories )
+14:33 < gildean> then in that dir command: npm install node-static
+14:33 < JamesMGreene> aAnyone know what this error is all about?
+14:33 < Antony_> but in that folder, or deeper to node modules/npm/node modules  ?
+14:34 < JamesMGreene> "OK, open '{filePath}'"
+14:34 < gildean> Antony_: in that folder, the npm install command creates the node_modules for you
+14:34 < gildean> JamesMGreene: not without any context
+14:35 < JamesMGreene> seems to be during a `fs.createReadStream` to read binary data
+14:35 < Antony_> i already have folder node_modules, which has huge amount of npm modules
+14:35 < gildean> Antony_: but is that folder under the folder of your project?
+14:36 < gildean> Antony_: each project should house its own modules
+14:36 < JamesMGreene> Sounds like it might be a Windows issue with having too many file handles open or something: http://comments.gmane.org/gmane.comp.lang.javascript.nodejs/38045
+14:39 < Antony_> my folder nodejs contains of:   node_modules folder, node.exe, hello.js(my test app), node_etw_provider.man, node_perfctr_provider.man, nodevars.bat, npm text file, npm.cmd
+14:42 < Antony_> gildean, i installed node-static into C:\Program Files (x86)\nodejs\node_modules\npm\node_modules
+14:42 < Antony_> but it's not working
+14:43 < Antony_> i also added to system PATH variable path to C:\users\Anton\Appdata\Roaming\npm
+14:44 < Antony_> and installed node-static there using -g
+14:48 < Bigdx> hey there
+14:48 < miclen> heilà Bigdx
+14:49 < Bigdx> quick question ... were do i get a list of the possible events a request-object could trigger?
+14:49 < Bigdx> am i just blind or is that a secret?
+14:49 < SomeoneWeird> request object?
+14:50 < Bigdx> like req what the callback of app.get gets
+14:51 < DaMorpheuS> api doc
+14:51 < JamesMGreene> isaacbw isaacs mbalho MI6 Nexxy piscisaureus_ tjfontaine trevnorris et al: Does Node 0.10.x have a fix for the "OK, open '{filename}'" error/bug, or at least expose some property to let us know what the max number of files that can be concurrently open is (and another property for how many files are already open)?
+14:52 < Bigdx> thats was my first tought but i cant find it ... have overseen it ... link?
+14:53 < Bigdx> for example there is nothing about the 'data'- or 'end'-event
+14:54 < DaMorpheuS> as far as I know has the callback function of the get allways 2 objects, the request and the response
+14:54 < Bigdx> exactly, and my point is i cant find were is written more about that request-objact
+14:55 < SomeoneWeird> console.log(req);
+14:55 < DaMorpheuS> console.dir(req) ;)
+14:56 < Bigdx> funny ^^ i means dome docs to get more informations
+14:56 < Bigdx> *mean some docs
+14:56 < DaMorpheuS> http://nodejs.org/api/http.html#http_event_request
+14:56 < DaMorpheuS> the methods are in the api docs
+14:57 < HSL> I'm trying to run nvm on a ubuntu machine, nvm tells me a version is installed, but the actual running version of nodejs is different
+14:59 < Bigdx> THX ... i missed that "implements http.IncomingMessage" -_- 
+15:03 < Bigdx> hmm ... does "request.setEncoding" require a lot of resources to convert things to utf8? my apps hangs when using it 
+15:06 < nathan7> Bigdx: that's a legacy interface
+15:08 < dubi> Why would a socket not emit when called from within an express function? The socket object is there, emits are happening everywhere else, but not from within an express route.
+15:10 < Bigdx> legacy in sense of deprecated? sorry, my english is not so fluent
+15:13 < nathan7> Bigdx: Yeah
+15:14 < nathan7> Bigdx: the docs don't actually seem to mention this, hrm
+15:14 < nathan7> Bigdx: oh, nevermind, I'm crazy
+15:14 < HSL> argh,..
+15:14 < HSL> hsl@oversight:~$ nvm install v0.10.7
+15:14 < HSL> v0.10.7 is already installed.
+15:14 < HSL> hsl@oversight:~$ nvm use v0.10.7
+15:14 < HSL> Now using node v0.10.7
+15:14 < HSL> hsl@oversight:~$ nodejs -v
+15:14 < HSL> v0.10.8
+15:14 < nathan7> node -v
+15:14 < nathan7> the binary is called node
+15:14 < nathan7> nvm will install it as node
+15:14 < HSL> nathan7: ah ok :)
+15:16 < deoxxa1> what weird package installs node as "nodejs"?
+15:17 < bnoordhuis> the debian/ubuntu .debs
+15:17 < HSL> nathan7: thx, got it working
+15:17 < HSL> deoxxa1: yeah, ubuntu :)
+15:17 < deoxxa1> bnoordhuis: oh lol, debian. masters of packaging.
+15:18 < Bigdx> nathan7: well ... and how can i "set encoding"? i  want to get the uploaded data with "req.on('data', function(chunk) {...} but chunks is "different" then the source (file), i guess because of some encoding-problem
+15:19 < gildean> Bigdx: the chunks are usually just a part of the upload, you need to concat them together
+15:20 < deoxxa1> Bigdx: collect all the chunks up into an array, then use Buffer.concat() at the end to join them together. if you try to convert a random chunk to utf8 you might end up converting half a character or something (because not all characters are exactly one byte).
+15:20 < deoxxa1> Bigdx: also - do you need to access them as strings? buffers are often more appropriate for arbitrary data
+15:22 < Bigdx> deoxxal, thx ... i'll try that ... buffers are fine as it usually binary-ddata, just in a few cases strings
+15:24 < Bigdx> yeah, works like a charme, thx
+15:29 < mscdex> node memory profiling is such a pain :-(
+15:30 < mscdex> well, heap profiling
+15:31 < gildean> mscdex: did you see the new features added to chrome for profiling?
+15:32 < gildean> hopefully we'll get to use them soon on node too
+15:34 < Bigdx> memory profiling? can you give me a link to that? 
+15:35 < Bigdx> hmm ... has anyone here done a kind of "resumable uploads" with node?
+15:36 < mscdex> gildean: i dunno, the state of node heap profiling utils is pretty dismal. webkit-devtools-agent works, but there's a huge learning curve in trying to make sense of the information shown
+15:37 < daekano> https://github.com/lloyd/node-memwatch
+15:37 < mscdex> yeah i used that too :/
+15:38 < Bigdx> resumable uploads should work with blobs, slices and xhr (client-side) and a middleware in node that puts thats slices back together ... or is there a better way?
+15:40 < gildean> mscdex: http://youtu.be/x6qe_kVaBpg?t=19m58s
+15:57 < dubi> Why would a socket not emit when called from within an express function? The socket object is there, emits are happening everywhere else, but not from within an express route.
+16:08 < DaMorpheuS> dubi: I don't think you have your socket in your route.
+16:08 < DaMorpheuS> you have your req, and res but not your socket
+16:09 < dubi> No actually
+16:09 < dubi> I have req, res, and the socket object
+16:09 < dubi> In the function
+16:09 < DaMorpheuS> what does your log say
+16:09 < dubi> But when I call "socket.emit" nothing happens
+16:09 < dubi> Nothing
+16:09 < dubi> There are no errors
+16:09 < dubi> Session IDs on both the client and server are identical
+16:10 < DaMorpheuS> can you make a fiddle i have to make some dinner but i can take a look at it in like 30 -45 min
+16:10 < DaMorpheuS> privmsg it to me
+16:13 < dubi> https://gist.github.com/roieki/3b59c94907af3c4dcaa4
+16:16 < howdynihao> you doing it wrong
+16:16 < rump> does the browser have a way to add to the end of the event loop, process.nextTick style?
+16:17 < howdynihao> settimeout
+16:18 < rump> seemed hackish but it'll do, thanks :)
+16:19 < howdynihao> dubi why do you need a 'global.io' ?
+16:19 < dubi> no reason
+16:20 < dubi> I'm actually calling it from somewhere else
+16:20 < dubi> But regardless, it's not the reason, since as I say, I get the socket object
+16:22 < howdynihao> mostly referring to #5 in express.js
+16:22 < howdynihao> looks like you'retrying to emit from a list of sockets
+16:24 < howdynihao> theres probably a better , correct way to broadcast
+16:26 < dubi> It doesn't happen even if I emit to all sockets
+16:27 < dubi> And if I emit to one socket only by socket id
+16:37 < tesla_im_> Review my startup: https://news.ycombinator.com/item?id=5775232
+16:41 < tesla_im_> <corren>
+16:44 < r04r> Is the topic serious? About not asking questions without permission? :P
+16:45 < r04r> If so, sorry not for asking permission for asking that question, I suppose!
+16:45 -!- tjfontaine changed the topic of #Node.js to: it's easier to ask than to ask to ask - http://nodejs.org - http://logs.nodejs.org - http://stackoverflow.com/questions/tagged/node.js
+16:45 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+16:46 < r04r> tjfontaine <3
+16:47 <@tjfontaine> r04r: they could have also been talking about PM'ing people without permission
+16:47 < r04r> tjfontaine: I suppose so, just thought it amusing since so many channels have the opposite in their topic
+16:48 <@tjfontaine> r04r: looking at scroll back it was a joke
+16:48 < r04r> tjfontaine: ok :D
+16:50 < tesla_im_> built with node: https://www.tesla.im
+16:52 <@tjfontaine> JamesMGreene: I'm not sure there's a good way to expose the fd limit information, you could use getrlimit from https://npmjs.org/package/posix
+16:53 < JamesMGreene> tjfontaine: boo =(
+16:54 <@tjfontaine> erm, so much for a conversation about it
+16:54 < r04r> Does anyone know if I can write bytes, shorts, longs, etc to a network stream using node? I'm currently working with a buffer, but I'd like to write them one at a time... Unless buffers are cheap enough to just allocate them often?
+16:55 <@tjfontaine> r04r: in general buffers are cheap, write it like oyu want it to work until you find out it can't
+16:56 < r04r> tjfontaine: Being new to this aspect of the language I would love to find out best practises before I begin. I tried some googling, but couldn't find much on the subject
+16:58 < motaka2> does anyone knows of a good book to learn node.js ?
+17:07 < elliottcable> Sun Tzu's “Art of War”
+17:08 < r04r> Alternatively Fifty Shades of Grey
+17:12 < mscdex> Fifty Shades of Bike Shed
+17:15 <@tjfontaine> r04r: it can be expensive to allocate a bunch of buffers, but if they're small you're going to fall inside the internal caching mechanism, so really just write it like you want it to work and then do profiling to see if that's sensible
+17:16 < r04r> tjfontaine: Alright, thank you. I shall do that and see how it goes. They are in fact small, yeah. None of them should be larger than a kilobyte, or even a few hundred bytes.
+17:19 <@tjfontaine> r04r: there is Buffer.poolSize which is the size of the large internal buffer created, anything smaller than that is carved off the larger one, if you need larger you hit a bit more expense in creating it
+17:20 < gaf> hi, i need help with node being proxied by nginx. i had a domain working fine, but than, i created a new host file, for a second domain/node app and now the first app gives me a 502. ideas to where to start?
+17:20 < willwh_> gaf: I do that tons
+17:20 < willwh_> and it works
+17:20 < willwh_> so you just have another config in ~/sites-available, sym-linked to ~/sites-enabled ?
+17:20 < gaf> yup
+17:21 < willwh_> just with a server { } definition?
+17:21 < gaf> yup
+17:21 < willwh_> hmm, weird, I proxy like 17 sites through nginx to node.js running on tcp 3000
+17:21 < willwh_> all with seperate configs
+17:21 < gaf> i just changed the ports
+17:21 < gaf> 1 app listen to 3000 and the other 3001
+17:22 < gaf> ofc, proxy_pass mirror that change
+17:23 < gaf> i have some phpadmin settings there, maybe some conflict. i will comment that out and test
+17:23 < gaf> myadmin*
+17:23 < gaf> i got php running there too X)
+17:24 < gaf> the php sites are fine
+17:25 < gaf> willwh, so all of yours are on 3000? does't need 1 port for each app?
+17:29 < eviltik> hi i'm making a node module. I've a tests directory with 2 tests inside. When i npm test, only one is executed (test pass). If i remove the first one, the one which stay is executed (test pass).
+17:30 < eviltik> any idea which my 2 tests are not executed ? my package.json contain {"scripts":{"test":"tests/*.js"}} 
+17:30 < willwh_> gaf: I have php running too, using php5-fpm
+17:30 < willwh_> and no - all my sites use the same node app :P
+17:32 < tesla_im_> Review my startup: https://news.ycombinator.com/item?id=5775232
+17:33 < tesla_im_> or go here directly: www.tesla.im
+17:49 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+17:50 < chiel> hi guys, has anyone here used passport.js in combination with union and director? there's a lot of docs available for use with express, but not so much for union/director
+17:51 < eviltik> hi i'm making a node module. I've a tests directory with 2 tests inside. When i npm test, only one is executed (test pass). If i remove the first one, the one which stay is executed (test pass).
+17:51 < eviltik> any idea which my 2 tests are not executed ? my package.json contain {"scripts":{"test":"tests/*.js"}} 
+17:52 < eviltik> i'm using simple assert() in my tests
+17:56 < gaf> willwh, i found the issue
+17:58 < gaf> it was a problem with "forever" module. now i manualy spin node with "node app.js" and it works
+17:58 < gaf> willwh. do you use forever?
+18:18 < eviltik> mgrplgr ???!!! #!@!
+18:18 < eviltik> how do you explain that ?
+18:18 < eviltik> npm config set loglevel verbose
+18:18 < eviltik> npm WARN invalid config loglevel="help"
+18:18 < eviltik> i set verbose and npm warn me about "help" ???
+18:18 < eviltik> wtf
+18:19 < eviltik> and the second time it's ok ?@!~"?
+18:19 < Fishrock123> My module apparently doesn't have the method I've exported: https://gist.github.com/Fishrock123/5658391
+18:19 < willwh> gaf: I don't :)
+18:19 < willwh> I wrote an init script on debian
+18:19 < willwh> ;x
+18:20 < gaf> wow, i'm amazed :p
+18:20 < willwh> you like forvever?
+18:21 < willwh> I don't really have stability issues so\
+18:21 < willwh> I've never looked elsewhere
+18:21 < gaf> it is ok, apart i found out i can run 2 apps at he same time, odd
+18:21 < gaf> can't
+18:21 < gaf> i must be doing some mistake
+18:22 < gaf> i think forever is quite popular
+18:22 < gaf> anyone can explain why i can't run 2 apps with forever at the same time?
+18:23 < s5fs> gaf: why not just spin up two instances of forever?
+18:23 < s5fs> i haven't used forever btw
+18:26 < sw99> a complaint i have heard against "node.js" is that JS is slow, is that true?
+18:27 < gaf> lol
+18:27 < sw99> do most browsers these days, IE, chrome, firefox, opera, safari, … have fast JS?
+18:27 < elliottcable> Yep.
+18:27 < teadict> I think it's a bot
+18:27 < gaf> s5fs, not sure, seems that it creates instances on the fly
+18:27 < elliottcable> http://v8.googlecode.com/svn/data/benchmarks/v5/run.html
+18:27 < sw99> elliottcable: yes but v8 is only on chrome no?
+18:28 < gaf> v8 is the heart of node
+18:28 < elliottcable> Er, we're talking about Node.js, aren't we?
+18:28 < Foxandxss> sw99: node runs on v8
+18:28 < gaf> is built on the top of it
+18:28 < sw99> ah lol
+18:28 < sw99> cool
+18:28 < jetienne> sw99: chrome and ndoe.js yes
+18:30 < sw99> it was this video that got me worried at first, http://www.youtube.com/watch?v=1e1zzna-dNw
+18:30 < sw99> i guess i'm still just as excited to dive into node.js now
+18:30 < sw99> because people have refuted this guy elsewhere
+18:30 < s5fs> sw99: haha, that video
+18:31 < s5fs> "sloooooooowww"
+18:31 < echo|> Before I clicked, I was going to go find that video and say it was by far the worst
+18:31 < elliottcable> Dude, this video. omg.
+18:31 < s5fs> echo|: what's funny is that it's one of the most popular node.js vids on you tube
+18:31 < sw99> lol
+18:31 < elliottcable> Is this a joke?
+18:31 < echo|> s5fs: Yep. 
+18:31 < elliottcable> Right? Maybe?
+18:32 < echo|> elliottcable: Nope.
+18:32 < elliottcable> I'm pretty sure he's trolling.
+18:32 < elliottcable> Look at the way he's talkin', come on!
+18:32 < echo|> He's serious as a heart attack, read through the comments. 
+18:32 < echo|> This is what happens when someone gets jelly after investing like a career in a different language.
+18:33 < sw99> yeah one sees it everywhere
+18:33 < s5fs> echo|: i dunno, plenty of ppl (myself included) have substantial investments in other tech besides js but don't feel this way. i'm not sure what it takes to cook up someone like him.
+18:33 < s5fs> anyways, if i'm scripting i've already decided that i want minimal performance concerns. i'm trying to stay high-level and leave the guts to the c++ smarties.
+18:36 < echo|> It definitely requires a particular personality type. Anyone who resorts to youtube to display their opinions in a "bashing" video has a special place in my book as it is ;)
+18:36 < elliottcable> I wouldn't say he's jealous.
+18:36 < elliottcable> If he believes what he's saying, he's just a generally over-invested techie.
+18:37 < syskk> is there any way to get a list of event listeners? i am currently wondering what is preventing my script from terminating and I have no idea
+18:37 < elliottcable> There's no reason for him to be *jealous* of Node, it's no *better* than anything else.
+18:38 < echo|> My jealous-ness accusations were more directed to the new "shiny" getting attention, as opposed to whatever it is he prefers and thinks is the end-all be-all.
+18:38 < s5fs> the way I figure, anytime someone says "X is perfect" means they don't have enough experience with X to tell you the shortcomings. we all go through a honeymoon phase with tech, but marriage is understanding and accepting faults :)
+18:38 < sw99> but is JS as pleasant to use as Ruby? (I know neither, but Ruby has been hyped up to be amazing)
+18:38 < s5fs> echo|: we all know the winner will be embedded J#
+18:38 < sw99> so for me it's Ruby/Sinatra   vs.   Node.js
+18:38 < Zolmeister> ruby sucks, python is much better
+18:38 < sw99> :S
+18:38 < sw99> lol
+18:38 < elliottcable> I prefer to have an open-relationship with my tech.
+18:38 < elliottcable> We both sleep around a lot.
+18:39 < elliottcable> Sometimes we even invite other tech into our projects.
+18:39 < s5fs> sw99: most of the ruby hype is rails hype (from what I can tell)
+18:39 < echo|> Lol, I come from the school of play-to-strengths.
+18:39 < s5fs> elliottcable: sounds exciting
+18:39 < elliottcable> Y'know, Rakefiles in my Node apps; Haskell generators all o'er the place.
+18:39 < elliottcable> It's the way to roll. It's just more *fun* that way, y'know?
+18:39 < syskk> answer anyone?
+18:39 < elliottcable> I like to watch, too.
+18:39 < echo|> I've also noticed a lot of the ruby-hate is actually misplaced Rails hate.
+18:39 < s5fs> well who I am to "yuck" another person's "yum"
+18:40 < elliottcable> sw99 ⑊ Well, make sure to learn CoffeeScript if you want a Ruby-esque experience.
+18:40 < s5fs> echo|: most folks can't separate the framework from the language, that's why you see so much "rails vs node" as if they're directly comparable
+18:40 < elliottcable> Rails is *so* terrible.
+18:40 < elliottcable> Ruby itself is a truly excellent language.
+18:40 < Zolmeister> ruby syntax is horrible
+18:41 < syskk> ah i found the guilty one: redis session
+18:41 < s5fs> syskk: for shame redis session!
+18:41 < syskk> shame on him! :D
+18:42 < syskk> shame on https://github.com/visionmedia/connect-redis/blob/master/lib/connect-redis.js#L43
+18:43  * s5fs watches syskk rub line 43's nose in carpet
+18:43 < syskk> it doesn't even advertise it does some async kung fu in the background… doesn't take any callback
+18:43 < echo|> For some reason I really wanted to say "It just works!" really loudly.
+18:44 < echo|> Too many startup pitches these eyes have seen.
+18:44 < s5fs> echo|: bonus points if you startle a co-worker
+18:45 < echo|> :( My nearest co worker is like ~300 miles. Remote work ftl when it comes to office disruption. I startled my dog though.
+18:46 < sw99> The "persistent server-client connection" in Node.js (the ability to do live update of data), is that available only in recent browsers?
+18:46 < sw99> will IE6 support it?
+18:46 < sw99> or IE7?
+18:46 < Zolmeister> You support IE6?
+18:46 < sw99> nah, fuck IE6
+18:46 < r04r> sw99: One option is socket.IO which lists http://socket.io/#browser-support
+18:47 < echo|> That depends upon the method/framework you use in the browser itself, most of the ones like socket.io fallback to support.
+18:47 < sw99> ok
+18:47 < sandfox> Hey everyone, has anyone seen this weird error before in node core :: Assertion failed: (stream->write_queue_size == 0), function uv__write, file ../deps/uv/src/unix/stream.c, line 726.
+18:48 < sandfox> I found a similar bug from 2 years ago but thats as far as I've got https://github.com/joyent/node/issues/1720
+18:50 < WalkerAlencar> hi, any BRazilian?
+18:51 < WalkerAlencar> Algum brasileiro por ae?
+18:53 < pringlescan> hello all, does anyone have a data grid they really like?
+18:53 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+18:56 < Fishrock123> Is there anything that would cause all of a modules exports to become undefined?
+18:57 < Zolmeister> Fishrock123: is you defined module.exports=undefined
+18:57 < Zolmeister> if*
+18:57 < Fishrock123> Hell no lol.
+18:58 < Fishrock123> Zolmeister: This is what (simplified) my files look like: https://gist.github.com/Fishrock123/5658391
+18:59 < Zolmeister> if you run those files, does it work?
+19:05 < Fishrock123> Maybe nodejitsu has issues with this then.
+19:19 < chiel> does anyone here us director for url routing? i was wondering if there's any shorthand for redirecting requests.
+19:21 < Zolmeister> res.redirect('/')
+19:21 < chiel> ah, thank you :)
+19:22 < chiel> i had logged it, but i didn't know what the function signature was
+19:22 < chiel> is a http status code an optional second argument, or?
+19:22 < Zolmeister> I think so
+19:23 < echo|> Fishrock123: Don't you mean to prefix exports in blog.js with module.?
+19:23 < chiel> ok ta
+19:23 < Fishrock123> echo|: I was fairly certain you didn't have to do that?
+19:24 < echo|> I can easily be wrong
+19:26 < Fishrock123> echo|: I actually hope it;s this simple.
+19:26 < Fishrock123> ... nope :(
+19:34 < volitek> How do you add methods to stuff in a postgresql database?
+19:36 < floody> hello
+19:41 < zenetik> hi, probably stupid question, but i was thinking that i can put "scripts": {"test": "tests/*.js"} in my package.json 
+19:41 < zenetik> but only the first file is taken (of course ...)
+19:41 < zenetik> is there a simple and stupid way to launch multiple js test file directly in package.json ?
+19:42 < eddyb> hi, I'm trying to use node-inspector to visualize my heap
+19:43 < eddyb> but apparently I need https://github.com/dannycoates/v8-profiler for that. and it's not updated :(
+19:46 < eddyb> oooh http://nodetime.com/
+19:49 <@Nexxy> hay guise can i ask a question?!????
+19:50 < nathan7> Nexxy: NO
+19:50 < nathan7> Nexxy: What do you think this place is?
+19:50 <@Nexxy> ... an extension of my mother's basement?
+19:51 < elliottcable> Nexxy ⑊ yes what is your question ask your question damnit what is it
+19:52 <@Nexxy> elliottcable, has anyone really ever been far even as decided to use even go want to do look more like?
+19:52 < nathan7> Nexxy++
+19:54 < Havvy> Nexxy: Yes.
+19:55 <@Nexxy> Havvy, how can we be certain?
+19:56 < Havvy> By section 4.8 subparagraph 'n' of the Treaty of Widgets.
+19:56 < Willox> elliottcable, not those damn characters again
+19:56 < elliottcable> <3 Nexxy
+19:57 <@Nexxy> <3
+19:57 < elliottcable> nathan7 ⑊ It doesn't work unless you prefix it. Which I should probably fix but meh.
+19:57 < elliottcable> -wholoves Nexxy
+19:57 < purr> elliottcable: Nexxy is loved by elliottcable.
+19:57 < elliottcable> see? no nathan7.
+19:58 < Havvy> -wholoves Havvy
+19:58 < purr> Havvy: Havvy is loved by no one :(
+19:58 < Havvy> Hmm, how does purr decide who is loved by whom?
+19:58 <@Nexxy> <3 Havvy 
+19:58 < Havvy> -m
+19:58 <@Nexxy> -wholoves Havvy 
+19:58 < purr> Nexxy: Havvy is loved by Nexxy.
+19:58 < Havvy> <3 Nexxy
+19:58 < Havvy> <3 ashnur
+19:58 < Havvy> -wholoves Nexxy
+19:58 < purr> Havvy: Nexxy is loved by elliottcable and Havvy.
+19:59 <@Nexxy> HEARTS FOR EVERYONE!
+19:59 < Sly> <3 Nexxy
+19:59 < Sly> ;D
+19:59 <@Nexxy> <3 Sly 
+19:59 < Sly> How's you?
+19:59 < Sly> :3
+19:59 < Willox> elliottcable, is there an amazing story behind ell.io?
+19:59 < Willox> It makes me feel pretty happy inside
+19:59 < Havvy> -wholoves Nexxy
+19:59 < purr> Havvy: Nexxy is loved by elliottcable, Havvy, and Sly.
+20:00 <@Nexxy> Sly, laggy! :(
+20:00 < Sly> :(
+20:00 < Sly> Poor internets.
+20:01 < Sly> What are you doing to murder your connection?
+20:01 < elliottcable> Willox ⑊ How d'ya mean?
+20:01 < Havvy> Downloading all the porn. ;)
+20:02 < elliottcable> Purr's tracking is really simple:
+20:02 < Sly> Havvy: it wouldn't surprise me. Nexxy has to teach her robot army how to reproduce.
+20:02 < Willox> Well it links to a lot of different elliots
+20:02 < elliottcable> “<3 foo” is love,
+20:02 < Willox> I thought it was pretty cool
+20:02 < elliottcable> “ಠ_ಠ foo” is disapproval
+20:02 < elliottcable> and “++ foo” and “-- foo” increments/decrements through love, neutrality, and disapproval.
+20:02 < elliottcable> <3 Willox
+20:02 < Willox> what are my loves
+20:02 < elliottcable> -wholoves Willox
+20:02 < purr> elliottcable: Willox is loved by elliottcable.
+20:03 < elliottcable> -- Willox
+20:03 < Willox> aw
+20:03 < elliottcable> -wholoves Willox
+20:03 < purr> elliottcable: Willox is loved by no one :(
+20:03 < Willox> :(
+20:03 < elliottcable> -- Willox
+20:03 < elliottcable> -whohates Willox
+20:03 < purr> elliottcable: Willox is hated by elliottcable.
+20:03 < Willox> :o
+20:03 < elliottcable> ++ Willox
+20:03 < elliottcable> -whohates Willox
+20:03 < purr> elliottcable: Willox is hated by no one :)
+20:03 < Willox> <3 Willox
+20:03 < elliottcable> -wholoves Willox
+20:03 < purr> elliottcable: Willox is loved by no one :(
+20:03 < Willox> :(
+20:03 < elliottcable> lol
+20:03 < elliottcable> he's really PG-13 in this channel
+20:03 < elliottcable> but he'd call you an egotistical prick if you tried to love yourself, elsewhere
+20:03 < elliottcable> :3
+20:03 < Willox> That's charming
+20:03 < elliottcable> anyway. For reals this time:
+20:03 < elliottcable> <3 Willox
+20:03 < elliottcable> :)
+20:03 < elliottcable> as for what you love/hate that he knows about,
+20:04 < Willox> Is that all it does?
+20:04 < elliottcable> -loves Willox
+20:04 < purr> elliottcable: Willox doesn't love anything :(
+20:04 < elliottcable> -hates Willox
+20:04 < purr> elliottcable: Willox doesn't hate anything :)
+20:04 < Willox> How much does it understand?
+20:04 < Willox> <3 cheese
+20:04 < Willox> -loves Willox
+20:04 < purr> Willox: Willox loves cheese.
+20:04 < elliottcable> -loves elliottcable 
+20:04 < Willox> I love popcorn
+20:04 < purr> elliottcable: elliottcable loves cloudhead, devyn, tucker, gqbrielle, IamTash, Bluebie, alexgordon, Breaking Bad, zsh, purr, locks, last.fm, Zero 7, Tiberian Sun, cold, berri, NuckOff, git, George R. R. Martin, github, OS X, micahjohnston, ChelseaP, GitHub, brits, the cock, SubStack, Aria, isaacs, negative space, Lua, zzap, logs, #elliottcable, russfrank, Kaufmann Mercantile, iPad, tmux, SSH, Prompt.app, Little Snitch, Ronald Jenkees, JavaScript, judofyr, Primer, Solar
+20:04 < Willox> -loves Willox
+20:04 < purr> Willox: Willox loves cheese.
+20:04 < Willox> Good enough
+20:04 < Willox> Any plans to make it better at english?
+20:04 < elliottcable> nope!
+20:04 < Willox> I'm glad to see you love Lua
+20:04 < elliottcable> but somebody in my channel's trying to write a purr replacement that does full NLP
+20:05 < elliottcable> imo, a failed endeavour from the start
+20:05 < elliottcable> anyway. Back to fixing a parser, with me.
+20:05 < elliottcable> o7 all.
+20:05 < Willox> What's your channel?
+20:05 < elliottcable> invite'd
+20:05 < Willox> i'll try to work out what that means one day
+20:05 < elliottcable> I sent an invite to your client. It should show you somewhere. Check your “status” or “console” window?
+20:08 < elliottcable> Hey.
+20:08 < elliottcable> Is there a way to change the default descent-depth in the Node repl?
+20:12 < ashnur> hahah
+20:12 < ashnur> whats with the hearts?
+20:14 < Havvy> -wholoves ashnur
+20:14 < purr> Havvy: ashnur is loved by Havvy.
+20:14 < ashnur> ah, gotit :)
+20:14 < Havvy> That missing space...
+20:22 < alan_bradley> hi, has anyone used restify-oauth2 to create a login form?
+20:36 <@isaacbw> -loves isaacbw
+20:36 < purr> isaacbw: isaacbw doesn't love anything :(
+20:36 <@isaacbw> :(
+20:39 < elliottcable> I'm genuinely sorry that I've never gotten around to supporting postfix-increment-operator loves.
+20:39 < elliottcable> Right now is about when I'm starting to wish I'd open-sourced him sooner.
+20:41 < rmill> isaacs: Get a seed box in Sweeden ;)
+20:47 < floody> could someone show me a good example of handling nested cpp objects as an addon to node? i already checked few modules from the npm but i didn't get it yet
+21:16 < samholmes> Does Juice work on the client-side?
+21:20 < samholmes> I'm trying to build a real-time preview for an email; I want it to run in the client-side so that I don't have to make round-trips to the server just to render the EJS and Juice template.
+21:20 < samholmes> Anyone here know about LearnBoost's Juice module?
+21:25 < dorkmafia> anyone created a wrapper for c++ before
+21:26 < Snugug> RobW_: Hey, you have a moment?
+21:28 <@isaacbw> dorkmafia: no one ever
+21:29 < RobW_> Snugug: Sure, what's up?
+21:30 < Snugug> I've got my index.js and templates set up, I want to test what I've got so far. How do I do so?
+21:30 < Snugug> Do I need to roll it as an NPM package and install it to test? Or is there another way?
+21:30 < dorkmafia> anyone know what i'm doing wrong here? http://pastebin.com/mEpFY24a
+21:32 < RobW_> Snugug: You can just drop your generator into a node_modules directory and run yo [foldername minus generator]
+21:33 < RobW_> I don't' think there's anything special that needs to be done to register it with yo, aside from being local.
+21:34 <@isaacbw> dorkmafia: are you fluent with c++?
+21:34 < samholmes> Hey substack, why do you argue that using the command-line for creating you browserify bundle is better than using middleware?
+21:35 < RobW_> Snugug: There used to be a node project that let you debug node with chrome dev tools, but since 10.x it's non-functional.
+21:35 < Snugug> RobW_: Do I need a package.json file?
+21:35 < RobW_> Snugug: Lot of yo jekyllrb and console logs when building mine...
+21:35 < dorkmafia> isaacbw: i'm adequate at c++
+21:35 < Snugug> I've moved my project into node_modules and yo {project}-generator doesn't work
+21:35 < RobW_> Snugug: Yeah, believe so.
+21:35 < RobW_> It needs to know what the dependencies are, etc.
+21:35 < dorkmafia> isaacbw: I just grabbed this example off nodejs.org
+21:36 < dorkmafia> the node-gyg configure build works fine
+21:37 < RobW_> Snugug: I just commented out everything in generator-webapp, then uncommented piece by piece from the top down. Prompts, then prototype methods, then templating, then grunt file.
+21:37 < Snugug> RobW_: https://github.com/yeoman/yeoman/wiki/Generators#using-generator-generator These instructions don't work. Awesome.
+21:38 < RobW_> Snugug: What's the issue? I looked at gen-gen, but it seems like most yeo 1.0 work is being done on webapp first, so just copied from webapp master
+21:39 < Snugug> RobW_: I'm going to try that
+21:40 < RobW_> Snugug: Honestly I'd let generator-generator have some time to catch up before I used it. It basically fills in a couple fields for you, but doesn't give you as much of a starting point as web app.
+21:40 < Snugug> Yah
+21:40 < RobW_> Trying to hit a moving target.
+21:40 < levilewis> I'm going crazy trying to get a simple data association to work with sequelizejs. I must be missing something obvious
+21:41 < RobW_> Snugug: There's #yeoman too, prob a better place to have future discussions. Not super populated but every once in a while a dev team member shows up, and people answer their own questions a couple hours later.
+21:41 < Snugug> Yup
+21:45 < dorkmafia> yup
+21:47 < samholmes> Browserify has changed a lot since 1.15
+21:47 < samholmes> Where's 1.15 docs?
+21:48 < shanejonas> samholmes: https://github.com/substack/node-browserify/tree/v1
+21:48 < shanejonas> doesnt deep link to the wiki etc though which sucks
+21:50 < samholmes> shanejonas: yeah
+21:50 < samholmes> that's no good. :]
+21:50 < samholmes> :\
+21:50 < samholmes> I'm using browserify like this: http://pastie.org/7970970l
+21:51 < samholmes> shanejonas: have you ever used it like this?
+21:52 < vandenoever> is there a c++ equivalent to node.js? an http library that has the same event driven model?
+21:53 < samholmes> All I want to do is create another bundle. How can I create another bundle and give it another route path like "/admin/bundle.js"?
+21:53 <@isaacbw> vandenoever: node works because of closures
+21:53 < shanejonas> samholmes: link is broken
+21:53 <@isaacbw> it would be miserable to try to emulate the same thing with c++
+21:53 < samholmes> Browserify used to export a middleware function?
+21:53 <@isaacbw> besides, writing web applications with c++ is a terrible idea
+21:54 < samholmes> shanejonas: http://pastie.org/7970970
+21:54 < samholmes> Why doesn't browserify export a middleware function anymore?
+21:54 < shanejonas> samholmes: to keep it simple
+21:54 < mscdex> vandenoever: node uses libuv, which you could use standalone if you want
+21:54 < samholmes> What was so bad about having a middleware function for Connect/Express?
+21:54 < samholmes> shanejonas: Middleware is simpler than CLI
+21:55 < samholmes> shanejonas: unless I'm mistaken
+21:55  * samholmes is confuzled
+21:55 < shanejonas> i just compile to ./public/application.js now basically and then reference ./public/application.js in my index.html
+21:55 < vandenoever> isaacbw: i like the type safety of c++
+21:55 < shanejonas> i wrote this: https://github.com/shanejonas/grunt-browserify2
+21:56 < shanejonas> compile: {
+21:56 < shanejonas>       entry: './build/entry.js',
+21:56 < shanejonas>       compile: './public/application.js'
+21:56 < shanejonas>     }
+21:56 < shanejonas> basically
+21:56 < samholmes> shanejonas: but when developing, I have to run the compile every single time I want to test my app
+21:56 <@isaacbw> shanejonas: please put multiline pastes in a paste site
+21:57 < vandenoever> mscdex: thanks, i'll have a look
+21:57 < shanejonas> samholmes: i use cache-coffeeify to get around that
+21:57 < shanejonas> there may be something for normal js
+21:58 < samholmes> shanejonas: what's grunt?
+21:58 < samholmes> a lot of new things here
+21:58 < samholmes> I've been coding in a bubble. :P
+21:58 < shanejonas> so you need default tasks for you new project
+21:58 < shanejonas> like compiling sass, coffeescript, etc
+21:58 < shanejonas> and then minifying/linting etc
+21:59 < samholmes> this project isn't new
+21:59 < samholmes> I've been working on this project for over a year
+21:59 < shanejonas> grunt is a tool that provides packages that do that for you, with a config file. Gruntfile.js
+21:59 < shanejonas> ahh
+21:59 < shanejonas> so what oyu can do is just make an express plugin for it
+21:59 < samholmes> for grunt?
+22:00 < shanejonas> browserify, if you wanted to use browserify2 with the express middleware
+22:00 < samholmes> shanejonas: how do you develop; do you use nodemon?
+22:01 < shanejonas> looks like someone did it already: https://github.com/dstrek/node-browserify-express
+22:01 < shanejonas> samholmes: i use grunt and a custom task to restart my express server
+22:02 < samholmes> So is grunt a program you can run on it's own
+22:02 < samholmes> you can give it "tasks" and it'll automate them?
+22:02 < shanejonas> its just a node module
+22:02 < samholmes> Oh, it's not a program like node-inspector that you run?
+22:02 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+22:02 < shanejonas> no no no, its like a Makefile that pulls in other programs to compile your project
+22:03 < shanejonas> heres some documentation on what a Gruntfile looks like: https://github.com/gruntjs/grunt/wiki/Sample-Gruntfile
+22:03 < samholmes> I heard of makefile, but I've never used it
+22:03 < shanejonas> what do you use right now to minify/etc?
+22:05 < samholmes> shanejonas: I don't have a minification step yet
+22:05 < samholmes> I would assume my app would just run a minification routine on the production build
+22:05 < samholmes> I wouldn't want to minify on the development build.
+22:05 < samholmes> But, what I use is just straight out express middleware
+22:06 < shanejonas> gotcha. that express plugin i linked should work the same way the old browserify did. and you can upgrade to browserify2
+22:06 < samholmes> As you know I'm using browserify 1.15, so I have the old API
+22:06 < shanejonas> yea
+22:06 < samholmes> shanejonas: I'm interested in how you and others use browserify. I feel like I'm doing things wrongly.
+22:07 < samholmes> substack mentioned that he doesn't use middleware/api, is this better in some way that I'm missing?
+22:07 < samholmes> are these build steps any good, (I don't have a build step)
+22:08 < shanejonas> its just too complicated to maintain an express middleware plugin and he wants to just keep it tiny i think
+22:10 < shanejonas> samholmes: my setup uses grunt, when i make a change it recompiles my project, runs livereload, then the browser reloads itself (if its css it only only reload css)
+22:10 < shanejonas> and it only recompiles css when css changes and js when it changes. 
+22:10 < shanejonas> but i use coffeescript(dont hate me) so i need a compile step
+22:13 < samholmes> I see
+22:13 < samholmes> how does grunt know when this happens?
+22:13 < samholmes> when you run nodemon, it'll watch your files
+22:13 < samholmes> if a file changes, it reloads the app
+22:13 < shanejonas> grunt itself really just runs other grunt tasks. so it has a watch one: https://github.com/gruntjs/grunt-contrib-watch
+22:14 < shanejonas> has an option for livereload now too
+22:15 < shanejonas> samholmes: theres a grunt-nodmon too to give you an idea of what grunt actually does: https://github.com/ChrisWren/grunt-nodemon
+22:20 < samholmes> shanejonas: This is interesting. Would you say using grunt, or having a compile/build step is a lot better than not?
+22:21 <@isaacbw> if you need a build step, you need a build step
+22:21 < samholmes> isaacbw: do I need a build step? :S
+22:22 < shanejonas> samholmes: for my projects I almost always need minification, and appcache
+22:23 < samholmes> shanejonas: do you blog?
+22:23 < shanejonas> i have 1 post on my blog zz
+22:24 < samholmes> ah lol
+22:24 <@isaacbw> samholmes: probably ;)
+22:24 < shanejonas> samholmes: more coming though lol
+22:24 < samholmes> I only ask cause I was wondering if you had a article on how you use grunt and develop etc.
+22:24 < samholmes> maybe that could be your next blog entry^
+22:24 < samholmes> :P
+22:25 <@isaacbw> grunt is just a plug n play alternative to makefiles
+22:25 < shanejonas> ^^
+22:25 < samholmes> I can't do all these things to set up grunt atm, I need quick solutions.
+22:25 < samholmes> well, what's a makefile? :P
+22:25 <@isaacbw> wait, seriously?
+22:25 < samholmes> isaacbw: yes seriously.
+22:25 < samholmes> I code in a bubble
+22:25  * samholmes already said that.
+22:25 <@isaacbw> https://www.gnu.org/software/make/manual/make.html
+22:26 <@isaacbw> samholmes: a really really tiny bubble
+22:26 < samholmes> reading that may take a while..
+22:27 < samholmes> in order for me to understand makefiles I have to read all of that?
+22:27 <@isaacbw> hah no
+22:27 <@isaacbw> just read the introduction
+22:27 < mscdex> man pages should be standard reading material in classrooms
+22:27 <@isaacbw> though you should also be familiar with your shell or they won't be very useful
+22:27 < mscdex> man page textbooks!
+22:28 <@isaacbw> but if you aren't familiar with your shell, that's a huge gap as well
+22:28 <@isaacbw> mscdex: it seems like people don't even know how to read documentation if it isn't a tutorial
+22:29 < samholmes> mscdex: wouldn't help me much, as I don't go to class rooms
+22:29 < mscdex> i mean for the young kids out there!
+22:29 < samholmes> Ah
+22:29 < mscdex> :-D
+22:29 <@isaacbw> samholmes: you're on a unixy platform, right?
+22:29 < samholmes> I understood that a makefile tells make what to do.
+22:29 < samholmes> But I don't really know what make does
+22:29 < samholmes> isaacbw: as of a few months, I have OS X
+22:29 <@isaacbw> keep reading
+22:30 < samholmes> for the longest ass time I've been stuck with windows.
+22:30 <@isaacbw> alright, well most software in the unix world is built with make
+22:30 < samholmes> if I know how to use make, do I need grunt?
+22:30 <@isaacbw> no
+22:30 < samholmes> isaacbw: do you not use grunt?
+22:30 <@isaacbw> no
+22:30 < samholmes> -not
+22:30 < samholmes> double negatives
+22:30 <@isaacbw> I use makefiles and shell scripts
+22:31 < mirko_> does anyone know how to delete a message on gmail with node-imap?
+22:31 < samholmes> and vim?
+22:31 <@isaacbw> hah, yup. I actually recently switched to vim from emacs
+22:31 < mirko_> tried adding a delete flag or moving the message into trash with no success
+22:31 < mirko_> Error: Cannot move message: server does not allow deletion of messages // Error: The flag "deleted" is not allowed by the server for this mailbox
+22:31 < shanejonas> isaacbw: why?
+22:31 < shanejonas> isaacbw: vim is so good
+22:32 < samholmes> shanejonas: he said he switched
+22:32 <@isaacbw> yea, so I switched to it :)
+22:32 < shanejonas> ohhh
+22:32 < shanejonas> well the
+22:32 < shanejonas> then
+22:32 < shanejonas> <3
+22:32 < samholmes> I don't use it
+22:32 < samholmes> I use sublime text
+22:32 < mscdex> mirko_: can you post your code to a gist?
+22:33 <@isaacbw> but becoming familiar with the shell and unix text processing utilities will make you a much more productive developer
+22:33 < mirko_> sure
+22:33 < samholmes> I suppose
+22:33 < samholmes> but there are major annoyances that others can deal with it seems
+22:33 < samholmes> major for me
+22:33 < samholmes> minor for others
+22:33 <@isaacbw> only because you aren't familiar with it
+22:34 < samholmes> true
+22:34 < samholmes> but take this for example:
+22:34 <@isaacbw> well, if you're looking for something to invest some time in learning, it should be using the shell (pipes, >, <, etc) and makefiles
+22:34 < samholmes> when in command mode in vim, move your cursor to the end of a line, press i, you're at the penultimate char, not the last char..
+22:34 < ningu> isaacbw: what would you recommend as the most practical way to do in-place search/replace across a whole directory of files?
+22:34 < shanejonas> Ack
+22:34 <@isaacbw> sed
+22:34 < shanejonas> :(
+22:35 < ningu> I do that all the time in textmate but I like to see first what will be replaced
+22:35 < ningu> to be sure I got the pattern right
+22:35 < samholmes> isaacbw: did you get that?
+22:35 < ningu> can sed recurse through dirs?
+22:35 <@isaacbw> samholmes: you want 'a', not 'i'
+22:35 < mh`> hey substack, got a sec? wanted to ask simple question about ploy and its node 0.8 dep
+22:35 < samholmes> isaacbw: that too me is a major annoyance, let alone not being able to simply click to were I want to go.
+22:35 < ningu> or do you have to do find . -exec sed -i s/// {} ';' ?
+22:35 < samholmes> isaacbw: a stands for what?
+22:35 <@isaacbw> append
+22:36 <@isaacbw> samholmes: and there is gvim, which is a gtk wrapper for vim that lets you click around
+22:36 < samholmes> it essentially just goes into insert mode and places your cursor after the highlighted character?
+22:36 <@isaacbw> these 'annoyances' have been solved for a long time :)
+22:36 < shanejonas> isaacbw: :set mouse=a
+22:36 <@isaacbw> samholmes: yup
+22:36 <@isaacbw> it's like i + 1
+22:36 < ningu> yeah, $a is to append at the end of a line
+22:36 < floody> samholmes: next time hit 'a' at end of the line :)
+22:37 < samholmes> nice
+22:37 < ningu> also, J is a fun command
+22:37 <@isaacbw> ningu: or just A
+22:37 < samholmes> like isaacbw said, its cause I don't know
+22:37 < mh`> to be clear you can use that mouse mode not just in gvim
+22:37 < mh`> if your term is set up properly
+22:37 < samholmes> gvim works on mac?
+22:37 < mh`> no use macvim
+22:37 < ningu> isaacbw: oh yeah, forgot about that one
+22:37 < mh`> i was about to type that :)
+22:37 < mh`> samholmes: do you have homebrew?
+22:37 < samholmes> ah
+22:37 < samholmes> mh`: yup
+22:37 <@isaacbw> mh`: oh cool
+22:37 < mh`> brew install macvim
+22:38 < mh`> it's pretty nice
+22:38 < mh`> even has mountain lion full screen support
+22:38 < samholmes> does macvim run with the command of the same name?
+22:38 < mh`> so thats how i use it
+22:38 < mh`> nope it runs with 'mvim'
+22:38 < mirko_> mscdex: just posted the tests at https://gist.github.com/buholzer/50f5d93c120976e847ba
+22:38 < mh`> doesn't mess up your terminal vim
+22:38 < samholmes> I see
+22:38 < mh`> so then in your .vimrc
+22:38 < mh`> use
+22:38 < samholmes> why doesn't backspace work sometimes in terminal?
+22:38 < mh`> if has('gui_running') …. endif
+22:38 < samholmes> it adds wierdness like ^H charaters
+22:38 < mh`> to do things that you want to effect mvim only
+22:39 < mh`> samholmes: improper environment settings
+22:39 < mh`> samholmes: you using iterm2?
+22:39 < ningu> samholmes: something wrong in your settings
+22:39 < samholmes> can mvim work over SSH?
+22:39 < mh`> no, it runs outside of the terminal in its own cocoa native window
+22:39 < samholmes> I'm using Terminal on Mountain lion
+22:39 < mh`> it's like, MacVim.app
+22:39 < mh`> the mvim is just a convenience/launcher
+22:40 < mirko_> mscdex: function deleteAllMessages()
+22:40 < samholmes> mh`: I don't see the point of using macvim if it's like sublime text where you just leave the terminal
+22:40 < samholmes> the whole point of leaving vim is so that anywhere in a terminal I can use it.
+22:40 < mh`> it is- well, the reason for me is that it performs better
+22:40 < mh`> and you can still do that because you can use vim and macvim with the same vimrc setup
+22:40 < mh`> which is what i do
+22:41 < mh`> thats why i pasted that if block guard for you
+22:41 < mh`> i use that to use a different font in macvim
+22:41 < samholmes> well, installing macvim causes the issue that I'm depending on a better vim, not vim itself
+22:41 < dorkmafia> samholmes: have you tried :e scp? you should probably ask in #vim
+22:41 < mh`> samholmes: if you rely on the menus, yes
+22:41 < mh`> samholmes: i don't
+22:41 < samholmes> dorkmafia: what's that for?
+22:41 < mh`> i run it fullscreen and it's just better looking because of the rendering performance etc
+22:41 < mh`> by no means do you need it to have mouse support
+22:42 < dorkmafia> samholmes: :help scp
+22:42 < mh`> samholmes: re your backspace key question, did you mean only in vim?
+22:42 < mh`> or it happens in shell too
+22:43 < antiface> Anyone know any good tutorials or other resources for using node.js with the Twitter API and mongodb?
+22:43 < dorkmafia> anyone know what i'm doing wrong here? http://pastebin.com/mEpFY24a still can't figure out why everything works fine with node-gyp but wont run with node..
+22:44 < antiface> I can do the Twitter / MongoDB thing in Python, but think Node.js would be much better.
+22:44 < samholmes> rather than me learning by asking people, there should be a book or tutorial or course I can read or watch that can teach me all of this, or is this what college is for?
+22:44 < samholmes> I highly doubt college is the only place where this knowledge and information is available.
+22:44 < mh`> vim?
+22:44 < antiface> There's always a resource online, sometimes they are hard to find.
+22:44 < samholmes> vim, terminal stuff
+22:44 < samholmes> bash stuff
+22:44 < mh`> i didn't go to college
+22:44 < samholmes> command line stuff
+22:44 < mh`> or most of high school
+22:44 < samholmes> mh`: didn't graduate?
+22:45 < samholmes> HS that is
+22:45 < mh`> i did
+22:45 < mh`> barely
+22:45 < samholmes> haha
+22:45 < mh`> and a year early
+22:45 < dorkmafia> samholmes: they have this cool thing called google :)
+22:45 < mh`> yeah google is pretty comprehensive
+22:45 < samholmes> finishing high school this week (if i can)
+22:45 < antiface> hehe Google, wazzat? ;-)
+22:45 < mh`> be happy that like, google exists
+22:45 < mh`> it didn't, well not in its current form, when i was in school
+22:45 < mh`> heh
+22:45 <@TooTallNate> dorkmafia: you need the NODE_MODULE_INIT macro
+22:45 < dorkmafia> samholmes: for vim i rec u start here: http://www.derekwyatt.org/vim/vim-tutorial-videos/
+22:46 < samholmes> it's annoying that I have to spend time reading a bullshit psychology book otherwise people will look down on me.
+22:46 < dorkmafia> TooTallNate: hm I grabbed this off the nodejs.org site I guess it's out of date
+22:46 < ningu> samholmes: you won't learn vim in college either. basic skills like vim, git, etc. don't seem to really be taught anywhere formally.
+22:46 < samholmes> ningu: then WTF is college for
+22:47 < samholmes> ?
+22:47 < ningu> although you shouldn't take my word for it, since I didn't take the classes where it might theoretically have been taught.
+22:47 < antiface> ningu: That is so true.
+22:47 <@TooTallNate> dorkmafia: sorry, it's just NODE_MODULE
+22:47 <@TooTallNate> dorkmafia: and I see them listed http://nodejs.org/api/addons.html
+22:47 < dorkmafia> ningu: I learned vim in college though that was years ago
+22:47 <@TooTallNate> dorkmafia: which page are you looking at?
+22:47 < antiface> samholmes: I think college is to become a college teacher.
+22:47 < samholmes> I hate the pressure from everyone saying you have to graduate HS and go to college, when I see it not doing shit for me..
+22:47 < samholmes> antiface: that's rediculous..
+22:47 < ningu> samholmes: I've never taken a CS course. and I'm an academic so I'm also not the person to ask what college is for. 
+22:48 < samholmes> ningu: You _are_ and academic?
+22:48 < dorkmafia> http://nodejs.org/api/all.html#all_wrapping_c_objects - i think i was actually missing the addon.cc
+22:48 < dorkmafia> frack
+22:48 < ningu> samholmes: yes... what's the question?
+22:48 < samholmes> ningu: I'm confused cause I thought that would mean that you attend academia.
+22:49 < ningu> I don't know what it means to attend academia.
+22:49 < antiface> Does anyone know of any good tutorials or other resources for: Nodejs + Twitter API + MongoDB?
+22:49 < mscdex> mirko_: try changing the second argument to openBox from true to false
+22:49 < ningu> I'm finishing up a ph.d. and will go on the academic job market after that. although I may end up in tech due to it being hard to get an academic job. but in any case I'm an academic :P
+22:49 < mscdex> mirko_: true means open the box in readonly mode
+22:50 < mirko_> mscdex: will try, thanks!
+22:50 < antiface> I have good Twitter npm packages, good MongoDB npm packages.. just having a hard time putting them together.
+22:50 < ningu> antiface: maybe you should ask a question about what you're having trouble with, then.
+22:51 < antiface> I'm having trouble with JavaScript period at this point.
+22:51 < dorkmafia> in my binding.gyp do i have to include addon.cc and myobject.cc?
+22:52 < ningu> antiface: well, there are certainly JS tutorials out there.
+22:52 <@TooTallNate> dorkmafia: ya, you need to list all your .cc files
+22:52 < antiface> ningu: I guess I jumped to Freenode too quickly. I will keep picking at it and come back when I have a better idea of what I'm trying to do. Thanks. :)
+22:52 < dorkmafia> coo
+22:52 < dorkmafia> thanks TooTallNate 
+22:52 <@TooTallNate> dorkmafia: no prob!
+22:53 < dorkmafia> can't believe i missed that one file :(
+22:54 <@isaacbw> ningu: what field are you in?
+22:54 < ningu> isaacbw: linguistics.
+22:54 <@isaacbw> ah, very cool
+22:55 < dorkmafia> samholmes: part of the reason there is college is to help transition teenagers into adults and to broden your accademic horizen 
+22:56 < ningu> also learning how to learn, learning how to work on larger projects, thinking more analytically
+22:57 < ningu> as well as acquiring generally useful knowledge
+23:01 < dorkmafia> ningu: and making connections
+23:02 < dorkmafia> let's not forget that
+23:24 < mirko_> mscdex: imap.addFlags(results, 'Deleted' ... worked with imap.openBox('Inbox', false ...
+23:24 < mirko_> mscdex: thanks for the quick help, appreciate it!
+23:37 < garthk> Heh. Just tied Outlook in knots deleting old mail.
+23:37 < garthk> Now… back to my 1TB XML parsing speed problem, or OAUTH2?
+23:39 < ningu> garthk: I'm going to go out on a limb and assume you want to use a streaming parser for that
+23:40 < garthk> ningu: hahah well, yeah. I tried node-expat, but the build problems eventually caught up to me with Node 10. I'm using htmlparser2 at the moment.
+23:41 < ningu> building the bindings and not expat itself?
+23:41 < ningu> if you can't build expat that's fairly serious
+23:42 < ningu> I just did npm install node-expat and it built with no errors on OS X
+23:42 < garthk> It still spends a shitload of time mucking around with strings, as far as I can tell. I'm hoping to figure out a way of avoiding that. Most of the strings are repeated thousands to billions of times. It might help to write an addon and keep track of my own strings, somehow. 
+23:42 < garthk> ningu: Oh, cool. I like to have options.
+23:43 < garthk> If Nate got it running under gyp, now, then it might work on Windows. Woot.
+23:43 < ningu> yes, it uses gyp
+23:43 < ningu> anyway, you can always transform the strings into something else in your script before you do something with them
+23:43 < ningu> I don't really know what you're doing
+23:47 < garthk> ningu: parsing repetitive XML into objects with timestamp, object name, instance name, counter name, and value. The timestamps and 99% of the values are numbers. Everything except the values gets repeated thousands to millions of times. I'd like to be able to crank through it at ~100MB/s, but right now I'm more like ~8MB/s. 
+23:48 < garthk> I was hitting one bottleneck by using object streams with a write per object. Node can only crank that around at ~0.5m writes/sec. It's great if you're throwing around 64KB buffers, but crummy if you're throwing around 90 byte objects. :)
+23:49 < garthk> I wrote a chunky, new-stream version of dominictarr's 'through' module which deals with arrays of objects per write but keeps the same API style, which I quite like. It's still too slow. Back to the benchmarks. :)
+23:50 < garthk> Ugh. 6MB/s. 
+23:50 < Zolmeister> ikr
+23:55 < samholmes> Anyone here use Juice for emails?
+23:55 < volitek> I'm using node-postgres, and I'm querying a table of which one of the columns is an array of a composite type. How on earth do I get the length of this array?
+23:56 < ningu> volitek: foo.length?
+23:56 < ningu> volitek: if you want to get it from postgres, that's a postgres question
+23:57 < volitek> gives me a type error :(
+23:57 < ningu> hmm
+23:57 < beg> what does console.log(foo) print?
+23:57 < ningu> so what exactly is node-postgres giving you for the column?
+23:57 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+23:58 < volitek> I suppose, but i guess more to do with the node module, hoping someone here used it or knew somethign better
+23:58 < niggler> beg: util.inspect
+23:58 < volitek> gives me null, but its an empty array
+23:59 < ningu> volitek: what do you get in psql if you run the same query? do you get NULL or do you get {}?
+23:59 < samholmes> Could someone provide me some feedback: https://github.com/LearnBoost/juice/issues/38
+--- Log closed Tue May 28 00:00:19 2013
