@@ -1,0 +1,1207 @@
+--- Log opened Sun Jun 23 00:00:14 2013
+00:01 < tec27> hmm, don't see anything particularly weird about that
+00:01 < Skullclown> it all seems to be working, the "hello" message even goes through
+00:01 < Skullclown> but nothing triggers client-side
+00:01 < Skullclown> until I quit the server (and this autocloses the socket)
+00:02 < tec27> lemme try running it and see if I can figure anything out, one sec
+00:02 < JBreit> is there any e-learning apps on Node?
+00:04 < rhalff> tec27, all the examples seem to be doing own emit events, you send it directly, i didn't yet use socket.io though, planning to.. :-)
+00:05 < tec27> well, send is an alias for socket.emit('message', args...)
+00:05 < Skullclown> tec27: some more info: the client-side seems to be switching protocols or something.. while the client isn't firing events, I can see GET requests in my console passing by: GET /, GET websocket, GET xhr-polling, GET jsonp-polling, ...
+00:05 < rhalff> tec27, ah ok..
+00:05 < Skullclown> until I stop the server, which suddenly triggers all the events, including those that should have been fired a long time ago
+00:06 < tec27> yeah, Skullclown, I'm not sure how socketio buffers sends when connection switching is happening
+00:06 < Skullclown> the problem is the client not firing events
+00:06 < Skullclown> if I stop the server asap, all events trigger, without the extra GET requests in the console (because it didn't get the time)
+00:06 < tec27> well, I'm wondering if its getting the events at all, but hang on, I'll look through dev tools and see what I see :)
+00:07 < Skullclown> ok, thanks :) I've been at it for a few hours and can't figure it out
+00:11 < Skullclown> tec27: want me to show you the server's console output?
+00:15 < tec27> sure
+00:15 < Skullclown> http://pastebin.com/UTvsDXtp
+00:18 < tec27> confused as to how your server manages to server socket.io.js
+00:18 < tec27> with your code, it crashes every time it tries to do that for me
+00:19 < tec27> works if I remove the io.enable('browser client gzip')
+00:20 < Skullclown> I've tried both serving the client standalone and serving it via server
+00:20 < Skullclown> same result
+00:20 < tec27> well, if I remove that, it works fine for me
+00:20 < tec27> seems to trigger only a websocket request (after querying the server to find out what transports it supports)
+00:20 < tec27> what browser are you using?
+00:21 < Skullclown> tec27: tried both Chrome and Firefox
+00:26 < Skullclown> tec27: is there a way to stop it from finding out what transports it supports and only use a specific transport?
+00:26 < tec27> yeah, one sec though, I think I see how my code differs from yours
+00:28 < tec27> alright, still not doing anything weird for me, but anyway
+00:29 < tec27> you can just do: io.configure(function() { io.set('transports', ['websocket']); });
+00:31 < Skullclown> nah, same issue
+00:31 < Skullclown> I load the client, server says "client authorized" and "Sent: hello"
+00:31 < Skullclown> client just doesn't move
+00:31 < Skullclown> the client's console only has "Setting up socket."
+00:32 < tec27> it'd probably be good to look at the responses from the server in the network panel of chrome
+00:32 < tec27> see what content they have, etc.
+00:32 < Skullclown> tec27: only the last one says "101 Switching Protocols, Pending"
+00:33 < tec27> well, thats a websocket thing
+00:33 < tec27> the other transports wouldn't do something like that
+00:33 < tec27> you should be able to look at the websocket frames in there as well (if there are any)
+00:34 < Skullclown> ok it finally worked but
+00:34 < Skullclown> it took 1.4 minutes
+00:34 < Skullclown> :/
+00:34 < tec27> do you see an http request in there where the server returns a list of valid transports?
+00:35 < Skullclown> first request is /socket.io/1/?t=1371947477544
+00:35 < Skullclown> response was 0gRJArBXbzoXI7vKb7IQ:60:60:websocket
+00:35 < tec27> seems right
+00:35 < Skullclown> then there was a websocket
+00:36 < Skullclown> ws://.../socket.io/1/websocket/0gRJArBXbzoXI7vKb7IQ
+00:36 < Skullclown> and that websocket took 1.4 minutes 
+00:36 < tec27> yeah, that's strange
+00:39 < Skullclown> yeah, it's always that same socket
+00:39 < Skullclown> that takes 1.4 minutes to finish
+00:45 < Skullclown> tec27: still here? I "fixed" it
+00:45 < tec27> yeah
+00:45 < tec27> what's the fix?
+00:45 < Skullclown> don't use websocket. >.>
+00:46 < tec27> lol :(
+00:46 < Skullclown> I forced the client to connect with jsonp-polling
+00:46 < Skullclown> and server to serve only jsonp-polling
+00:46 < Skullclown> so yeah.. that works..
+00:47 < Skullclown> I honestly don't know, this is kind of killing me :/
+00:48 < tec27> wish I could be of more help, but it seems to work fine for me =/
+00:48 < Skullclown> does it matter if it's running on a raspberry pi?
+00:48 < Skullclown> and it's working for you on websocket?
+00:48 < tec27> I guess it could matter, but I don't really see why
+00:48 < tec27> yeah
+00:49 < Skullclown> what OS are you on?
+00:49 < tec27> win7
+00:49 < Skullclown> hm, same
+00:49 < Skullclown> RPi has 2 interfaces active, eth0 and wlan0
+00:50 < Skullclown> wlan0 is set up in AP mode though but my pc is connected to the RPi via eth0
+00:50 < Skullclown> 1gbps LAN
+00:50 < Skullclown> well, the fact jsonp-polling works kind of proves it's not the network..?
+00:51 < Skullclown> can you upload your code for a second?
+00:52 < tec27> I don't have it now, but it was exactly what you had. All I did was change the "/" response to return an html file with your script in it
+00:53 < tec27> and changed your script to connect to my machine's IP instead of what was there
+00:54 < Skullclown> tec27: can it be that it only takes this long because it's not being served by the node.js server?
+00:54 < Skullclown> that's pretty much the only difference between our code..
+00:54 < tec27> doubt it
+00:54 < Skullclown> do you serve your client .js via node.js?
+00:54 < Skullclown> or locally?
+00:54 < tec27> I serve it via node
+00:55 < Skullclown> tec27: when I do that, it seems to serve it slowly
+00:55 < Skullclown> it takes some time to load even though it's a small file..
+00:56 < tec27> maybe something in between your server and client is buffering packets?
+00:57 < Skullclown> tec27: never mind, seems to be serving it fast now
+00:57 < Skullclown> 1.2s after clearing cache
+00:57 < Skullclown> 12ms if it's in cache
+00:57 < tec27> its probably gzipping it and stuff
+00:57 < Skullclown> I'll turn that all off
+01:00 < Skullclown> nope, same issue
+01:00 < Skullclown> the client.js is served pretty quickly, that's not an issue
+01:00 < Skullclown> but the websocket
+01:00 < Skullclown> bleh
+01:01 < Skullclown> it always takes exactly 1.4min
+01:01 < Skullclown> is that the socket timeout or something?
+01:03 < tec27> might be, I dunno
+01:03 < Skullclown> I made a near-empty page test.html with ONLY the client javascript in it
+01:04 < Skullclown> still the same issue
+01:06 < Skullclown> I tried serving the client via the node.js server
+01:06 < Skullclown> client page loads, websocket just keeps hanging
+01:17 < Skullclown> tec27: I'm thinking it has something to do with my computer...? my iphone works perfectly
+01:18 < tec27> yeah, seems really strange
+01:19 < Skullclown> even worse, I tried it via iphone using my RPi's wlan0 AP setup
+01:19 < Skullclown> so that one should be much slower..
+01:20 < Skullclown> I can confirm, it works just as well via eth0 on my iphone (well, iphone > router > eth0)
+01:21 < Skullclown> my desktop on the other hand is just waving "nope"
+01:21 < Skullclown> http://www.websocket.org/echo.html works fine though
+01:22 < Skullclown> http://websocketstest.com/ works instantly as well
+01:22 < Skullclown> what the hell..
+01:23 < Skullclown> visiting the webpage says "Yes" on everything
+01:23 < Skullclown> but the report says no on everything except for SSL websockets
+01:23 < Skullclown> http://websocketstest.com/result/232396
+01:24 < Skullclown> ok, websockets don't seem to work
+01:24 < tec27> yeah, something is weird with how your computer is configured
+01:24 < tec27> are you running a firewall of any sort?
+01:24 < Skullclown> nope
+01:24 < Skullclown> everything disabled
+01:24 < Skullclown> even just enabled DMZ on my computer, just in case
+01:25 < Skullclown> does this work for you? http://html5demos.com/web-socket
+01:25 < Skullclown> open 2 tabs, try to chat between tabs
+01:25 < tec27> yep
+01:25 < tec27> works fine
+01:25 < Skullclown> says "socket open" here, but doesn't work
+01:25 < Skullclown> so I'd say the result page of websocketstest.com was right
+01:26 < Skullclown> nothing works except for SSL?
+01:26 < Skullclown> what the crap
+01:26 < Skullclown> it does work on my iphone
+01:26 < Skullclown> jesus christ
+01:26 < tec27> it really sounds like a firewall issue, but I dunno
+01:26 < Skullclown> the "jesus christ" part is more of a
+01:26 <@mbalho> wss:// is the only reliable way to do websockets over mobil enetworks
+01:26 < Skullclown> "goddamn my computer"
+01:27 < Skullclown> mbalho: so iphone automatically uses wss?
+01:27 < tec27> nah
+01:27 <@mbalho> not necessarily
+01:27 < Skullclown> ah yeah it's connected to my home wifi anyway so it's just using regular ws then
+01:27 < tec27> its not a "not necessarily" :P
+01:27 <@mbalho> it depends on the server 
+01:27 < tec27> it's not possible to automatically use SSL when the server is not configured for it
+01:27 < Skullclown> nope, server is not configured for anything specific
+01:27 < tec27> your iphone is using ws, same as your computer
+01:27 < Skullclown> just standard settings
+01:28 < Skullclown> yeah my computer is going derp ):
+01:28 < Skullclown> my phone > my computer
+01:28 < tec27> just write code on your phone, problem solved!
+01:30 < Skullclown> yeah I can confirm btw
+01:30 < Skullclown> it really is my desktop messing up websockets
+01:30 < Skullclown> http://www.websocket.org/echo.html
+01:30 < Skullclown> I only get a response if I activate TLS
+01:30 < Skullclown> without it, it thinks it's connecting
+01:30 < Skullclown> it thinks it's connected *
+01:30 < Skullclown> but it's not
+01:31 < tec27> "Some networks also interrupt WebSocket traffic over port 80 -- we've found several schools (even ones that don't filter Facebook) having trouble with WebSockets. Moving WebSocket traffic to port 443 (with and without SSL) fixed the problem."
+01:31 < Skullclown> yeah but
+01:31 < Skullclown> that doesn't explain why it works on my iphone
+01:31 < Skullclown> on the same network :P
+01:32 < tec27> it does if there's something running on your computer that is doing the interrupting :P
+01:32 < Skullclown> true
+01:32 < Skullclown> but no antivirus, no firewall, no "internet security crap"
+01:32 < Skullclown> no windows firewall either
+01:35 < Skullclown> no windows defender either o.o
+01:35 < Skullclown> I'm dying a little inside.
+01:39 < Skullclown> I'll honestly pay the person that finds a fix o.o
+01:42 < Skullclown> powering on a Win7 VM to see if this works ):
+01:57 < Skullclown> tec27 Win7 VM works fine... my OS is broxed. RIP.
+01:57 < tec27> :(
+01:57 < Skullclown> I assume there's no "download-this-file-and-fix-your-websockets.exe"? ):
+02:02 < Skullclown> tec27 thanks for the help, I'm off. Off to cry in a corner. ): RIP. See you & thanks. :P
+02:02 < tec27> gl
+02:02 < tec27> cya
+02:16 < Marcelo> Hello there!
+02:32 < Skullclown> tec27
+02:32 < tec27> sup
+02:32 < Skullclown> Chrome & Firefox don't work, Safari does. Safari uses hybi-76
+02:32 < Skullclown> Chrome & FF use hybi-draft-13
+02:32 < Skullclown> (websocket protocol)
+02:32 < Skullclown> I just stumbled on that detail >.>
+02:33 < Skullclown> euh I meant draft-76 *
+02:33 < Skullclown> not hybi-76
+02:34 < Skullclown> in case anyone else has the issue, at least now we know a bit more :) install Safari, different protocol, works
+02:34 < Skullclown> cya & gn
+03:10 < myndzi> i'm using mocha and should.js, but mocha is kind of retarded
+03:10 < myndzi> suggested replacement?
+03:15 < Havvy> myndzi: QUnit perchance
+03:16 < myndzi> how's vows?
+03:17 < sebv> what r you testing?
+03:17 < myndzi> qunit was more for the browser i thought, but i'll check it out too
+03:17 < myndzi> sebv: just kind of getting familiar with unit testing and development. i'm writing tests for my tetris engine :P
+03:18 < myndzi> qunit i remember has a nice output interface but i'm looking for console use
+03:18 < myndzi> mocha looks good on a mac i bet but it's pretty wonk from putty
+03:19 < sebv> I use mocha+karma, testing as many thing as possible within browser.
+03:28 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+03:29 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+04:22 < darkPassenger> im doing an ajax request which modify an array upon success, but whenever i use the array afterwards its undefined ....
+04:22 < darkPassenger> and im sure it gets js objects in it 
+04:22 < darkPassenger> at least one
+04:23 < darkPassenger> does it need to be treated otherwise than in the success: ajax request function ? 
+04:25 < darkPassenger>   
+04:36 < arnorhs> darkPassenger: darkPassenger what you're doing sort of makes sense, so you'll have to post your code in a jsfiddle or something to get better answers
+04:36 < arnorhs> s/better/any/
+04:41 < darkPassenger> its a big code 
+04:41 < darkPassenger> but ill try to 
+04:47 < darkPassenger> http://pastebin.com/0uDj2DGg
+04:47 < darkPassenger> arnorhs: 
+04:48 < darkPassenger> arnorhs: sorry I updated it, : http://pastebin.com/MsxBv3Si
+04:49 < darkPassenger> the array passed to the function has at least one elem in it from the init function
+05:01 < macbn> is there any middleware that automatically sanitize all req.params to prevent xss?
+05:05 < Zolmeister> macbn: don't check the input, just sanitize the output
+05:05 < Havvy> macbn: By mathematical definition, no.
+05:06 < Havvy> Such a thing is not possible.
+05:11 < macbn> sanitize = htmlentity ?
+05:11 < macbn> htmlentitize
+05:12 < Havvy> That's not the only way to perform an XSS. ;)
+05:12 < Zolmeister> although, if you escape() it, it should be safe
+05:16 < a_meteorite> So I'm having something... odd with npm... seems to be hanging
+05:17 < Zolmeister> a_meteorite: try npm cache clear
+05:18 < a_meteorite> http://pastebin.com/MpR4MFKN
+05:18 < a_meteorite> it just sits like that, I left it running once for about 10 mins... ctrl-c, tried again, same deal
+05:18 < a_meteorite> Zolmeister: didn't help :(
+05:19 < Zolmeister> what does '-d' do?
+05:20 < a_meteorite> that's for more info afaik
+05:20 < a_meteorite> otherwise it wasn't as clear what's going on
+05:20 < Zolmeister> why do you specify '.' ?
+05:20 < a_meteorite> installing the dependencies for a local package that isn't published
+05:20 < a_meteorite> there's just a package.json in that folder
+05:21 < Zolmeister> oh, well just fyi, '.' is optional
+05:21 < a_meteorite> ah. might be new I guess.
+05:21 < Zolmeister> that being said, I have no idea why it hangs
+05:22 < a_meteorite> bummer.. npm has been annoying me a lot lately
+05:22 < Zolmeister> I take it back
+05:22 < Zolmeister> the preinstall script for findingsatoshi is hanging
+05:23 < a_meteorite> what's the property in package.json for that? I didn't specify one
+05:23 < Zolmeister> hmm, actually maybe not
+05:23 < Zolmeister> post you package.json
+05:24 < a_meteorite> Zolmeister: http://pastebin.com/vpHb68uM
+05:25 < Zolmeister> does npm hang only with this? like, if you manually try to install a module will it work?
+05:26 < a_meteorite> trying with socket.io...
+05:27 < a_meteorite> yup, same deal. http://pastebin.com/KpqytYMW
+05:28 < a_meteorite> could it be a SSL cert issue?
+05:28 < a_meteorite> wget https://registry.npmjs.org/socket.io "ERROR: The certificate of âregistry.npmjs.orgâ is not trusted."
+05:29 < Zolmeister> well, that can't be good
+05:29 < a_meteorite> huh, a self-signed cert
+05:31 < a_meteorite> npm config get ca does spit out a bunch of certs
+05:31 < a_meteorite> if any of those match with the registry though, I have no idea
+05:31 < Zolmeister> yeah, I have no issues installing socket.io
+05:32 < Zolmeister> maybe your network has gone rogue?
+05:32 < a_meteorite> probably not an issue, guessing npm allows the cert fine (or I'd expect it to say otherwise)
+05:32 < a_meteorite> or... yeah... it can't even contact the registry
+05:32 < a_meteorite> wget --no-check-certificate https://registry.npmjs.org/socket.io does get a JSON file
+05:33 < a_meteorite> or something. it's one big glob of ugliness. :)
+05:34 < a_meteorite> I wonder if node v0.11.3-pre is at fault
+05:37 < a_meteorite> building the latest stable instead of a prerelease in my home...
+05:44 < a_meteorite> that seems to have done the trick
+05:44 < a_meteorite> downgraded to latest stable and re-installed npm for it.
+05:44 < a_meteorite> brb, i'm going to go kill AAA_awright who installed v0.11.3-pre :D
+05:44 < sinclair|net> does anyone here know of a jquery like nodejs tool that would allow me to query a html page in the form $('a') <- would return all 'a' tags in a page?
+05:44 < sinclair|net> sooo
+05:45 < sinclair|net> var page = new Page('some html here');
+05:45 < sinclair|net> page.query('.container') <-- would return all containers in a page
+05:45 < standoo> zombiejs
+05:45 < standoo> search "headless browser nodejs" in google
+05:46 < sinclair|net> standoo: without native dependencies 
+05:46 < sinclair|net> so phantom and zombie are both out
+05:46 < sinclair|net> (probably should have mentioned that)
+05:46 < standoo> sinclair|net: hmmm, not sure about that part
+05:46 < Zolmeister> sinclair|net: you can run jquery in node
+05:46 < standoo> sinclair|net: you are trying to make it portable?
+05:47 < sinclair|net> Zolmeister: the npm module tells me it has problems running in windows due to some stupid stuff with contextify
+05:47 < Zolmeister> sinclair|net:  this one? https://github.com/tmpvar/jsdom
+05:47 < Zolmeister> sinclair|net: just install linux
+05:48 < a_meteorite> thanks Zolmeister
+05:48 < Zolmeister> a_meteorite: np, glad it worked out
+05:48 < standoo> Zolmeister: what worked out?
+05:49 < sinclair|net> Zolmeister: i do have linux, i prefer windows a billion times more
+05:49 < Zolmeister> standoo: he fixed npm
+05:49 < sinclair|net> in fact, i can't overstate how rubbish i think other operating systems are in comparison to windows
+05:49 < a_meteorite> yeah... lesson is don't trust non-stable node to do things right
+05:49 < Zolmeister> trololololol
+05:49 < standoo> sinclair|net: billion times more? interesting?
+05:49 < standoo> sinclair|net: why so?
+05:49 < Zolmeister> no, dont encourage him
+05:49 < sinclair|net> standoo: you get what you pay for
+05:49 < Zolmeister> sinclair|net is a troll
+05:50 < sinclair|net> except with mac OS's, then you just get rubbish
+05:50 < sinclair|net> shiny rubbish
+05:50 < sinclair|net> but rubbish non the less
+05:50 < Havvy> sinclair|net: If Linux had perfect support for the CLR, would you prefer Linux?
+05:50 < Zolmeister> no, Havvy, dont do it
+05:50 < sinclair|net> Havvy: it has mono, and mono is awesome
+05:50 < Zolmeister> hes trolling
+05:51 < sinclair|net> Zolmeister: note, this jsdom looks quite good
+05:51 < Havvy> I still can't get mono to work.
+05:52 < sinclair|net> Havvy: i haven't had any problems, mono is just as advanced as .net, more so in some ways
+05:52 < freewil> what about silverlight support
+05:52 < sinclair|net> moonlight, but no one uses that (or silverlight for that matter)
+05:52 < freewil> i tried, i think its called moonlight, before (probably 1+ years ago) but it didnt seem to work
+05:53 < freewil> i think it was during Vancouver olympics
+05:53 < freewil> nbc was using silverlight for all the streaming
+05:53  * Havvy notes that Subway's job applications uses Silverlight.
+05:53 < sinclair|net> silverlight is dead, it was from day one
+05:53 < freewil> wasnt netflix using silverlight initially
+05:53 < sinclair|net> i never supported it, tho was pressed into supporting flash
+05:54 < sinclair|net> Zolmeister: yes yes, jsdom for the win
+05:54 < Zolmeister> yes, jsdom is quite good
+05:55 < sinclair|net> Havvy: TS 0.9 is out
+05:56 < sinclair|net> and is getting some pretty damn good reviews
+05:57 < standoo> TS?
+05:57 < sinclair|net> typescript
+05:59 < standoo> interesting
+06:00 < macbn> is it better to sanitize output or input?
+06:00 < sinclair|net> both
+06:01 < Zolmeister> output
+06:02 < macbn> im using this npm https://github.com/ctavan/express-validator
+06:02 < macbn> and it just remove <script> to [removed]
+06:02 < macbn> and stored to database
+06:02 < Zolmeister> why?
+06:03 < Zolmeister> doing that stops nothing
+06:03 < Zolmeister> 1. dont trust user input in internal functions
+06:03 < Zolmeister> 2. sanitize variable outputs in templates
+06:04 < sinclair|net> macbn: ^
+06:04 < macbn> it can do sanitize('').xss()
+06:04 < Havvy> Ideally, have your templating functions do the sanitization for you.
+06:04 < macbn> https://github.com/chriso/node-validator
+06:05 < macbn> can jade do that?
+06:06 < sinclair|net> Zolmeister: i take it back, jsdom uses contextify
+06:07 < Havvy> macbn: Yeah. Jade will auto-escape entities.
+06:07 < Havvy> Unless you tell it not to.
+06:07 < macbn> really?
+06:07 < macbn> mine doesnt
+06:08 < macbn> i insert <script>alert("aa")</script>
+06:08 < macbn> and it executes
+06:08 < macbn> maybe because i used !{}
+06:09 < Zolmeister> yes, ! turns off escaping
+06:09 < Zolmeister> I think
+06:09 < macbn> but i need to do !{} because it is a suer comment
+06:09 < macbn> i want to enable a href
+06:09 < Zolmeister> that should be a separate variable
+06:09 < standoo> nodejs rocks
+06:09 < Zolmeister> node.js*
+06:10 < standoo> Zolmeister: i stand corrected
+06:10 < macbn> i guess ill just use that express-validator
+06:38 < emilsedgh_> hi, i updated from 0.8 to 0.10.12 and now im hitting this assertion:
+06:38 < emilsedgh_> node: ../deps/uv/src/unix/core.c:688: uv__io_stop: Assertion `loop->watchers[w->fd] == w' failed.
+06:49 < mscdex> emilsedgh_: post an issue on github
+06:53 < emilsedgh_> ok mscdex
+06:53 < emilsedgh_> second assertion im getting on 0.10 series :(
+07:38 < ak5> is there a good resource for conventions on how to make node modules?
+07:52 < minibn> what is the difference between req.body and req.params
+07:52 < ningu> body is from POST params, params is from :foo
+07:52 < ningu> in the url
+07:52 < minibn> oh ok
+07:52 < minibn> thanks
+07:53 < minibn> so its better to do xss filter for all those
+07:55 < ningu> yep
+07:55 < minibn> do you use any library for xss filter?
+07:55 < minibn> im using express-validator
+07:56 < ningu> there are many
+07:56 < ningu> I've used express-forms I think
+07:56 < minibn> ill checkout express forms
+07:57 < minibn> i have to do it manually
+07:57 < minibn> like in express-validator
+07:57 < minibn> i always need to use req.sanitize('param').xss();
+07:58 < ningu> not really sure what you are trying to do
+07:58 < ningu> you can have custom middleware to do whatever you want if it's the same for every param
+07:59 < ak5> does the model system read the main js file out of package.json? I mean using require('foo') will read index.js in node_modules/foo/ if package.json in that folder has "main": "index.js" ?
+07:59 < ak5> module system*
+08:00 < ningu> ak5: yes, read http://nodejs.org/docs/latest/api/modules.html#modules_folders_as_modules
+08:01 < ak5> ningu: ty
+08:02 < minibn> im just trying to do xss filter all inputs
+08:02 < ningu> minibn: so use a loop like I suggested
+08:02 < minibn> loop?
+08:02 < ningu> loop through all params
+08:03 < minibn> oh
+08:03 < minibn> i want to make a middleware for that
+08:03 < minibn> that converts all req.body and req.params to be sanitized
+08:03 < ningu> so do that
+08:04 < minibn> is there any library that does that already?
+08:04 < ningu> no idea
+08:04 < ningu> but it sounds like 3 lines of code
+08:05 < minibn> i have to do it in all the routes
+08:06 < ningu> not if it's a middleware
+08:06 < minibn> ya i dont know how to write a middleware
+08:06 < ningu> minibn: app.use(functiom (req, res, next) { /* do stuff */ });
+08:06 < ningu> done.
+08:06 < ningu> function, even.
+08:06 < minibn> oh
+08:07 < minibn> ill try
+08:07 < minibn> thanks
+08:07 < ak5> ningu: I am having trouble testing my module using the interpreter in `node`
+08:08 < ak5> ningu: I can't require my module
+08:08 < ak5> ?
+08:08 < ningu> is it in the node_modules dir?
+08:08 < ningu> I would suggest you read the docs that I linked, I mean the whole page
+08:08 < ak5> got it ^_^
+08:08 < ak5> its only going to work in the node_modules dir, huh>?
+08:09 < ningu> if you don't specify a relative or absolute path but just do require('foo') then yes
+08:13 < ak5> cool, reading, thanks
+08:17 < minibn> ningu: is this a good idea to do this ? https://gist.github.com/anonymous/b5865e792426f6f6bb9c
+08:17 < minibn> im using sanitize function from node-validatorhttps://github.com/chriso/node-validator
+08:36 < mmalecki> felixge: you around?
+08:43 < pellis> hello
+08:43 < pellis> got 2 questions - (1) is it good practice to throw Exception in constructor once i realize that parameters cannot be used to construct the object?
+08:44 < AAA_awright> Yes
+08:44 < pellis> and (2) maybe related, is the any data storage agnotic framework i can use to do Model validation?
+08:44 < AAA_awright> JSON Schema perhaps
+08:44 < pellis> AAA_awright: for some reason i can't find an example of existing object that does this - i think i remember in Javascript throwin exceptions is discouraged because of callbacks
+08:44 < AAA_awright> pellis: That's if you have a callback at all, in which case you're expected to call it exactly once
+08:45 < pellis> i see. in my case this object is holding data and logic, like a Model. it is being persisted to Redis with some simple custom code.
+08:45 < AAA_awright> With my resent recearch I'm inclined to say you should throw, and that excuses you from calling the callback
+08:46 < pellis> i saw node-validator which looked good for doing validations. this means i need a "is_valid" in this model, which will run node-validator validations
+08:47 < pellis> AAA_awright: so the rule is, dont throw if you're getting a callback?
+08:47 < pellis> and this is also needed to be checked with your caller.. and his caller, and so on -- i guess this is why Exceptions with callbacks is nasty?
+08:47 < AAA_awright> pellis: There's some disagreement on that point
+08:47 < AAA_awright> I used to say correct
+08:48 < AAA_awright> Becausethrowing and not calling the callback makes it easier to break code paths
+08:48 < AAA_awright> But there's also code patterns that will be broken if you call the callback without throwing, so idk
+08:49 < AAA_awright> Absolutely don't do both, though
+08:49 < pellis> what do you mean by both?
+08:50 < AAA_awright> Don't call a callback with an error and also throw
+08:50 < AAA_awright> Just choose one or the other, probably the callback
+08:50 < pellis> yep but in case of constructing
+08:50 < AAA_awright> It's just another function call then?
+08:50 < pellis> you only get an object, or have an exception - you can't get a null from constructing?
+08:51 < AAA_awright> I don't follow?
+08:51 < pellis> i.e. foo = new MyFoo(some,invalid,params)
+08:51 < pellis> foo cannot be null in case you have bad params can it?
+08:52 < AAA_awright> What do you mean null?
+08:52 < AAA_awright> If you detect a bad argument usually you just throw an Error
+08:52 < pellis> yea, so that's where i'm coming from
+08:53 < nathan7> > new function() { return null }
+08:53 < nathan7> {}
+08:53 < AAA_awright> (Maybe a RangeError)
+08:53 < pellis> if the code you're running is initializing an object, and that code needs so call a callback
+08:53 < pellis> so you can't let the exception bubble up
+08:54 < AAA_awright> and that code needs to call a callback? Or...?
+08:55 < pellis> yes exactly
+08:55 < pellis> so there are many ways to do this, and each language has its own principles
+08:56 < pellis> i can for example only use factories.. so that MyFoo.build_from_message(params)
+08:56 < pellis> will return null on bad params
+09:18 < mmalecki> how to pipe fstream reader to tar packer?
+09:18 < mmalecki> fstream.Reader(path).pipe(tar.Pack()) doesn't work
+09:26 < motaka2> hello using this code http://jsfiddle.net/BfF6S/ i get all values of form inputs , but among several submits a form has I just need the value of the one which is clicked and not others, what should I do?
+09:28 < Trangar> motaka2, I think the best way to do this is just add a click event to each button and see which one fires
+09:28 < Trangar> someForm.find("input[type=submit]").click(function() { $(this); /* is our button */ });
+09:30 < motaka2> Trangar: this the code which uses formGetData()  http://jsfiddle.net/zy3x3/
+09:30 < motaka2> Trangar: How should I change these two so I can just have the value of the clicked
+09:30 < Trangar> motaka2, just replace the on("submit", ...) by the click event on each button
+09:30 < motaka2> among all submit buttons
+09:31 < Trangar> Then pass the $(this) as an argument to formGetData
+09:31 < Trangar> And that's the button you have pressed
+09:31 < motaka2> Trangar: So what will happen to other form inputs like text boxes and checked check boxes ?
+09:31 < Trangar> motaka2, their behavior won't change
+09:32 < motaka2> how should I change the formDataGet() function ?
+09:32 < Trangar> Wait
+09:34 < Trangar> motaka2, http://jsfiddle.net/EBUR8/ something like this
+09:39 < motaka2> Trangar: It doesnt work, I mean it works but not in ajax it cause the whole page to reload
+09:39 < Trangar> motaka2, well go figure out why :D
+09:44 < motaka2> Trangar: I cant figure out why
+09:45 < Trangar> motaka2, probably a javascript error somewhere
+09:45 < motaka2> Trangar: I am wondered why no one elese ever think of a normal submission
+09:45 < motaka2> Trangar: no at least firebug announces nothing
+09:45 < Trangar> motaka2, that's probably because firebug resets it's errors when the page is reloaded, so also when the form is submitted
+09:46 < motaka2> Trangar: Yupe right
+09:47 < motaka2> Trangar: When I am in PHP, and I submit a form php jsut recieves submited input value along with others, 
+09:51 < Trangar> motaka2, correct
+09:51 < daslicht> i just setup a new linux box with debian 
+09:51 < daslicht> i tried the following to isntall node:
+09:51 < daslicht> https://github.com/joyent/node/wiki/Installing-Node.js-via-package-manager#debian-lmde
+09:52 < daslicht> but the installation just hung at :Copying files to the temporary directory...
+09:52 < daslicht> ?!
+09:52 < daslicht> which linux works best with node?
+09:52 < daslicht> ubuntu ? debian cent os ?
+09:53 < gildean> daslicht: at which part does it stop?
+09:53 < daslicht> checkinstall
+09:53 < daslicht> after that i get : "Copying files to the temporary directory..."
+09:53 < daslicht> can i savely stop this process now ?
+09:54 < daslicht> or do i break anything : )?
+09:54 < gildean> it shouldn't break anything, it just compiles the source to a debian installer
+09:55 < gildean> instead of checkinstall, you should be able to do just: ./configure && make && sudo make install
+09:56 < daslicht> ok i try that 
+09:58 < daslicht> # node --version 
+09:58 < daslicht> v0.10.12
+09:58 < daslicht> looks good now
+09:58 < daslicht> thank you !
+10:12 < motaka2> Trangar: $("#content-in input[type=submit]").unbind("click").click(function(e) { does not trigger click event
+10:13 < Trangar> motaka2, why not?
+10:13 < motaka2> I dont know, does it have anything to do with the fact that all in content-in is loaded via ajax?
+10:13 < Trangar> It depends on when you bind the click events
+10:17 < motaka2> Trangar: I changed it for   $("#content-in").off('submit').on("click", 'form input[type=submit]', function(e) {
+10:18 < Trangar> motaka2, how is that going to work? You unbind the submit event and then add a click event?
+10:19 < motaka2> Trangar: $("#content-in").off('click').on("click", 'form input[type=submit]', function(e) {
+10:20 < Trangar> That could work
+10:25 < motaka2> Trangar: $("#content-in").off('click',"form input[type=submit]").on("click", 'form input[type=submit]', function(e) {
+10:26 < motaka2> Trangar: once this proj is done I will migrate to west
+10:26 < Trangar> motaka2, I suggest you just rebuild the entire form-submitting routine from the ground up, so you can debug stuff like the click event 
+10:27 < motaka2> Trangar: I am going to use serializeArray but yet it doesnt contain submit value
+10:27 < Trangar> Then fill it with submit values
+10:29 < motaka2> Trangar: I am doing so
+10:44 < motaka2> Trangar: Done, wanna see the result ?
+10:44 < Trangar> motaka2, no thanks 
+10:45 < motaka2> Trangar: Where are you from ?
+10:48 < Trangar> I think I'll pass on that question
+10:54 < motaka2> Trangar: ok anyway thanks for your care, binding the event to the submit was a good idea thank you
+10:55 < Trangar> No problem
+11:02 < mike1_> hi
+11:03 < mike1_> how do i read unix stream in node.js ? lets say i have /tmp/some.sock which emits some data and i want to keep reading it in node.js
+11:07 < squeeks> dgram.
+11:25 < ak5> why can't I get a responsebody out of request? It's documented...
+11:26 < ak5> It will not return html responses of GET requests or something? just ajax-y stuff?
+11:27 < gildean> ak5: your question makes little sense
+11:27 < ak5> hah, I know :/
+11:27 < ak5> it's freaking me out
+11:29 < gildean> ak5: put some code to a pastebin somewhere and maybe we can get some sense out your question
+11:40 < Trangar> ak5 do you want to get the content that is put in a request, like a form submit?
+11:40 < ak5> ok sorry guys, its baidu
+11:41 < ak5> chinese website being stupid
+12:03 < ak5> weird, it works with chimera.js but not with request.js
+12:08 < jhsto> Does anyone happen to know is it possible to update HTML5 audio tag duration without reloading the whole file?
+12:39 < Industrial> How do people manage creating lots of little services that do one thing? Just have an app.js each and hard code all the logic? How do you manage stopping/starting/restarting and more importantly failures?
+12:41 < jhsto> Industrial: https://github.com/nodejitsu/forever ?
+12:41 < Industrial> jhsto: what if something fails, or keeps failing
+12:42 < jhsto> it gets restarted automatically
+12:42 < jhsto> I'm not sure if it stops spawning the daemon if it constantly dies
+12:45 < RLa> jhsto, is has grace period, default is 1000ms
+12:53 < nathan7> Industrial: substack has a bunch of stuff for this
+13:19 < OliverJAsh> looking for advice on architecting my application
+13:19 < OliverJAsh> http://stackoverflow.com/questions/17256439/separation-of-concerns-in-node-js-app-and-dealing-with-load-across-different-pro
+13:54 < ankit_bisht> can anyone tell me about omegle integration in nodejs
+13:57 < ankit_bisht> getting timeout error in omegle integration with nodejs
+13:57 < ankit_bisht> please guide me through the solution?
+13:59 < sashman> Does anybody is running "Mongoose-Session"?? I get err by only starting it 
+13:59 < mh0> Hm, guys, on node-xmpp or similar pacakges I keep getting "Uncaught Error: Module version mismatch. Expected 11, got 1."
+13:59 < mh0> What is this and how could I go about fixing it?
+14:00 < SomeoneWeird> mh0, you upgrade your node version, you have to recompile the native module
+14:00 < sashman> I had been looking to get Passport+SocketJS as Auth working and seen 10k's tutorials but none of them is anyways working!
+14:00 < SomeoneWeird> figure out which one it is  and then cd to it's node_modules folder and run "node-gyp clean && node-gyp configure && node-gyp build"
+14:00 < mh0> SomeoneWeird: Right, okay
+14:04 < sinclair|net> oh, i didn't know substack was into 3d graphics
+14:04 < ankit_bisht> omegle problem with nodejs??
+14:12 < nathan7> SomeoneWeird: I think just clean and rebuild will do
+14:14 < SomeoneWeird> it might, havn't tried that though so :)
+14:15 < ankit_bisht> hey anyone can just help me out
+14:16 < SomeoneWeird> ankit_bisht, "problem with omegle and nodejs" doesn't tell us anything
+14:17 < ankit_bisht> getting timeout error in omegle integration with nodejs
+14:18 < SomeoneWeird> define integration
+14:21 < ankit_bisht> SomeoneWeird, i have included omegle in websocket server in nodejs, so when when i am trying to connect to omegle sometimes connec. times out and an error is thrown, i can't handle it.. It is forcing the server to close
+14:26 < ankit_bisht> SomeoneWeird, please tell me how to handle this error
+14:40 < motaka2> hello change isnt trigerred on this code, http://jsfiddle.net/aV92L/
+15:04 < eere> if thre is a streaming socketio connected and writable by client how  to overide/redirect ajax requests php would normal handle to node?
+15:05 < derchiller> i'm trying to use an irc bot, but can't detect utf8 encoded characters (to decode properly). the plan is to support iso-5589-1 and utf8, but i can't distinquish between them both (i have tried various functions for this)
+15:05 < derchiller> the source can be found here: http://pastebin.com/FkT59LRp the first part is my file, the second the lib i'm using (there are two files missing to run it)
+15:06 < derchiller> i guess the problem isn't the convertions but the character set of the connection, but i don't know. i can decode both if i change the irc-lib encoding to "binary" (of the socket)
+15:07 < derchiller> but i can't do so if i use the normally uncofigurable default charset utf8 of the irc-lib (npm "irc")
+15:07 < derchiller> any ideas?
+15:09 < derchiller> oh, the problem are german umlauts (as you may saw already in the source)
+15:17 < ggwalle> why node is slow than vert.x?
+15:17 < ggwalle> i think node should faster than vert.x
+15:20 <@mbalho> people use vert.x?
+15:20 < nathan7> people exist?
+15:21 < ggwalle> because v8 optimize should better than rhino, and vert.x have slow many middle level between js and native code(vert.x -> jvm -> native)
+15:21 < ggwalle> the only reason i think is node not use all machine resource as jvm
+15:22 < ggwalle> node should support thread as compute level, not use fork
+15:23 < ggwalle> mbalho: node js 3x slower than vert.x
+15:24 <@mbalho> does it have 30,000 modules?
+15:24 < ggwalle> it's very strange vert.x can faster than node(in js), because v8 should faster than vert.x's js engine.
+15:25 < ggwalle> mbalho: it's had, because jvm based can use java lib directly
+15:25 < ggwalle> mbalho: as you know, there are many strong java lib, such as jsoup
+15:26 <@mbalho> java libs and npm are quite different in practice
+15:26 < mh0> hm
+15:27 < mh0> i seem to be getting an error on node-webkit about a underfined symbol
+15:27 < ggwalle> mbalho: their usage is diff, but their purpose is same
+15:27 < mh0> the module seems to be node_expat - i've been trying to get this to work all day.
+15:29 < ggwalle> mbalho: node should put more attention in performance, and use thread replace fork.
+15:30 < sinclair|net> ggwalle: don't say that, the node head will scald you for it
+15:30 < sinclair|net> *heads
+15:31 < sinclair|net> ggwalle: i too have some issue with not being able to spawn a v8 instances "inproc"
+15:31 < sinclair|net> but have pretty much given up
+15:32 < algesten> so is the argument that you want multithreaded node.js? is that what you mean with "node should put more attention in performance, and use thread replace fork"?
+15:32 < nathan7> sinclair|net: threads-a-gogo
+15:32 < nathan7> sinclair|net: https://npmjs.org/package/threads_a_gogo
+15:33 < sinclair|net> nathan7: great, now one which "isn't" a native module
+15:33 < ggwalle> sinclair|net: i mean, node should use mutil thread in compute level, so that, it's can use hardware resource more effecient.
+15:33 < nathan7> sinclair|net: it has to be native
+15:33 < mh0> anyone have an idea what caused my error?
+15:33 < sinclair|net> nathan7: sure, but have it in the core
+15:34 < nathan7> sinclair|net: hm
+15:34 < mh0> about the undefined symbol
+15:34 < nathan7> sinclair|net: I'd like full isolates
+15:34 < nathan7> sinclair|net: like, what we do now with cluster
+15:34 < sinclair|net> nathan7: exactly
+15:34 < nathan7> sinclair|net: so I can share a LevelDB across workers
+15:34 < sinclair|net> nathan7: i have a hard time explaining to system administrators that my node app may or may not spawn new instances
+15:35 < sinclair|net> who knows right?
+15:35 < sinclair|net> nathan7: note worthy tho, chrome does not do that
+15:35 < nathan7> sinclair|net: hm?
+15:35 < nathan7> sinclair|net: webworkers have IndexedDB access don't they?
+15:35 < nathan7> sinclair|net: IndexedDB is LevelDB on chrome
+15:36 < sinclair|net> nathan7: yeah, i don't know what voodoo is going on to be honest
+15:36 < ggwalle> nathan7: OMG, this lib is so hard for use.
+15:36 < sinclair|net> nathan7: being able to spawn new isolates in proc would be amazing
+15:37 < sinclair|net> nathan7: im told its "too difficult"
+15:37 < nathan7> sinclair|net: It takes a lot of work, yeah
+15:37 < nathan7> sinclair|net: Isolates have been tried
+15:37 < ggwalle> nathan7: it's make programmer must control thread in code, but in vert.x, the thread can be use in middle level, so programming in sync mode, run it in async mode.
+15:38 < sinclair|net> ggwalle: threading in node is not something i agree with so much
+15:38 < nathan7> ggwalle: You do realise the network is pretty much the slowest component? That's what node is about.
+15:38 < sinclair|net> ggwalle: it goes against the grain
+15:38 < nathan7> Threads are a pain, but being able to throw a computation out into a thread is a lovely convenience
+15:39 < sinclair|net> nathan7: i currently have a setup where i am running the TS compiler on a forked node
+15:39 < nathan7> sinclair|net: It involves changes in libuv and lots in node core
+15:39 < sinclair|net> nathan7: which is ok i suppose, tho i would prefer it were in proc
+15:39 < nathan7> sinclair|net: mhm
+15:39 < ggwalle> nathan7: yes, i know network may be the bottleneck, but i think node should faster than vert.x in same network configure, but it's not.
+15:40 < mh0> anyone?
+15:40 < sinclair|net> nathan7: do you work on node?
+15:41 < ggwalle> mh0: you should go to node-webkit channel... if you are that module's user
+15:41 < mh0> do they have a channel?
+15:43 < nathan7> sinclair|net: Not really, no
+15:43 < nathan7> sinclair|net: I broke websockets a few weeks ago
+15:43 < sinclair|net> heh
+15:44 < nathan7> sinclair|net: (this is mostly socket.io being broken and relying on chunking particulars)
+15:44 < sinclair|net> nathan7: what is your association with socket.io?
+15:44 < nathan7> sinclair|net: none
+15:44 < ggwalle> is anyone do bechmark of node-mongodb-native and node-mysql ?
+15:44 < nathan7> sinclair|net: You know the upgradeHead/bodyHead argument to HTTP CONNECT/UPGRADE events?
+15:45 < sinclair|net> nathan7: sorry, no
+15:45 < nathan7> sinclair|net: that's basically what the HTTP parser read too much
+15:45 < nathan7> sinclair|net: with streams2 you can do ReadableStream#unshift()
+15:45 < nathan7> sinclair|net: so I turned it into a zero-length buffer and unshifted the actual bodyHead onto the socket stream
+15:45 < nathan7> sinclair|net: which doesn't break the contract for that event at all
+15:46 < sinclair|net> nathan7: oh, well, it happens...i guess :)
+15:46 < nathan7> sinclair|net: however, socket.io doesn't handle the rare case of the headers aligning perfectly with a chunk
+15:48 < nathan7> sinclair|net: so that's waiting until 0.12
+15:49 < kenperkins> anyone going to nodeconf
+15:50 < nathan7> kenperkins: nobody at all
+15:50 < nathan7> kenperkins: you'll just be at the venue
+15:50 < nathan7> kenperkins: all alone
+15:50 < kenperkins> sweet
+15:50 < nathan7> kenperkins: wondering where everyone went
+15:50 < nathan7> there'll be beer and snacks though
+15:50 < kenperkins> I was curious about the survey question
+15:59 < bnoordhuis> kenperkins: what survey question?
+16:26 < AAA_awright> Why is my PBKDF2 function putting out strings like 387452010000000070ca5a0100000000f4528b1301000000b885570100000000b0ca5a01000000009428612602000000c88557010000000030cb5a0100000000
+16:26 < AAA_awright> I've either found a miracle password or something is very wrong with crypto
+16:34 < plops> Who use nodejs??
+16:35 < Willox> nobody, plops
+16:36 < plops> :P
+16:37 < plops> Willox, I ask the question to have a list of people who use it and thus prove that if is excellent!!
+16:37 < Willox> Well.. I don't
+16:45 < kenperkins> bnoordhuis: the google docs "you instanceof" one
+16:45 < kenperkins> I assumed it was looking for "male/female/other" but wasn't certain
+16:46 < wumpus_> hello everyone, i have a config file like this http://hastebin.com/kuxuweyihi.json and i use that file ad a module: var config = require('./config');
+16:47 < wumpus_> now when i need to get all the item types for a particular section/level i do : Object.keys(config.type[section][level])
+16:48 < mmalecki> plops: nodejs.org has a nice list
+16:48 < plops> ok
+16:49 < wumpus_> and when i need a particular item i do: config.types[section][level][type]
+16:49 < wumpus_> but it feels so bad
+16:50 < wumpus_> i can't think of a better way :( can you guys give me some hints?
+17:04 <@mbalho> var pizza = config.type[section][level]
+17:04 <@mbalho> Object.keys(pizza)
+17:04 <@mbalho> pizza[type[
+17:04 <@mbalho> oops
+17:04 <@mbalho> you get the idea
+17:22 < wumpus_> mbalho: hmmm ok thank you
+17:22 < wumpus_> so using a config file like that isnt' that crazy?
+17:29 < fluxy> ive a question about nodejs job listings
+17:30 < fluxy> when they list nodejs developer.. does that include the main ecosystem like express?
+17:30 < fluxy> i know its gonna kinda depend on the job, of course, but I just mean in a general case..
+17:31 < sambarino> well, i don't really know the answer to that, but if i was hiring and i wanted to make sure the candidates knew express i would say so
+17:32 < fluxy> yeah that makes sense
+18:01 < eighty4> n #webtech
+18:09 < Skullclown> anyone here ever had issues with websockets not working? (only SSL sockets work on chrome/firefox with hybi-draft-13 but all sockets work on safari with draft-76)
+18:13 < jar8776878> Hello
+18:13 < jar8776878> How to connect to DB ?
+18:16 < nohimn> you don't
+18:16 < nohimn> nobody uses databases with node
+18:16 < nohimn> it's impossible
+18:17 < Skullclown> it's not impossible?
+18:17 < Stumbler_> lol
+18:17 < nohimn> :P
+18:17 < Stumbler> what kind of database would you like to connect to jar8776878?
+18:18 < jar8776878> mysql or postgresql
+18:18 < Skullclown> isn't there a node-mysql ?
+18:18 < Stumbler> yup, was about to suggest it. 
+18:18 < jar8776878> it gives option for ORM ?
+18:19 < nohimn> it puts the lotion on its skin
+18:19 < Stumbler> there are a few to pick from, try: https://github.com/felixge/node-mysql
+18:19 < nohimn> use waterline - serious response -
+18:19 < jar8776878> Thanks Stumbler 
+18:20 < jar8776878> Thank You ALL
+18:20 < Stumbler> Waterline looks pretty spiffy, do you use it much nohimn?
+18:21 < ph88> is there a time map somewhere when the release of node.js 1.0 is expected ?
+18:22 < AAA_awright> ph88: What should have been Node.js 1.0 was called Node.js 0.4
+18:22 < ph88> why did it happen that way ?
+18:22 < AAA_awright> No clue
+18:22 < ph88> now it looks like there is no stable version
+18:27 < ph88> so how cool is node.js ?
+18:28 < Guest54504> ph88: download, install and see for yourself
+18:30 < Stumbler> node.js is so cool you could roast marshmallows over it like a campfire.  Yeah, it's that cool-  Its coolness value wraps around the floating point binary threshold into a negative value.
+18:33 <@mbalho> 9007199254740992
+18:34 < ph88> sub zero then
+18:46 < mnngfltg> Hello everyon. Being new to node.js... I'm trying to build a helper too (not as a separate job outside of the web server). Normally, I don't need a event loop. However, the tool needs to access my sqlite3 db (node-sqlite3 is async). Can I use async db functions in a stand-alone tool like this?
+18:46 < mnngfltg> s/helper too/helper tool/
+18:47 < bowiz2> Is it possible to run a script containing node.js (specifically an irc bot) continuously on an ftp server? As in while the server is running, the script is also continuously running.
+18:47 < owen1> bowiz2: npm install forever -g
+18:47 < mnngfltg> bowiz2, "FTP server"? That doesn't make sense...
+18:48 < squeeks> it certainly does if you know how many remote execution bugs have existed in FTP servers over the years...
+18:49 < mnngfltg> squeeks, hehe
+18:51 < bowiz2> owen1: and then I execute a script like so: forever [action] [options] SCRIPT [script-options] through the server and it should work?
+18:52 < bowiz2> And does anyone know of any good guides on how to get npm set up on an ftp server?
+18:53 < squeeks> if you can't SSH in, you are SOL.
+18:56 < sambarino> porting this app from express 2.x to express 3 is turning out to be really frustrating
+19:12 < enaqx> after upgrading to 0.10.12 we have error Error: Symbol binding_module not found.
+19:12 < enaqx> any idea?
+19:12 < Skullclown> is there any way to efficiently detect a certain device on a network? the device would be connected via WiFi but with a random IP address, is there an efficient way to find this device? all I would know in advance is the open port and protocol, not MAC address.
+19:12 < Jar6739843467> When i run npm install felixge/node-mysql on my cmd prompt i get Error
+19:12 < enaqx> first was bcrypt and bindings issue
+19:15 < Jar6739843467> What might be the problem ?
+19:18 < mscdex> enaqx: are you compiling from source or ?
+19:19 < mscdex> Jar6739843467: hard to know without seeing more details :-)
+19:19 < Jar6739843467> mscdex http://pastebin.com/4d4RmsZa
+19:20 < mscdex> Skullclown: just try connecting ?
+19:21 < ningu> Jar6739843467: do you have git installed?
+19:21 < Jar6739843467> yes
+19:22 < mscdex> Jar6739843467: and it's in your path?
+19:22 < owen1> sambarino: i can help u port it to vanilla.js if u want
+19:22 < Jar6739843467> mscdex means ?
+19:23 < mscdex> Jar6739843467: your PATH environment variable
+19:23 < mscdex> Jar6739843467: like if you fire up cmd.exe, can you just do `git` and it works?
+19:24 < Jar6739843467> yes
+19:28 < Jar6739843467> What could be the Problem ?
+19:28 < mscdex> dunno, post an issue npm's gh
+19:28 < mscdex> works for me
+19:28 < Jar6739843467> okay
+19:29 < mscdex> Jar6739843467: i guess you could try upgrading npm or something
+19:29 < Jar6739843467> current version is 1.2.25
+19:30 < mscdex> v0.10.12 has 1.2.32
+19:30 < Jar6739843467> i got 0.10.10 :P
+19:30 < mscdex> Jar6739843467: you could probably try something like `npm install npm -g` if you don' want to upgrade node
+19:33 < enaqx> mscdex: i've found. it is known error in bcrypt
+19:34 < mscdex> enaqx: which bcrypt module are you using?
+19:35 < enaqx> https://npmjs.org/package/bcrypt
+19:44 < nmdave> I'm brand new to node and trying to run the express.js hello world app. My code is simply: require('express'); var app = express();  The error I'm getting is: 12:42:20 web.1  | var app = express(); 12:42:20 web.1  |           ^ 12:42:20 web.1  | ReferenceError: express is not defined
+19:44 < AAA_awright> enaqx: I wouldn't use bcrypt
+19:45 < AAA_awright> enaqx: PBKDF2 is approved for password hashing instead
+19:45 < squeeks> approved by who?
+19:45 < squeeks> (and do you trust whoever that is?)
+19:45 < AAA_awright> NIST, among other standards organizations
+19:46 < enaqx> unfortunately there are lot of node.js code and i'm not hired to rewrite server code
+19:47 < AAA_awright> Well do try and bring it up because that's fairly serious
+19:47 < squeeks> AAA_awright: also, technically you're wrong.
+19:47 < squeeks> http://security.stackexchange.com/a/15091 etc.
+19:47 < AAA_awright> squeeks: Uh okay, why?
+19:48 < AAA_awright> squeeks: Hashed passwords are secret keys, that's a distinction without a difference
+19:53 < Jester831> is there a way to run repl on a server?
+19:53 < Jester831> like within the context of an express app
+19:59 < Guest50781> Hey guys, I have a few nice ideas for an email client. I'd like to make the backend using node.js. Do you think it's a good idea? Are the imap libraries such as node-imap nice enough to do the job yet? Thx
+20:03 < gkatsev> Jester831: check out replify
+20:04 < Jester831> thanks, actually just figured it out 2 seconds ago -- it's already built into compound
+20:04 < Jester831> compound console => win
+20:05 < gkatsev> interesting, haven't heard of compound before
+20:08 < tboyt> is there a way to convince npm to install a package as its own subdependency? basically, i have a project that uses itself to compile, and it would be nice to have it use the last stable version (as fetched from npm)
+20:29 < tomshreds> Hey guys, I have a few nice ideas for an email client. I'd like to make the backend using node.js. Do you think it's a good idea? Are the imap libraries such as node-imap nice enough to do the job yet? Thx
+20:35 < Skullclown> any socket.io experts?
+20:51 < niekniek> hello all, i'm trying a mongoose database check in a function, but for some reason it will never be executed
+20:51 < niekniek> worked fine in a separate file
+20:52 < niekniek> must be me not understanding the callback thing
+20:52 < niekniek> but i cannot figure it out
+20:52 < niekniek> after the db.once i have a console.log, but nothing
+20:54 < gaf> hi, i have a lil js question
+20:54 < gaf> looking at this code https://github.com/component/file-picker , what would you say when you see: >> function(files){};, is that standard? i mean, an empty function, with an arg...
+20:55 < gaf> what da heck an empty func returns anyway?
+20:58 < gildean> gaf: you can put anything you want in there, the files arg is the file(s) the user picked
+21:00 < gaf> gildean, but should i insert code there?
+21:00 < gaf> isn't that ready to use that way?
+21:01 < gildean> gaf: use for what?
+21:01 < gildean> that component only gives you the file-picker, it doesn't do anything with the picked files
+21:01 < gildean> you'd prolly want to put something like a call to an ajax post-req there
+21:02 < gaf> ahh, ok
+21:02 < serapath> hi, i tried to "npm install bcrypt" on windows and got couple of errors including the info "You can pass the --python switch to point to Python >= v2.5.0 & <  3.0.0."
+21:02 < gaf> cause i was reading the USAGE, and that was not clear there, no comments, nothing
+21:02 < serapath> so should i download an older python version and downgrade?
+21:03 < serapath> do i have to uninstall current python first?
+21:03 < serapath> is there another option?
+21:04 < serapath> what does it mean to "pass --python switch" ?
+21:05 < gaf> gildean, are you using components?
+21:05 < serapath> "npm install bcrypt --python 2.75" didnt work
+21:06 < gildean> gaf: not really, i've only read some posts about them
+21:06 < gaf> mm, k, me too
+21:07 < gildean> serapath: it means you should point to the python binary, not to the version
+21:07 < gaf> can't scape jq anyway
+21:07 < gaf> escape*
+21:07 < nathan7> serapath: PYTHON=/usr/bin/python2 npm install blah
+21:07 < nathan7> serapath: the --python is to node-gyp, you can't pass it through npm, the env var works though
+21:08 < bnoordhuis> gaf: an empty function returns undefined
+21:08 < bnoordhuis> gaf: i.e. function(){} is identical to function() { return undefined }
+21:09 < gaf> oh, ok, good call, i missed that. but anyway, it is not what the author wanted, i think. he wanted me, to fill it up with ajax calls
+21:10 < serapath> nathan7 that means what?
+21:10 < gaf> https://github.com/component/file-picker
+21:10 < serapath> do i have to install an earlier python first?
+21:10 < gaf> bnoordhuis
+21:11 < nathan7> gaf: it means you have to put code there, dear.
+21:11 < nathan7> gaf: or it'll do nothing.
+21:12 < nathan7> gaf: which kind of defeats having a file picker at all
+21:13 < gaf> yup, got it. i just had a glance in the code, and to be honest, i never built code with a file picker, so it's something new for me
+21:17 < gaf> dear
+21:17 < gaf> lol, you are so gay
+21:17 < astropirate> has anyone written a scrapper in Node.js?
+21:17 < gildean> gaf: btw. just because he's using jquery in the example doesn't mean you need to use jquery
+21:18 < astropirate> it bleeds memory for no reason...
+21:18 < gaf> lol, a component using jquery, that is just funny
+21:18 < gaf> i thought component would wipe jq
+21:19 < gaf> wipe awaayyyyyy that grotesque API
+21:20 < gaf> kk, joint time now, need a huge one
+21:25 < serapath> thx nathan7 
+21:26 < timwis> Hey guys, I have a basic express app, and I'm serving static content from my /public directory. How can I make /public/admin require basicAuth?
+21:26 < ningu> timwis: hmmm... there must be a middleware somewhere in connect or elsewhere for doing that.
+21:27 < gaf> i think you need first have "sessions"
+21:27 < ningu> actually, no
+21:27 < ningu> it's all in the headers for each request
+21:27 < ningu> you just need a passwd file or whatever
+21:27 < ningu> timwis: wait, you want basic auth for the static files?
+21:28 < timwis> ningu yes
+21:28 < ningu> I suppose it doesn't matter, actually. you would do it basically the same way.
+21:28 < ningu> something like: app.get(/^\/admin.*/, checkAuth); where checkAuth does what it sounds like and calls next() if auth succeeds.
+21:29 < ningu> so the question is where you can find a basic auth implementation to plug in for that checkauth method
+21:29 < ningu> tada: http://www.senchalabs.org/connect/basicAuth.html
+21:31 < timwis> wow, ningu, this works: app.get(/^\/admin.*/, express.basicAuth("userx", "passx"));
+21:31 < ningu> timwis: :)
+21:31 < ningu> don't you need to pass in a function?
+21:32 < ningu> oh, I see. there are two ways.
+21:32 < ningu> timwis: yeah, so you can either hardcode the user/pass or use some sort of htpasswd-reading module, etc.
+21:32 < timwis> yeah, or i can hardcode an encrypted pass and encrypt in a callback here
+21:33 < ningu> that too
+21:33 < ningu> I'm sure the htpsswd module exists
+21:33 < ningu> or you can just store the one valid user/encrypted pass combo in some config.json for your app
+21:33 < ningu> or the list, even
+21:37 < timwis> ningu yeah I'm doing config.js right now
+21:37 < timwis> will use the htpasswd module later
+21:37 < timwis> thanks for your help!
+21:38 < timwis> really impressed with express
+21:38 < timwis> I don't think I'll ever touch PHP again!
+21:38 < ningu> timwis: maybe easier to just have an array rather than adding another dependency, depends what you think is easier to maintain
+21:38 < ningu> timwis: haha, cool. express is nice, provides a lot of convenience. you may also find that if you need full control over http and want to use streams etc. you should just use the basic http.createServer()
+21:38 < ningu> timwis: also, check out restify for apis
+21:39 < ningu> restify is basically express for apis
+21:39 < timwis> Sounds interesting, I'll check it out
+21:39 < gaf> ningu, i want to use restify, how could i provide authentication with it?
+21:40 < ningu> gaf: I haven't tried to do that myself, so I dunno
+21:40 < ningu> it works very similarly to connect but they aren't fully compatible
+21:40 < gaf> ah, ok then, i will sure find out :P
+21:41 < ningu> there is an authorization plugin
+21:41 < gaf> i'm building this angular app, so i think restify is a good fit
+21:42 < ningu> the authorization plugin parses the headers for http basic/digest auth
+21:42 < ningu> but it looks like you are on your own for the password store
+21:42 < ningu> and also for deciding what to do next
+21:44 < ningu> gaf: so, (1) set the right http auth headers on urls that require auth, (2) use the authorization plugin to parse out the client's auth headers, (3) use your own code to verify the password and accept it or not
+21:45 < gaf> i never done these things, i'm a beginner on the server. maybe better stick with express so
+21:46 < ningu> gaf: just read up on how http basic auth works, it's not hard at all
+21:46 < gaf> do you have a good link about it?
+21:47 < ningu> just wikipedia
+21:47 < ningu> http://en.wikipedia.org/wiki/Basic_access_authentication
+21:47 < gaf> ok
+21:47 < ningu> that's enough to get you started
+21:47 < ningu> it's just headers
+21:49 < gaf> great, thanks, i learn a lot from wikepedia always. is a good resource
+21:54 < serapath> nathan7: hey, uninstalled phyton, reinstalled version 2.7. now it complains about the missing VCBuild.exe and said i should install microsoft sdk and .net 3.5 or visual studio 2008
+21:55 < serapath> nathan7: i installed  Microsoft Windows SDK für Windows Server 2008 (googled for it)
+21:55 < serapath> but still it tells me VCBuild.exe is missing
+21:56 < gaf> ningu, that was really interesting read, thanks
+21:56 <@isaacbw> hello beautiful people
+21:56 <@isaacbw> do you know who's the most lovely person in the universe? You are
+21:57 < dipen> isaacbw: :) hello!
+21:57 < ningu> gaf: yep, so you just set res.header(...) to announce that auth is required, and restify provides req.authorization with a nicely parsed version of the req headers when you use the plugin
+21:57  * Stumbler blushes   I knew I was pretty, but beautify? :*)
+21:58 <@isaacbw> the beutifulest
+21:58 < Stumbler> lol, hi isaac, looks like you're in a good mood :P
+21:59 < gaf> i see...it sounds good. i will install everything and have a go, i let you know how it went :)
+21:59 < serapath> could anyone give me any advise in how to succeed with "npm install bcrypt" on windows?
+21:59 < gaf> on windows?oh, cmon...
+22:00 < serapath> gaf yes on windows
+22:00 < gaf> just install virtual box, imho, and run ubuntu
+22:00 < ningu> serapath: if we don't know what the errors are we can't help
+22:00 < serapath> mmh... ok
+22:00 <@isaacbw> 1) uninstall windows 2) install linux
+22:00 < serapath> ningu it complains about missing VCBuild.exe
+22:00 <@isaacbw> how is node support on freebsd?
+22:01 < gaf> lol, isaacbw is radical
+22:01 < Stumbler> heh, but efficient
+22:01 < gaf> totally
+22:01 < serapath> ningu: it told me to install Microsoft SDK and .NET 3.5, which i did
+22:01 <@isaacbw> serapath: do you have visual c++ installed?
+22:01 < serapath> but that just gave me a MSBuild.exe
+22:01 < serapath> not VCbuild.exe
+22:01 < Stumbler> I tried using node on windows, I really did.  But damn, I spent more time fixing setup problems than actually coding :\
+22:01 <@isaacbw> I think VCbuild is part of visual c++
+22:01 < ningu> serapath: doesn't really sound like a node question
+22:02 <@isaacbw> or use mingw
+22:02 < serapath> if i rename MSBuild.exe to VCBuild.exe it complains that only one project could be stated
+22:02 <@isaacbw> man I don't 'know anything about windows
+22:02 <@isaacbw> don't listen to me
+22:02 < dipen> serapath: not for this fix, but for future sanity as well I also recommend getting ubuntu/linux installed on a VM if u dont wanna give up on windows yet!!
+22:02 < gaf> y, windows is a PITA, honestly, i tried also
+22:02 <@isaacbw> serapath: lol wtf
+22:02 <@isaacbw> why would you just rename the program and hope it works
+22:03 < serapath> isaacbw: i dont know, googled for MSBuild.exe and VCBuild.exe and it sounded as if it might work
+22:03 < serapath> didnt
+22:03 < gaf> issacbw, he is a ms user, not to be impressed :p
+22:03 <@isaacbw> serapath: I asked before but you didn't answer. Do you have visual studio installed?
+22:04 < serapath> isaacbw: no
+22:04 <@isaacbw> you need it I think
+22:04 <@isaacbw> visual c++
+22:04 <@isaacbw> it's free
+22:04 < serapath> isaacbw: it told me to either install visual studio 2008  ..or ... microsoft sdk 2008 and .NET 3.5
+22:04 < serapath> i installed the latter
+22:04 < serapath> couldnt find a proper download link for the first
+22:04 < serapath> ...for 2008
+22:04 <@isaacbw> really?
+22:04 <@isaacbw> start a timer
+22:04 < serapath> and installing 2010 or something might get me into other problems
+22:04 < serapath> like the python 3+ did
+22:05 < serapath> bcrypt need python 2.5 < x < 3
+22:05 <@isaacbw> http://go.microsoft.com/?linkid=9816758
+22:05 < serapath> i found that one
+22:05 < serapath> but it says microsoft visual studio express
+22:05 < serapath> and wasnt sure if "express" is the right thing
+22:05 <@isaacbw> it's the free one
+22:05 < serapath> but i'll try
+22:06 < serapath> ok
+22:06 <@isaacbw> and it's fine
+22:06 < serapath> thx :-)
+22:06 <@isaacbw> you just get less IDE features
+22:06 < gaf> sry dude, but WHY don't you install virtual box and run linux?
+22:06 <@isaacbw> fewer
+22:06 < serapath> dont care, as long as brcrypt will work
+22:06 <@isaacbw> dammit, where did my change jar go
+22:06 < serapath> gaf because my system is too slow
+22:06 <@isaacbw> I'm too poor for this shit
+22:06 < serapath> a virtual box would kill it
+22:06 < gaf> naa
+22:06 < gaf> run arch linux
+22:06 < serapath> and dont have the time to reinstall the operating system
+22:07 < gaf> just the prompt
+22:07 < serapath> i'll think i'll switch to linux in the future
+22:07 < serapath> but right now i just need bcrypt to work
+22:07 <@isaacbw> archlinux 4 lyfe
+22:07 < serapath> hey thx for that awesome responsive support
+22:07 < serapath> awesome :-)
+22:08 < gaf> what you got bte, a p3?
+22:08 <@isaacbw> come back if it doesn't work and we'll try harder to convince you how stupid windows is
+22:08 < gaf> you must be really under paid, lol
+22:08 < serapath> hehe :-) 
+22:08 < serapath> i currently have near zero income
+22:08 < gaf> and you are installing bcrypt on linux?mmm
+22:09 < gaf> on windows, i mean
+22:09 < gaf> oh nvm
+22:09 < gaf> anyway
+22:09 < gaf> get a fucking linux box dude
+22:09 < gaf> damn it
+22:09 < gaf> lol
+22:09 < serapath> i will
+22:09 < serapath> thx
+22:09 <@isaacbw> lol
+22:09 < serapath> i mean not today
+22:10 < Stumbler> once, I had a problem with my toaster burning my bread in the morning.  Then I installed linux and everything just works.  
+22:10 < serapath> but maybe in a couple of weeks
+22:10 <@isaacbw> windows just isn't very fun to develop on unless you're using visual studio
+22:10 < nathan7> serapath: I have no idea about windows :(
+22:11 <@isaacbw> but if you want to do anything near the unix development process in windows, you'll go crazy
+22:11  * nathan7 high fives isaacbw 
+22:11 < nathan7> archbros
+22:11 <@isaacbw> woo
+22:11 < gaf> i would also consider building a hackintosh, with few hundreds you could have a unix mac!that would do too
+22:11 < serapath> nathan7: no problem, had many helpful advise and currently i'm installing microsoft visual studio, which might solve it
+22:11 <@isaacbw> deleting system folders by hand is my favorite thing to do!
+22:11 <@isaacbw> every month when arch decides to change its system folder structure
+22:11 < Stumbler> I switched all of my development to a macbook several months ago, from windows.  my blood pressure dropped a lot.
+22:12 < gaf> i'm currently in the process of building my first hackintosh :D
+22:12 < Stumbler> havnt had much trouble at all, kinda love it.. really, never thought I would say that about mac
+22:13 < serapath> really, until now, everything worked like a charm. bcrypt is the first package that caused trouble. 
+22:13 < serapath> havent experienced any problems during the last couple of weeks
+22:13 < gaf> i used mac 4 years ago, than switched to linux, but now i need some commercial software...so
+22:14 < serapath> what really helped was to install git for windows and add all the linux commands to windows cmd
+22:14 < Stumbler> gaf, that's the only reason I never did a full baptism with linux.  otherwise I think I'd be using that instead
+22:14 < nathan7> isaacbw: I'm pretty happy about dropping sbins and /bin
+22:14 < serapath> like git for windows did that
+22:14 < gaf> Stumbler, yup, you and 90% of the devs
+22:14 < nathan7> isaacbw: it's a distinction from the age before package managers
+22:14 <@isaacbw> nathan7: nah, I don't mind the occasional system update hangup. Everything is really well documented
+22:15 <@isaacbw> the wiki is the best part about arch
+22:15 < nathan7> I had to help out three people irl with that already
+22:15 < serapath> whats special about arch?
+22:15 < Stumbler> gaf: it's unfortunate really, its the only thing keeping it from being a solid mainstream system, the fact that it's not mainstream. go figure.
+22:15 < gaf> my linux will be just for the server and custom applications. i want to build custom embed systems with the kernel, node, etc
+22:15 <@isaacbw> bleeding edge packages serapath 
+22:15 <@isaacbw> but that also means that things occasionally don't work :P
+22:15 <@isaacbw> very rarely 
+22:16 < serapath> ok
+22:16 <@isaacbw> you wouldn't want to run a server with it though
+22:17 <@isaacbw> oh man, do you even know what package managers are?
+22:17 <@isaacbw> windows is cray cray
+22:17  * dipen downloading arch.
+22:17 < serapath> i know npm
+22:18 < ningu> yeah, I pretty much refuse to use a system that doesn't have sane package management
+22:18 <@isaacbw> has anyone used the IE virtual box images? Do they give you a full OS or is the OS gimped to just let you use the browser?
+22:18 <@isaacbw> I need to use some windows-only CAD software and I refuse to reinstall windows
+22:19 < nathan7> isaacbw: this server runs Arch
+22:19 < nathan7> I have like two servers on Arch
+22:19 < serapath> and i found something which i havent tried yet...http://chocolatey.org/
+22:19 <@isaacbw> nathan7: which server
+22:19 < nathan7> but it's because I'm crazy
+22:19 < nathan7> isaacbw: the server that runs all my shit
+22:19 <@isaacbw> yea you are
+22:19 <@isaacbw> lol
+22:19 < nathan7> and my home server which runs a variety of important shit
+22:20 <@isaacbw> if it's like a remote server for random shit it seems fine, but I don't know about a public facing website larger than a blog
+22:20 < Stumbler> I'm not sure if it helps isaacbw, but I am aware that there are a few windows live USB images floating around.  If you're up for the questionable sources you'd have to go through to find it.
+22:20 <@isaacbw> but maybe, whatever
+22:20 <@isaacbw> Stumbler: I'm trying to avoid questionable sources
+22:20 < serapath> chocolatey is a windows package manager
+22:20 < Stumbler> alrighty, disregard :)
+22:20 < serapath> i really hope microsoft visual studio will solve it. the link gave me visual studio 2012, not 2008
+22:21 <@isaacbw> serapath: it might make a difference, but probably not
+22:21 < nathan7> isaacbw: I lack a website, nathan7.eu is mostly a rather strange collection of files in /stuff
+22:21 < serapath> hope it doesnt make a difference. it installs .NET 4.5, but bcrypt said it needs 3.5
+22:21 < serapath> but have installed .NET 3.5 too
+22:21 < serapath> so maybe it knows what to do... but it takes AGES !!!! :-(
+22:22 <@isaacbw> microsoft rocks at bloat
+22:26 < ningu> isaacbw: I dunno, gotta be careful, don't wanna rock the bloat
+22:27 <@isaacbw> lol
+22:27 <@isaacbw> aight, ima download this ie8 xp image and see if I can install shit on it
+22:27 < ningu> npm install shit
+22:28 <@isaacbw> quick, take the name
+22:28 < nathan7> npm install fæces
+22:28 < ningu> can you have non-ascii chars in npm modules?
+22:28 < ningu> module names
+22:31 < nathan7> ningu: (no.)
+22:31 < ningu> I figured not
+22:38 < gaf> k, you are buiding that cool app, you know...the cool one, than you are, you know...on github, than you find it. the perfect npm pkg for your app. you go all happy and click the link. than, you see it, that DARK BLUE BAR in the top of the repo, and you know it. it is CS(not speaking anymore the heretic word). what would you do?a)clone the repo, parse everything, and pretend you have created a "version" of such package.b)try to talk with the dev, and convince 
+22:38 < AphelionZ> Anybody working with TempoDB at all? I'd love to compare notes
+22:38 < gaf> him to make a "pure" js version or c)just say fuck it, is CS, i ain't using this shit.lol, what you do? 
+22:38 < nathan7> you.. you can just use it
+22:38 < nathan7> you can compile the CS to JS
+22:38 < nathan7> if he doesn't use a prepublish hook (ie he depends on coffeescript instead of devdepends) you send him a pullreq
+22:39 <@isaacbw> and call him a turd
+22:41 < nathan7> isaacbw++
+22:41 < gaf> a turd, that was a good option i didn't include
+22:44 < gaf> could npm imposse that pkgs MUST be in js only?like some script that trigger when user upload the pkg and check if it is CS?
+22:45 < gaf> impose*
+22:45 <@isaacbw> there's a package that will break your project if any coffee script is added as a dependency
+22:45 < gaf> i mean, it is just obscene all this CS situation
+22:45 < nathan7> gaf: ..dude
+22:45 < nathan7> gaf: if people use a prepublish hook
+22:45 < nathan7> gaf: it is JS by the time it reaches you
+22:45 < nathan7> gaf: it is JS by the time it reaches the npm repository
+22:46 < nathan7> err, registry
+22:46 < gaf> ok, so how can i check for the hook? where is it?
+22:48 <@isaacbw> oh hey, I forgot I have a windows 7 key
+22:48 <@isaacbw> damn autodesk, linux support wouldn't be so hard
+22:48 <@isaacbw> bastards
+22:49 < gaf> i'm looking into this CS pkg
+22:49 < gaf> https://npmjs.org/package/restify-oauth2
+22:50 < gaf> how can i check the prepublish hook from there?
+22:50 < gaf> i don't know what you mean by the registry
+22:50 < nathan7> does it *depend* on coffee-script
+22:50 < nathan7> registry.npmjs.org, the npm registry, where npm packages are stored
+22:51 < nathan7> gaf: it's fine
+22:51 < nathan7> it uses a prepublish hook
+22:51 < nathan7> no extensions fuckery, it's pure JS when you install it
+22:52 < gaf> really? care to describe the process of checking that sir, so i don't have to bother you again for that?
+22:52 < nathan7> gaf: if it depends on coffee-script
+22:52 < nathan7> gaf: it uses coffee-script at runtime
+22:53 < nathan7> gaf: devDependencies aren't listed on the npmjs.org page
+22:55 < gaf> i still don't know how to check it myself
+22:56 < gaf> but  nvm
+22:56 < gaf> i will find it on google
+22:56 < nathan7> gaf: if coffee-script is in the dependencies listed
+22:56 < nathan7> gaf: on the npmjs.org page
+22:57 < nathan7> gaf: then it can go to hell
+22:57 < nathan7> gaf: if it is not listed, it is okay
+22:57 < gaf> ok, that was easier than i thought
+22:58 < squeeks> 1415 packages going to hell. Is that it?
+22:58 < gaf> lol
+22:58 < gaf> would be nice a package to translate cs pkgs, on the app itself
+22:59 < gaf> so when you installed the CS, the pkg would parse in the moment of npm install
+22:59 < squeeks> be nice if people didn't use CS for npm packages altogether.
+22:59 < gaf> or maybe a -g package
+22:59 < squeeks> that way, those of us who don't use CS, don't have to in order to fix things.
+23:00 < gaf> squeeks, yup agree totally
+23:00 < gaf> would be nice if thy were blocked from NPM...just saying...
+23:00  * gaf roll yes
+23:00 < nathan7> no, that's not happening
+23:00  * gaf roll eyes*
+23:00 <@isaacbw> everything should be banned from npm
+23:00 <@isaacbw> nothing is good enough for npm
+23:00 < gaf> lol, ban everything! you are a real radical
+23:00 < nathan7> npm is so awesome because there are no barriers
+23:01 < nathan7> npm is anarchism
+23:01 < gaf> unistall windows ban all the pkgs
+23:01 < nathan7> npm works because it is anarchism
+23:01 <@isaacbw> centralized anarchism
+23:02 < nathan7> isaacbw: yes
+23:02 <@isaacbw> a torrent-based package manager could be cool
+23:02 < nathan7> isaacbw: you can replicate it
+23:02 < nathan7> isaacbw: the registry is forkable
+23:02 < gaf> no barriers...cmon, even the anarchism has barriers. reality has barriers. eg, don't try to be superman and jump from the 20th floor of your building
+23:02 <@isaacbw> someone should create an active curated form of npm with decent, active packages
+23:02 <@isaacbw> *fork
+23:03 < gaf> fuck yeah
+23:03 < gaf> i mean, no
+23:03 <@isaacbw> arachism 5 lyfe
+23:03 <@isaacbw> *4
+23:03 < gaf> we cannot loose all the CS code
+23:04 < gaf> i think best is to make a pkg to translate the cs on the fly, when doing npm install
+23:04 < darknoobie> Im looking to write a function that will trigger every hour on nodejs. How do I go bout writing such a function and adding it before express loop
+23:04 < gaf> like a command line pkg, so you would do.: npm install -translate <pkg_name>
+23:04 < AphelionZ> darknoobie: idk about express and how it fits in but setInterval has been working for me for 100% of my needs
+23:05 < nathan7> gaf: this is what the prepublish hook is for
+23:05 < nathan7> gaf: it translates it before publishing
+23:05 < gaf> oh, i see
+23:05 < darknoobie> I would imagine I would have to set a listener
+23:07 < nathan7> darknoobie: setInterval(function() { /* ... */ }, 3600 * 1000)
+23:08 < darknoobie> function hourly(){setInterval(function(){3600* 1000})};
+23:08 < nathan7> lol wat
+23:08 < darknoobie> nathan7: I would then create a module and export that function? 
+23:09 < nathan7> ..I give up
+23:09 < darknoobie> im sorry:( total newb
+23:09 < nathan7> setInterval(function() { console.log('coocoo!') }, 3600 * 1000)
+23:10 < nathan7> You probably want it to do something more useful than log 'coocoo!' hourly
+23:10 <@isaacbw> darknoobie: are you completely new to programming?
+23:10 < darknoobie> asynchronous yes
+23:11 < darknoobie> Asynchronous programming has me a little confused.
+23:13 <@isaacbw> the program structure is the same though. The stuff you wrote doesn't make any sense
+23:13 <@isaacbw> function() {3600*1000} what did you expect that to do?
+23:14 <@isaacbw> Seriously, if you let us know what you thought that would do, we can help fix your understanding
+23:15 <@isaacbw> I'm not trying to be a dick
+23:15  * nathan7 solemnly pats isaacbw on the shoulder
+23:15 < darknoobie> So in my app.js I would setInterval(myfunction, 3600*1000)
+23:16 <@isaacbw> right
+23:19 < darknoobie> Being that nodejs is a single threaded. how would it be affected if myFunction sent 1000 emails(newsletters)
+23:20 < darknoobie> would that block the server for example express from responding to request?
+23:20 <@isaacbw> you would probably send them to a proper mail server
+23:20 <@isaacbw> or better, sendgrid
+23:20 <@isaacbw> don't put a web server and your email sending code in the same process
+23:20 <@isaacbw> that's nasty
+23:21 < darknoobie> So you recommend having a seperate app running?
+23:22 <@isaacbw> I recommend using sendgrid to send newsletters
+23:22 < nathan7> It's not necessarily a separate app entirely, but it's certainly a separate entry point, a separate program
+23:23 < nathan7> It might share a bunch of code with the rest of the app
+23:24 <@isaacbw> or if you don't want to use sendgrid, pass your messages to a proper delivery agent like postfix
+23:25 < darknoobie> I was just gonna add setInterval(myfunction, 3600*1000) somewhere on my app.js file
+23:25 < AphelionZ> Anybody playing with TempoDB at all? I'm running into an issue because it only stores numbers and i need to include some strings with my data and i'm wondering if anybody has a strategy or workaround for that kind of thing?
+23:25 < darknoobie> before server.listen()
+23:26 < darknoobie> Ill be using sendgrid
+23:26 < darknoobie> This function will query a database for email addresses and send the newsletter to each client
+23:30 < darknoobie> Thank you guys for the help :D much appreciated.
+23:37 < owen1> i try to install https://github.com/obazoud/statusdashboard but fail since hiredis (one of it's dependencies) fail: make: node-waf: Command not found
+23:37 < owen1> i noticed this thread - https://github.com/mranney/node_redis/issues/397 but not sure what actions i am suppose to take to solve it.
+23:43 <@isaacbw> how is grooveshark still around
+23:44 <@isaacbw> someone make a service like google music
+23:45 <@isaacbw> except connected to a CD player so I can stream my CDs
+23:45 <@isaacbw> wherever I am
+23:45 <@isaacbw> because I'm a weirdo and refuse to rip my CD collection
+23:45 < nathan7> isaacbw: news flash
+23:45 < nathan7> nobody has CDs anymore
+23:45 < nathan7> well actually
+23:45 < nathan7> I have CDs
+23:45 < nathan7> just no optical drives
+23:46 <@isaacbw> lol
+23:46 <@isaacbw> I have a vinyl collection
+23:46 < Stumbler> damnit, am I behind the times again?  What do I need to do now, move all of my stuff to the cloud or something? >:(
+23:47 <@isaacbw> yup, that's it
+23:47 < Stumbler> hehe, I remember the days when it was all about physical backups :P
+23:47 < nathan7> man
+23:47 < nathan7> Stumbler: a real man just puts a torrent of his encrypted hard drive online
+23:48 < nathan7> Stumbler: and lets the world seed it
+23:48 < Stumbler> lmao
+23:48 < Stumbler> lmao for real
+23:56 < serapath> re
+23:56 <@isaacbw> sume
+23:56 < nathan7> con
+23:56 < serapath> so Microsoft Visual Studio was installed successfully, but still doesnt work
+23:56 < serapath> http://pastebin.com/LUkzD7pX
+23:56 < serapath> any suggestions?
+23:57 <@isaacbw> man that took a long time
+23:57 < serapath> yes
+23:57 < serapath> like i said
+23:57 < serapath> takes ages
+23:57 < serapath> my machine is really slow
+23:57 <@isaacbw> dunno, maybe it really has to be 2008
+23:57 < serapath> and that was really huge
+23:57 <@isaacbw> is visual studio in your path?
+23:57 <@isaacbw> try to look through the installation folders for VCBuild.exe
+23:58 <@isaacbw> maybe you have to restart your computer or something
+23:59 < serapath> i'm not so good with that kind of stuff, but it seems that it might not be http://pastebin.com/DKBBcMW3
+23:59 < serapath> i restarted already
+23:59 < serapath> i searched for VCBuild, but it can only find MSBuild
+23:59 <@isaacbw> yea, doesn't look like it
+23:59 <@isaacbw> did you look through by hand? Windows has a terrible find function
+23:59 < serapath> oh ok
+23:59 < serapath> no didnt yet
+--- Log closed Mon Jun 24 00:00:10 2013
