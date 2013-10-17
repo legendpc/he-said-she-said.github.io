@@ -1,0 +1,2042 @@
+--- Log opened Mon Apr 29 00:00:04 2013
+00:00 < kwikness> how can i upgrade?
+00:00 < mscdex> kwikness: just install over top your existing version
+00:01 < kwikness> i pulled from git and just did make install. still getting the same result
+00:01 < mscdex> kwikness: what platform and arch are you on?
+00:01 < kwikness> ubuntu x64
+00:02 < mscdex> kwikness: if you want to upgrade using the pre-built binary tarballs, there's this: curl http://nodejs.org/dist/latest/node-v0.10.5-linux-x64.tar.gz | tar zx --strip=1 -C /usr/local
+00:02 < kwikness> kyle@kyle-desktop:~/node$ node --versionv0.5.11-pre
+00:02 < kwikness> maybe the source i'm pulling isn't the right version?
+00:03 < kwikness> git://github.com/ry/node.git ?
+00:03 <@isaacbw> no
+00:03 < mscdex> kwikness: joyent/node.git
+00:03 < kwikness> jejeje
+00:03 < brianng> hi
+00:03 < brianng> is there such a thing as a non-blocking timer?
+00:03 < brianng> an asynchronous timer
+00:04 <@isaacbw> setTimeout()
+00:04 <@isaacbw> setInterval()
+00:04 < mscdex> ^
+00:04 < brianng> isnt that blocking?
+00:04 <@isaacbw> no
+00:04 < brianng> ty :)
+00:04 < mscdex> a "blocking timer" would be like a synchronous sleep()
+00:04 <@isaacbw> or I wouldn't have answered your question with it ;)
+00:05 < dypsilon> is there a blocking timer in node?
+00:05 < mscdex> no
+00:06 < kwikness> mscdex, compiling again now. pretty sure that was the issue. thanks :)
+00:06 < mscdex> not in node core anyway
+00:06 < dypsilon> mscdex, thx
+00:06 < brianng> that makes things so much easier for me :)
+00:06 < brianng> thanks
+00:07 < ome> brianng: what is it that you want to do?
+00:07 < brianng> kill something after the timer runs out
+00:08 < brianng> so settimeout would be good
+00:10 <@isaacbw> yup
+00:31 < dypsilon> oh noes
+00:31 < dypsilon> cursor.each in the mongodb native driver is synchronous
+00:32 < dypsilon> is there any way to asynchronously iterate over a mongo db result without loading everything into the memory?
+00:34 < ljharb> dypsilon: yes - don't fetch it from mongo all at once.
+00:34 < dypsilon> ljharb, meaning run one query per document? doesn't feel right
+00:34 < ljharb> wait, you can already do it async
+00:35 < ljharb> just call .next() on the DBCursor if it hasNext(), and don't call "toArray" or check it's length
+00:35 < ljharb> http://api.mongodb.org/java/2.6/com/mongodb/DBCursor.html
+00:35 < ljharb> that's a java doc (gross) but i'm assuming the concept is the same
+00:37 < dypsilon> ljharb, ah
+00:37 < dypsilon> http://mongodb.github.io/node-mongodb-native/api-generated/cursor.html#nextobject
+00:37 < dypsilon> i think that's it, isn't it?
+00:37 < ljharb> there you go
+00:37 < ljharb> looks right ot me
+00:37 < dypsilon> thank you
+00:49 < myhrlin> would ncurses be necessary (or available) in nodejs to create a 'progress bar' of sorts?
+00:50 < niggler> myhrlin mscdex wrote the node-ncurses module
+00:51 < myhrlin> oh right, npm, thanks niggler
+00:52 < niggler> this is where !npm ncurses would be awesome
+00:55 < myhrlin> !npm ncurses and then a pastie link would be returned
+00:55 < myhrlin> good stuff
+00:55 < niggler> instead we are stuck with purr
+00:56 < niggler> >>> npm
+00:56 < purr> niggler: ReferenceError: npm is not defined
+00:56 < niggler> bad purr!
+01:03 < xcm> d
+01:07 < monokrome> Hello. I'm trying to use promises to walk an entire directory and all of it's contents, but I'm not quite sure how to make it so that I can make sure that it isn't "done" until all of the files have been walked. Can anyone help with this? Here's what I'm in the middle of at the moment
+01:07 < monokrome> https://gist.github.com/ecd033b3da13f1563dd7
+01:08 < monokrome> I'm using Q, I assume that each "path" in the stack will need to resolve 
+01:08 < monokrome> but maybe I'm doing that part wrong?
+01:12 < mscdex> myhrlin: it's not necessary, you can probably easily accomplish the same thing with simple ansi/vt100/etc escape codes
+01:12 < mscdex> myhrlin: there's probably at least several "progress bar" modules on npm now that operate like that
+01:13 < ljharb> monokrome: you'll get more help if you show JS instead of coffeescript.
+01:14 < myhrlin> mscdex: it would make for a nice first attempt :) I'll check those out, thanks
+01:19 < monokrome> ljharb: Well, I'm just wondering how to manage nested promises
+01:21 < monokrome> in recursive functions
+01:21 < ljharb> i can answer that more easily with code, but i can't read coffeescript at all
+01:21 < ljharb> it makes my eyes bleed
+01:22 < monokrome> I'm just trying to walk a directory using promises using this Q library
+01:22 < monokrome> I'm doing it wrong
+01:22 < monokrome> I've tried 4 different ways now
+01:29 < monokrome> ljharb: I rewrote it in JS
+01:29 < monokrome> https://gist.github.com/monokrome/91a63f29d84983451996
+01:29 < ljharb> monokrome: what's '/ ?
+01:29 < ljharb> line 7
+01:30 < monokrome> refresh
+01:30 < ljharb> you're right tho - a promise can only be fulfilled once
+01:30 < ljharb> you shouldn't be reusing them imo
+01:30 < monokrome> I'm just asking how to do this properly
+01:30 < monokrome> I don't understand
+01:30 < ljharb> ok so first of all, the "done" callback can't ever fire until it's resolved
+01:30 < ljharb> so you don't "resolve" inside a "done"
+01:31 < monokrome> I created a new promise for tat
+01:31 < monokrome> that*
+01:31 < monokrome> when statPromise resolves
+01:31 < ljharb> the resolve call on line 29 will never fire
+01:31 < monokrome> readPromise gets created
+01:31 < ljharb> because it's inside the same promise's "done" callback, defined on line 19
+01:31 < monokrome> it files and says the promise has no method resolve
+01:31 < ljharb> another problem is that you're reusing the "readPromise" variable
+01:32 < ljharb> don't do that - actually declare a new variable
+01:32 < monokrome> but I wasn't really asking how my code is wrong as much as I'm asking what the right way to do this is
+01:32 < monokrome> ok
+01:32 < monokrome> I know this is probably wrong in a dozen places
+01:32 < ljharb> also you're missing a bunch of "var" statements
+01:32 < ljharb> probably cause of the coffeescript
+01:32 < ljharb> ok
+01:32 < monokrome> I just jumped into gist and converted this to JS by hand so that you didn't have to read CS's generated coffeescript
+01:32 < ljharb> gotcha
+01:32 < monokrome> so sorry if there are some issues like that
+01:33 < monokrome> the JS that CS generates is pretty messy
+01:33 < ljharb> exactly
+01:33 < zomg> monokrome: try ClojureScript
+01:33 < zomg> You can't even understand half of that shit
+01:34 < monokrome> Ever use Clojure?
+01:34 < ljharb> what you're trying to do is really complex, because you've got an unknown number of tasks
+01:34 < zomg> monokrome: Of course I used Clojure, how else would I have used ClojureScript? =)
+01:34 < ljharb> zomg: the answer to "your js doesn't work cause youre transpiling from something else" isn't "use something else"
+01:34 < monokrome> is ClojureScript written in Clojure?
+01:35 < zomg> monokrome: Yes, ClojureScript is the Clojure JS runtime
+01:35 < zomg> ljharb: I know but I was just saying that comparatively speaking CoffeeScript output is very sane
+01:35 < monokrome> I meant the JVM clojure
+01:35 < monokrome> oooh okay
+01:35 < niggler> is there a way to set up a submodule that specifies the head
+01:35 < ljharb> ahhh ok
+01:36 < ljharb> monokrome: essentially what you want to do is, "walk" each path by making a promise for it. then "walk" each subpath, doing the same. each path's promise shouldn't be considered resolved until all of its subpaths' promises are resolved.
+01:36 < niggler> *that just tracks the head (so i don't have to pollute commits each time)?
+01:36 < ljharb> it's a recursive nightmare, basically.
+01:36 < monokrome> right
+01:36 < ljharb> monokrome: ie, try to work on just 1 level of depth first. then make it work for 2, which is the hard part. then you'll probably find it works for a billion.
+01:36 < monokrome> if you know a better way, I'm all ears
+01:36 < monokrome> I got it at one level
+01:37 < ljharb> you mean a commitish instead of just a sha?
+01:37 < niggler> ljharb so i set up a submodule for test files
+01:37 < ljharb> niggler: as of git 1.8.2, you can
+01:38 < niggler> and i change the test files every once in a while
+01:38 < ljharb> niggler: http://stackoverflow.com/questions/9189575/git-submodule-tracking-latest
+01:38 < ljharb> i think that's what you want
+01:38 < ljharb> of course, everyone's on git 1.8.2 because being on old versions of anything is pure insanity, right???
+01:38 < niggler> lol $ git --version
+01:38 < niggler> git version 1.7.12.4 (Apple Git-37)
+01:38 < niggler> damnit!
+01:39 < ljharb> you can just download the binary and update
+01:39 < ljharb> git 1.8.2 also has pre-push hooks, which is nice
+01:39 < monokrome> I guess that I can just use findit
+01:39 < niggler> the desire is to have the tests in a separate repo
+01:39 < niggler> so that the main repo isn't polluted with massive files
+01:40 < ljharb> sure, i think that's just fine
+01:40 < niggler> so one thought is to just put the logic in the makefile
+01:40 < ljharb> so use git 1.8.2, and have your tests submodule track a branch instead of a sha
+01:40 < niggler> make test would git pull and do magic
+01:40 < ljharb> but also, why do you need such massive test files?
+01:40 < niggler> but as you said, not everyone uses git 1.8.2
+01:40 < niggler> ljharb its a binary format 
+01:40 < ljharb> ugh, ok
+01:41 < ljharb> i think that that mode of submodules just won't work with older gits
+01:41 < niggler> yeah :/ if i had a choice i wouldn't include them
+01:41 < ljharb> and you can just put that in the docs
+01:41 < ljharb> if someone's using an old version of something, they should update anyways
+01:41 < niggler> w/e ill continue using submodules until apple's Xcode tools includes 1.8.2+
+01:42 < ljharb> ugh, why chain yourself to that
+01:42 < niggler> you know what's funny?  it was *python* of all things that convinced me just to stick with the apple tools
+01:42 < ljharb> configure && make && make install like a pro
+01:43 < niggler> lol i do that with node :)
+01:43 < ljharb> good
+01:43 < ljharb> i just install the binary for git tho, nbd.
+01:43 < niggler> not cool enough ljharb ?
+01:43 < ljharb> http://git-scm.com/download/mac
+01:44 < niggler> if Xcode didn't provide it, id install it
+01:45 < ljharb> xcode will silently decline to update it if you have a newer one installed
+01:45 < ljharb> it's never caused me problems
+01:46 < ralphholzmann> hi ljharb !
+01:46 < ljharb> what up!
+01:46 < ralphholzmann> just poked my head in here and noticed your nick
+01:46 < ljharb> "ask a question, get a random stranger's strong opinion!" :-p
+01:46 < ralphholzmann> loll
+01:47 < niggler> hey we aren't all strangers
+01:47 < apple> anyone?
+01:47 < ljharb> nope
+01:48 < Guest54027> hello belfare
+01:52 < nemothekid> Should I be using 'node app' in production? I have the instance behind a load balancer, but the process seems to start refusing connections after a while
+01:55 < ChrisPartridge> nemothekid: probably something to do with the application code, maybe memory leak?
+01:55 < wcauchois> hello
+01:55 < wcauchois> i'm somewhat confused by the new stream API in 0.10
+01:55 < wcauchois> does the 'readable' event get emitted only once? or multiple times?
+01:55 < ChrisPartridge> nemothekid: or perhaps fd limit
+01:56 < owen1> i plan to have many node daemons that are 'subscribers' to muliple queues in RabbitMQ. each subscriber have different kind of job and might live on it's own host. also, i want to be able to deploy and manage each one independently from the others. what patterns/npm packages/ideas should i look into?
+01:57 < nemothekid> ChrisPartidge: I guess it would be a memory leak in the app code. The app doesn't get much use yet, but after 2-3 days it stops accepting connections
+01:57 < ChrisPartridge> wcauchois: multiple readable events could be fired, yes
+01:58 < wcauchois> ChrisPartridge: so to get the entire contents of the stream, i should concatenate the results of calling read() in my 'readable' event handler?
+01:59 < wcauchois> and then i stop when 'end' is called?
+02:00 < ChrisPartridge> wcauchois: should work, give it a shot
+02:01 < wcauchois> ChrisPartridge: thanks. doesn't seem that different from the old 'data' / 'end' event
+02:02 < JamesMGreene> WAT?  Object #<Readable> has no method 'off'
+02:11 <@isaacs> niggler: There are between 5 and 8 people who work "on node" at any given time as their primary job function, depending on what you count as "on node"
+02:12 < niggler> primary job function != full time isaacs 
+02:12 <@isaacs> ircretary: tell dypsilon There are between 5 and 8 people who work "on node" at any given time as their primary job function, depending on what you count as "on node"
+02:12 < ircretary> isaacs: I'll be sure to tell dypsilon
+02:12 < niggler> the question was about people who work on node as their full-time job
+02:12 <@isaacs> niggler: well, that's what i'm saying
+02:12 <@isaacs> sometimes it IS their full time job
+02:12 < niggler> do you work on something other than node for any amount of time?
+02:12 <@isaacs> sometimes they work on other things part-time, etc.
+02:12 <@isaacs> is working on npm working on node?
+02:12 <@isaacs> what about the node or npmjs.org websites?
+02:13 < niggler> that's the problem with the question posed
+02:13 <@isaacs> or replying on the mailing list and issues?
+02:13 <@isaacs> niggler: well, i mean, typing code into node and landing patches is my full time job.
+02:13 < brianng> hi
+02:13 <@isaacs> but like, so is talking about node, having meetings to decide what kind of stuff to get in, doing builds, etc.
+02:13 < brianng> im getting this error
+02:13 < brianng> TypeError: Object true has no method 'forEach'
+02:13 < brianng> can i hv some help pls
+02:14 < brianng> do i hv to convert it into an array?
+02:14 <@isaacs> brianng: somewhere you're doing something like thisIsAnArrayIThing.forEach(function...)
+02:14 <@isaacs> brianng: but thisIsAnArrayIThing is actually "true"
+02:14 <@isaacs> brianng: gist your code.
+02:14 < niggler> isaacs dypsilon framed the question as "how many devs are working only on node an nothing else"
+02:14 < niggler> i guess you can count npm and nodejs.org as part of that
+02:14 < brianng> thanks sec
+02:14 <@isaacs> niggler: well, right, but again... is answering questions on the mailing lists and in issues working "on node"?
+02:15 <@isaacs> niggler: if so, man... i work WAY more than full time on node!
+02:15 < niggler> so i guess the question would be how many people are hired by joyent just to work on node (the node skunkworks)
+02:15 <@isaacs> 2 joyent employees work on the node project itself
+02:15 < brianng> http://pastebin.com/NrKiNGxL
+02:15 <@isaacs> niggler: but there's also voxer, mozilla, strongloop, microsoft, and learnboost
+02:15 <@isaacs> niggler: is "working on libuv" count as "working on node"?
+02:15 < niggler> does mozilla hire any employee whose sole function is to contribute to node?
+02:16 <@isaacs> niggler: trevnorris works for mozilla, ask him :)
+02:16 < brianng> from this https://github.com/seishun/node-steam-trade/blob/master/index.js
+02:17 < niggler> isaacs how many people at joyent spend time working on node? (different question)
+02:19 < brianng> isaacs u there?
+02:20 < niggler> brianng what error are you getting
+02:20 < brianng> TypeError: Object true has no method 'forEach'                                                                                                                                                                                                 
+02:20 < niggler> and that's coming from https://github.com/seishun/node-steam-trade/blob/master/index.js?
+02:20 < brianng> im doing addItems(object);
+02:21 < brianng> yeh
+02:21 <@isaacs> niggler: you mean, working with or working on/
+02:21 < niggler> latter
+02:21 <@isaacs> niggler: working on node full time = me and tjfontaine
+02:22 < niggler> brianng are you calling addItems directly?  if so, what is object
+02:22 < niggler> is object an array?
+02:22 < niggler> if not, then make it addItems([object])
+02:22 < brianng> object.documents is results from mongoose
+02:22 < niggler> its expecting an array of objects to add brianng
+02:23 < niggler> isaacs you mentioned in the talk that joyent hired someone to do CI work.  I guess that's for more than just node?
+02:23 < brianng> okay thanks i'll try figure it out :)
+02:23 < tjfontaine> niggler: I'm neck deep in jenkins
+02:23 < niggler> oh that was you tjfontaine 
+02:26 <@isaacs> niggler: so far, tj's just working on jenkins for node, but yeah, there's plans.
+02:26 <@isaacs> niggler: the thing is, node-core itself isn't really that big
+02:27 < niggler> i think in discussing node that it's fair to include libuv and most of the modules that are included as part of the standard distribution isaacs
+02:27 <@isaacs> niggler: these are the active and past committers: https://github.com/joyent/node/wiki/Project-Organization
+02:27 <@isaacs> niggler: but there are a few "full time on node" folks who dont' have commit bits.
+02:29 <@isaacs> niggler: it's tricky compared wiht how proprietary software is usually developed
+02:29 < niggler> for the pretty uninformed statement "there are 10^N people working full time on node", would you say N is closer to 1 or 2 or 3?
+02:30 <@isaacs> niggler: it's probably just less than 1 :)
+02:30 <@isaacs> niggler: at joyent working with node, roughly "everyone"
+02:31 <@isaacs> nt sure how many engineers are at joyent these days :)
+02:31 < niggler> lol fair enough
+02:32 < brianng> niggler: ive checked it im providing an array of objects
+02:35 < g0z> there is 10^N people sitting in this chair currently where N is approximately 1/infinity
+02:48 < trevnorris> what's going on?
+02:48 < niggler> hey trevnorris 
+02:48 < chilts> nomuch
+02:48 < chilts> you?
+02:49 < niggler> dypsilon earlier asked about full-time employees working on node
+02:49 < trevnorris> ah, ok.
+02:49 < niggler> so the question is whether or not you work on non-node stuff
+02:51 < trevnorris> not recently. been working on re-implementing buffers mainly.
+02:51 < niggler> so mozilla pays you to work on node stuff?
+02:51 < niggler> actually trevnorris why hasn't mozilla tried to build a node-equivalent using spidermonkey
+02:52 < tjfontaine> ben is working one in his spare time (he says)
+02:52 < trevnorris> it's not completely official yet, but I am. still getting the HR paperwork done.
+02:52 < tjfontaine> *working on
+02:53 < trevnorris> mozilla has been focusing most it's efforts on B2G. also things like the apps marketplace, of course the browser, etc.
+02:54 < trevnorris> there are also some big changes to SM coming down the pipe, so just doesn't make sense right now.
+02:56 < trevnorris> I mean, google doesn't code v8 with node in mind (meaning, they're focus is in js parsing performance, when the major bottlenecks for node is in the cc api)
+02:57 < rtgibbons> On v0.8.23, we were making a call to request.setTimeout; It says it will wait for the socket, then call setTimeout on the socket. But while load testing we saw not all request were getting the TImeout set, eventually causing the the app the become completely unresponvie
+02:58 < rtgibbons> wrapping the setTimeout around the 'socket' even fixed our problem
+02:58 < trevnorris> niggler: so basically, I work on node full-time because i worked on it 20-30 hrs/week in my spare time. then isaacs had the idea to ask my manager about mozilla sponsoring me.
+02:58 < rtgibbons> But is this an issue that should be raised, the only reference I could find was https://github.com/joyent/node/issues/3107
+02:58 < trevnorris> niggler: so I did, and they are. but mozilla's focus is and will be for the foreseeable future (that I'm aware of) the browser.
+02:59 < niggler> fair enough trevnorris 
+02:59 < mscdex> trevnorris: but what about firefox os?!
+02:59 < trevnorris> niggler: you're also forgetting they built rhino before node existed.
+02:59 < trevnorris> mscdex: firefox os is a browser (except the kernel)
+03:08 < nathanbbb> how do you rebuild your node_modueles
+03:08 < nathanbbb> i broke some shit with git :/
+03:08 < nathanbbb> npm rebuild didnt do anything :/
+03:16 < trevnorris> nathanbbb: add some explanation of how "broke some shit with git" is linked to needing to rebuild your node_modules.
+03:17 < nathanbbb> well when i updated it deleted a bunch of files
+03:17 < nathanbbb> and i restore them by accident
+03:17 < nathanbbb> so i need to revalidate the modules so the speak
+03:17 < nathanbbb> so it checks all the files and folders are correct
+03:17 < nathanbbb> when i updated node
+03:18 < trevnorris> hm. so the checked out node_modules are included in your git repo?
+03:18 < nathanbbb> yeah :/
+03:19 < trevnorris> well... i'd just delete the node_modules folder and grab them all again.
+03:19 < trevnorris> unless you have hot patches in there. in that case you're messed. :)
+03:20 < nathanbbb> nar no patches ;)
+03:22 < nathanbbb> is there a quicker way then resintalling each module
+03:22 < niggler> nathanbbb npm install
+03:22 < niggler> if your package.json has the dependencies field set
+03:22 < niggler> then it should do it all in one fell swopp
+03:22 < niggler> *swoop
+03:23 < niggler> trevnorris are you the same trevor norris from jstat?
+03:23 < nathanbbb> it would seem like we dont have one of those
+03:23 < trevnorris> niggler: yup.
+03:23 < trevnorris> haven't worked on that in a while though.
+03:24 < niggler> there's a spelling mistake in the description
+03:24 < niggler> "Libraray" is not a word
+03:24 < niggler> lol i forgot i already filed an issue: https://github.com/jstat/jstat/issues/64
+03:24 < trevnorris> =P fixed. thanks.
+03:25 < trevnorris> oh, wtf? that didn't alert me. freaking github.
+03:25 < nathanbbb> is there a global package.json file ?
+03:25 < NitsG> Team help for a issue 
+03:25 < NitsG> http://stackoverflow.com/questions/16261010/nodejs-retrieving-value-from-array-show-as-un
+03:25 < nathanbbb> cause there isn't one in this project :/
+03:25 < niggler> nathanbbb create one
+03:25 < Glacialheart> hey rvagg, are you here?  I have a leveldb question.
+03:26 < Glacialheart> if you have a minute
+03:26 <@mbalho> if you ask he will answer you later probably
+03:26 < niggler> you can use ircretary 
+03:27 <@mbalho> you can also send him a postcard, i have his address
+03:27 < Glacialheart> k. having trouble getting the db.batch() to work.  so, i have about 10 puts in a row.  for some reason, only the 1st put actually saves to the db
+03:28 < Glacialheart> i have a bunch of console.log()'s showing the data is right
+03:28 < Glacialheart> and i have no idea why they are not saving to leveldb
+03:30 < Glacialheart> each put has an error function and as far as i can tell there are no errors...
+03:36 < ChrisPartridge> Glacialheart: perhaps gist/pastebin your code
+03:44 < NitsG> Guys please help in http://stackoverflow.com/questions/16261010/nodejs-retrieving-value-from-array-show-as-un     -  verifyData() is being called prior to cellsData get data . how to control this
+03:44 < NitsG> hence undefined
+03:44 < Glacialheart> http://pastebin.com/Kg3hXAcS
+03:45 < Glacialheart> there it is.  only the first put works.  I've put a bunch on console.logs()'s places verifying the put data is valid
+03:46 < nathanbbb> woot
+03:46 < nathanbbb> made a package.json file
+03:46 < nathanbbb> removed node_mildes from git :0
+03:48 < NitsG> Guys please help in http://stackoverflow.com/questions/16261010/nodejs-retrieving-value-from-array-show-as-un     -  verifyData() is being called prior to cellsData get data . how to control this
+03:53 < Glacialheart> ChristPartridge the other thing worth noting is that those puts are inside 10 db.get all nested to be called in order
+03:54 < mscdex> NitsG: move your browse.* chain into the callback where you set cellsData
+03:54 < mscdex> s/browse/browser/
+03:55 < ChrisPartridge> Glacialheart: and are the get's being called?
+03:55 < Glacialheart> yes. i'm able to console.log() out their data
+03:56 < Glacialheart> all the data is good where the puts are
+03:56 < NitsG> mscdex is it possible to call the cellsData loading logic prior to verifyData?
+03:56 < NitsG> mscdex: is it possible to call the cellsData loading logic prior to verifyData?
+03:58 < Glacialheart> it's like db.get(key) function (err, value) { ~~~ if (err) { ~~~ } else { db.get(key_2) function (err, value) { ~~~
+03:59 < Glacialheart> each db.get is inside the successful previous db.get's no errors else
+04:01 < nathanbbb> if i have a package.json, when i run the node app should it download all the required packages ?
+04:02 < nathanbbb> or do I need to install them first
+04:02 < ljharb> nathanbbb: no, you need to run `npm install`
+04:02 < nathanbbb> mmm so i should probably setup something to auto do that when package.json is updated
+04:04 < ljharb> or you could just do it in a pre-receive hook
+04:19 < Glacialheart> @ChrisPatridge can i do a db.put for inside a db.get for that key?
+04:19 < Glacialheart> maybe that's the issue?
+04:28 < ChrisPartridge> Glacialheart: i'd imagine that would be fine (if I understand what you are saying)
+04:29 < Glacialheart> i think as a workaround for now, i'll write out to another DB then read that DB back into the master
+04:30 < Glacialheart> (if the db_temp.put works the way i think it will)
+04:32 < Glacialheart> yep, for whatever reason, i cannot write to the DB i am reading from
+04:33 < Glacialheart> oh well, i'll just have 2 node files to do what i want now and i'll make a script to do it - no biggie, but i wonder exactly what i am doing out of sync
+04:35 < ChrisPartridge> Glacialheart: https://github.com/rvagg/node-levelup#considerations
+04:37 <@mbalho> Glacialheart: you should use 1 db and prefix keys 
+04:37 < Glacialheart> ah, thanks @ChrisPartridge
+04:37 < ChrisPartridge> Glacialheart: i'd suggesting poking rvagg when he's around
+04:38 < ChrisPartridge> s/suggesting/suggest
+04:39 < ChrisPartridge> Glacialheart: your issue might be related to this https://github.com/rvagg/node-levelup/pull/128
+04:39 < sweetD> hey guys, I'm currently using aws micro instance for my first node app, are there any other standard practice hosting providers or any recommended ones, specifically for nodejs
+04:42 < jesusabdullah> sweetD: what do you mean by "standard practice" ?
+04:42 < jesusabdullah> sweetD: If you're looking for a PaaS, last I checked nodejitsu and heroku were the guys to go with
+04:43 < jesusabdullah> sweetD: otherwise, aws, rackspace, azure and friends are all fine
+04:43 < jesusabdullah> sweetD: azure also has some node-specific stuff iirc
+04:43 < jesusabdullah> sweetD: oh also joyent is a nice host along the lines of aws/rs/azure
+04:43 < sweetD> jesusabdullah: I'm new in the community so, I thought maybe there was like a standard hosting recomendation such as "heroku" for ruby on rails
+04:44 < sweetD> jesusabdullah: I've been looking into Linode, also, as of right now I have the free tier on aws
+04:44 < dypsilon> native node.js hosting nodejitsu + joyent
+04:45 < jesusabdullah> sweetD: yeah the closest things to "heroku for node" are nodejitsu and heroku
+04:46 < rvagg> Glacialheart: looking at your gist, I'm not sure exactly what you're saying the problem is but be aware the each put is an async request in itself and will happen in its own time in its own thread and will return at some point in the future, perhaps you are trying to get() before the callback has actually returned?
+04:47 < rvagg> Glacialheart: also, you can pester people in ##leveldb about this, they're mostly levelup users who are willing to help
+04:48 < rvagg> Glacialheart: or post an issue on the levelup repo, we're happy for it to be used for support too
+04:48 < dypsilon> sweetD, joyent is the main company behind node, that said, see this page http://joyent.com/solutions
+04:48 < sweetD> thanks @dypsilon and @jesusabdullah
+04:49 < sweetD> is joyent and or nodejitsu.com easy to scale and to update code on?
+04:49 < Glacialheart> rvagg, should i post it github? or put it ##leveldb ?
+04:49 < dypsilon> sweetD, that's what they do for a living :)
+04:49 < Glacialheart> which would be more appropriate?
+04:49 < rvagg> Glacialheart: whatever you like, if you have lots of code to show then go to github
+04:50 < rvagg> if you want to chat it over then try ##leveldb
+04:50 < Glacialheart> k. many thanks
+04:50 < rvagg> and with that, I'm off to hunt for fresh coffee beans
+04:50 < sweetD> dypsilon: thank you very much, have yet to even start writing my app :/ reading so much doc and looking at code, I'm tying to build a marketplace 
+04:51 < dypsilon> sweetD, you are welcome
+04:54 < sweetD> dypsilon: is there a standard Database that is usually recommended with node.js or is it usually mongo, I know each one has it's specific use and pros and cons, but I"m just wondering
+04:54 < dypsilon> sweetD, I think mongodb is defacto database for node
+04:55 < dypsilon> also use the native driver with it: http://mongodb.github.io/node-mongodb-native/
+04:55 < jesusabdullah> I would disagree
+04:55 < jesusabdullah> there's no "de facto database"
+04:55 < jesusabdullah> there are *popular* databases, mongo being one of them
+04:55 < TehShrike> Redis is also popular
+04:55 < jesusabdullah> couchdb is also popular, redis is useful for redis-y things
+04:56 < TehShrike> I still love me a good relational database
+04:56 < jesusabdullah> believe it or not sql databases work well with node from what I've seen
+04:56 < sweetD> is redis more like memcahe?
+04:56 < jesusabdullah> the leveldb guys are doing interesting things with node as well
+04:56 < TehShrike> Yeah, everything I've done with node so far has been backed by MySQL
+04:56 < jesusabdullah> yeah probably sweetD, I haven't used memcache(d)
+04:56 < dypsilon> I agree with everyone on this.
+04:56 < jesusabdullah> sweetD: my only real advice is not to use sqlite, last I checked it kinda sucked
+04:57 < jesusabdullah> (the bindings I mean)
+04:57 < TehShrike> Wait, really?
+04:57 < TehShrike> oh
+04:57 < jesusabdullah> that was a long time ago, I could be wrong
+04:57 < sweetD> most the "tutorials" i've come across seems to be on mongo, and i've enjoyed using it on a php project but just curious
+04:57 < jesusabdullah> yeah, sqlite itself seems fine
+04:57 < TehShrike> I haven't tried any of the sqlite libraries for node
+04:57 < TehShrike> sqlite in general is pretty awesome
+04:57 < jesusabdullah> I think mongo probably has the most actively developed orms for node
+04:57 < jesusabdullah> (mongoose)
+04:57 < dypsilon> support for mysql wasn't so good either, last time i checked
+04:57 < rvagg> sqlite in Node is *slow*
+04:58 < rvagg> slow x 1024
+04:58 < dypsilon> eg no prepared statements 
+04:58 < sweetD> cool, is it bad practice to upload images on your host vs using a cdn
+04:58 < jesusabdullah> I do think people tend to gravitate towards mongo and couch because they use javascript and are hot new technologies
+04:58 < jesusabdullah> as good or bad as anywhere else sweetD 
+05:00 < TehShrike> I agree with jesusabdullah, and would add on top of that that the learning curve for using relational databases competently is non-trivial
+05:01 < jesusabdullah> then again sql is the bread and butter of databases, if you're like me and all you can use is couch you can't really say you "know databases"
+05:01 < sweetD> jesusabdullah: not sure what you meant :( I'm slow at times, most of times.
+05:01 < jesusabdullah> not that knowing sql is "knowing databases" either but you can fake it that way
+05:01 < TehShrike> It's good to know relational database shizzle
+05:01 < jesusabdullah> sweetD: It's not bad practice no, there are just trade-offs, and using node doesn't change that
+05:02 < TehShrike> Relational databases are to data storage as functional programming is to coding
+05:02 < jesusabdullah> sweetD: what node brings to the table is javascript and async
+05:02 < dypsilon> I'm trying to upload an image using hapi, which in turn uses formidable (according to the docs). As soon as my request handler is hit the image is  in the /tmp, but it's damaged. Also it's twice the size of the original. Any idea what may go wrong here?
+05:02 < jesusabdullah> dypsilon: maybe it's writing each chunk twice?
+05:03 <@Nexxy> halp
+05:03 < jesusabdullah> dypsilon: input is 'abcde' and output is 'aabbccddee' ?
+05:03 < TehShrike> Nexxy: hulp
+05:03 < jesusabdullah> Nexxy: how i halp lol
+05:03 <@Nexxy> how 2 DSP
+05:03 <@Nexxy> midi synth
+05:03 < TehShrike> wat R dsp
+05:03 <@Nexxy> tone generation
+05:03 <@Nexxy> etc
+05:03 < TehShrike> o
+05:03 < jesusabdullah> Nexxy: digitally proccor the signal?
+05:03 <@Nexxy> thealphanerd where are you
+05:03 < jesusabdullah> Nexxy: seriously, what exactly are you wanting to do
+05:03 <@Nexxy> I can't say yet
+05:03 < jesusabdullah> Nexxy: where are YOU?
+05:03 < thealphanerd> Nexxy: at this exact moment?
+05:03 <@Nexxy> but it involves making audio
+05:03 <@Nexxy> thealphanerd, ohh you're here!
+05:03 < thealphanerd> oh ahi
+05:03 < thealphanerd> hai
+05:04 <@Nexxy> I forget what the best JS audio lib is
+05:04 < jesusabdullah> Nexxy: well it kind of depends, like, you can do tone generation with sine waves, square waves, sawtooths and stuff like that
+05:04 < thealphanerd> https://github.com/colinbdclark/Flocking
+05:04 < jesusabdullah> Nexxy: html5 audio?
+05:04 < thealphanerd> this is a project I contribute too
+05:04 <@Nexxy> yeah, substack was showing me a litle bit about baudio
+05:04 < thealphanerd> but it isn't necessarily thebest
+05:04 <@Nexxy> oki
+05:04 < jesusabdullah> baudio is kind of a hack, fun to play with but it just writes bytes to sox
+05:05 <@Nexxy> yeah
+05:05 < thealphanerd> Nexxy: are you looking for something to produce audio with?
+05:05 < jesusabdullah> which is a legitimate strategy sure but in baudio's case pretty lo-fi
+05:05 < thealphanerd> or something for web app?
+05:05 < jesusabdullah> sox is cool though
+05:05 <@Nexxy> thealphanerd, yeah
+05:05 <@Nexxy> I want to generate sine waves to start with
+05:05 < thealphanerd> Flocking can run in node as well
+05:05 < thealphanerd> fwiw
+05:05 < TehShrike> thealphanerd: on a scale from easy to whatever, how hard would it be to use flocking to play white noise?
+05:05 < thealphanerd> super simple
+05:05 < dypsilon> jesusabdullah, doesn't look like this. It just looks damaged...
+05:05 < TehShrike> I need a white noise generator
+05:05 < TehShrike> But haven't taken the time to go looking at the new audio shizzle yet
+05:05 <@Nexxy> TehShrike, for an application or just to listen to
+05:06 < TehShrike> Just to listen to
+05:06 <@Nexxy> I use simplynoise.com
+05:06 < thealphanerd> http://flockingjs.org/demos/interactive/html/playground.html
+05:06 < TehShrike> Me too
+05:06 < TehShrike> But it's Flash
+05:06 < jesusabdullah> dypsilon: if it was smaller I'd say that pipe might be getting closed prematurely
+05:06 <@Nexxy> oh ya
+05:06 < thealphanerd> TehShrike: what er you looking at used the white noise for?
+05:06 < jesusabdullah> Nexxy: maybe https://github.com/joeferner/node-portaudio ? I've heard good things about portaudio
+05:06 <@Nexxy> hmmm
+05:06 < maybach> jesusabdullah: and dypsilon thank you for your help today. 
+05:06 < TehShrike> thealphanerd: putting into a web site with a single button, and playing into my headphones
+05:06 <@Nexxy> now I see what people are saying about all the choices!
+05:06 < dypsilon> maybach, you are welcome
+05:06 < jesusabdullah> maybach: I helped you today?
+05:07 < thealphanerd> try that playground I posted above
+05:07 < TehShrike> thealphanerd: <3
+05:07 < maybach> jesusabdullah: yea my nick was SweetD but I changed it.
+05:07 < jesusabdullah> oh alrite
+05:07 < dypsilon> jesusabdullah, prematurely? I would understand if it was half the size, but not double the size...
+05:07 < jesusabdullah> oh, dypsilon also make sure you're not inadvertently riggledogging the encoding
+05:07 < jesusabdullah> yeah exactly dypsilon 
+05:07 < thealphanerd> https://github.com/jussi-kalliokoski/node-cubeb
+05:07 < thealphanerd> this library has similar functionality to portaudio
+05:08 < thealphanerd> Nexxy: any other questions?
+05:08 < jesusabdullah> Nexxy: once you have waves at frequencies you can make combinations of them to generate more interesting tones
+05:08 < jesusabdullah> Nexxy: LINEAR combinations in fact
+05:08 < dypsilon> jesusabdullah, yeah, the problem is, that everything is kinda blackboxed inside of the framework for me. And I think there is no bug in the framework itself, so I'm thinking what I could do wrong outside of it.
+05:08 < jesusabdullah> Nexxy: also, play with fourier transforms and their friends
+05:08 < dypsilon> How to check the encoding?
+05:09 <@Nexxy> jesusabdullah, ya
+05:09 <@Nexxy> thealphanerd, hmm not atm
+05:09 <@Nexxy> I will query you
+05:09 <@Nexxy> it's super secret
+05:09 < jesusabdullah> dypsilon: usually if you're messing up the encoding you're setting it somewhere, like, req.setEncoding('utf8') or something weird like that
+05:10 < jesusabdullah> I've *heard* that fourier transforms aren't sufficient for reliably backing out the fundamental frequency of a tone, I don't know why though and I've definitely used it with clean tones before
+05:10 < thealphanerd> jesusabdullah: a lot has to do with if you are trying to do real time processing or not
+05:10 < MI6> joyent/node: isaacs v0.10 * 7bd8a5a : doc: Deprecate require.extensions - http://git.io/Sr8pZw
+05:10 < thealphanerd> and what kind of window functions you use
+05:10 < jesusabdullah> also, pass filters
+05:11 < jesusabdullah> and that's everything I know about DSP!
+05:11 < jesusabdullah> yeah thealphanerd I mean, fft's aren't exactly blazing fast and your signal may not be very clean
+05:11 < jesusabdullah> thealphanerd: I've mostly done non-realtime with clean signals, or at least inside a reasonably tight window
+05:12 <@Nexxy> what about soundmanager 2?
+05:12 < jesusabdullah> nexxy I'd be curious to know what you have in mind and/or what you end up doing
+05:12 < jesusabdullah> Nexxy: fyi
+05:12 <@Nexxy> I can't say! :D
+05:13 <@Nexxy> I'll query you if you really want to know
+05:13 < jesusabdullah> the curiosity is BURNING Nexxy 
+05:13 < jesusabdullah> oh, thealphanerd this flocking thing looks cool I tried playing with SC once and did not get far
+05:14 < thealphanerd> flocking is really interesting
+05:14 < thealphanerd> I'm working on porting the STK to it right now
+05:14 < thealphanerd> some weird meta code generation stuff with a functional language called flocking
+05:14 < thealphanerd> although I'm having problems with llvm
+05:14 < thealphanerd> grrrr
+05:15 < dypsilon> jesusabdullah, ok, seems like a hapi bug (https://github.com/spumko/hapi/issues/771), but thanks for your help
+05:16 < jesusabdullah> dypsilon: anytime XD
+05:16 < jesusabdullah> thealphanerd: how u run flocking lol
+05:19 < thealphanerd> are you on that playground page?
+05:20 < thealphanerd> http://flockingjs.org/demos/interactive/html/playground.html
+05:20 < thealphanerd> there is a white noise example
+05:22 < jesusabdullah> thealphanerd: naw I was at the github repo
+05:22 < thealphanerd> look at the link above
+05:22 < thealphanerd> there is a white noise demo
+05:24 < jesusabdullah> yeah playing with it
+05:25 < jesusabdullah> problem: don't know how to make it sound badass
+05:38 < dypsilon> I want to manage several versions of node. Is nvm the way to go nowadays?
+05:38 < howdynihao> nave by isaacs
+05:39 < jesusabdullah> nave is reasonably good yeah
+05:39 < jesusabdullah> is nwm the one that had that really bad bug in it?
+05:40 < jesusabdullah> er, nvm?
+05:40 <@Nexxy> that was n
+05:42 < dypsilon> hm, how do i install it without node?
+05:42 < SomeoneWeird> nvm is good
+05:43 < jesusabdullah> Nexxy: ahh
+05:44 < jesusabdullah> dypsilon: I wanna say nave is 100% bash?
+05:44 < dypsilon> jesusabdullah, oh you are right, no need to install at all
+05:52 < maybach> hey guys is there a recommended auth npm, or should I do something custom?
+05:52 < jesusabdullah> maybach: what do you want to do for auth?
+05:52 < dypsilon> maybach, passport.js is pretty popular
+05:52 < tuhoojabotti> yeah
+05:53 < jesusabdullah> maybach: what exactly do you have in mind?
+05:53 < maybach> was just reading about that dypsilon, jesusabdullah just need something where I can require for a user to be logged in. Like the users/page if logged in you can edit your profile
+05:55 < dypsilon> maybach, that's a lot of different components. So you need a template engine (handlerbars), framework (express), authentication middleware (passport), session management (express does that), session storage
+05:56 < jesusabdullah> maybach: if passport does basic auth you're probably g2g
+05:56 < dypsilon> also there are a lot of different frameworks, template engines etc. those are just some examples
+05:57 < jesusabdullah> maybach: the reason I ask is because imo oauth third party auth and basic auth are different beasts
+05:57 < maybach> I'm using express right now. hopefully mongoose soon, jade, and might look into passport
+05:57 < dypsilon> yeah, passport is fine
+05:58 < dypsilon> you could use either basic auth, but the user can't logout and you can't customise the login window
+05:58 < dypsilon> or local password strategy
+05:58 < dypsilon> there are lots of examples in passports github
+05:58 < jesusabdullah> s/basic/cookie/
+05:59 < maybach> yea'll I'll have to read some on passport, it looks like it offers social logging in also from facebook and what not
+05:59 < jesusabdullah> right that's what I was saying, a lot of those things focus on the third party auth
+06:01 < maybach> cool beans, do you guys have any web apps up on node? 
+06:01 < jesusabdullah> I have a few here and there
+06:01 < jesusabdullah> small things mostly
+06:03 < dypsilon> maybach, me not yet, but i'm planning to rely heavily on node with everything
+06:03 < maybach> A friend of mine convinced me to do my marketplace on node, vs php and mysql
+06:05 < jesusabdullah> I used to work for nodejitsu helping to build/maintain the backend systems and their web framework, as part of running the support team, to give you an idea of what I've done
+06:05 < jesusabdullah> so a few apps for that kind of thing but a lot of framework hacking, not as much building apps per se
+06:05 < jesusabdullah> oddly enough
+06:06 < jesusabdullah> I did write http://whatismyip.jit.su/ which is kinda old but totally works and looks AWESOME
+06:06 < maybach> jesusabdullah: that sounds dope, you must know your way around node pretty well.
+06:07 < jesusabdullah> I mean, I know parts of it pretty well
+06:07 < jesusabdullah> I'm not up to snuff on the 0.10 stream apis, haven't dug into those yet
+06:07 < jesusabdullah> I've been around a while though
+06:07 < dypsilon> jesusabdullah, would you build a big website, like ecommerce, using only node?
+06:08 < jesusabdullah> I mean, honestly I'd see if I could dredge up something free that does 90% of what I need
+06:08 < ChrisPartridge> jesusabdullah: those banners on whatismyip are fit-inducing
+06:08 < jesusabdullah> if it were just me
+06:08 < jesusabdullah> ChrisPartridge: I made the gifs in college ^__^
+06:08 < niggler> oscommerce
+06:09 < maybach> oscommerce :/ 
+06:09 < dypsilon> that was just an example. the question was really if you would go with node for a big website including user management, many static pages etc
+06:10 < jesusabdullah> assuming I wanted to write something from scratch, yeah I'd probably do it in node because I like node and it's what I know
+06:10 < jesusabdullah> but that doesn't mean you should. When it comes to CRUD, that's a Solved Problem for the most part, and rails and even php can more or less handle it
+06:10 < maybach> I'm fascinated by the "new.myspace.com" written in node.
+06:11 < jesusabdullah> if perf is really important to you, using async tooling like node can help you get more bang for your buck
+06:11 < jesusabdullah> one thing to keep in mind, there's no de facto "rails for node" right now
+06:11 < dypsilon> jesusabdullah, please no ruby/php. nothing is really solved there, besides simple problems
+06:12 < jesusabdullah> dypsilon: good thing crud is a simple problem :)
+06:12 < dypsilon> jesusabdullah, well, crud gets interesting when you have decent design
+06:12 < dypsilon> and real life users on both ends
+06:13 < jesusabdullah> anyways: if you like microframeworks or "no frameworks" and want to write something from scratch node's pretty sweet
+06:13 < dypsilon> well, I think I made the right choice
+06:13 < jesusabdullah> if you want something that's almost more like customizing a skeleton app, or you want to take a preexisting solution and modify it to fit your needs, there are other places to look
+06:14 < jesusabdullah> dypsilon: it may very well have been a good choice :) and I approve, it's just that you asked what *I* would do and, well, I've become a very pragmatic person lately
+06:14 < maybach> hey fellas nice meeting ya'll, need some ZzZ see ya'll around
+06:14 < jesusabdullah> peace
+06:14 < dypsilon> maybach, see ya
+06:14 < jesusabdullah> (not too many people that start with node and gravitate towards, "maybe I should just do a wordpress site")
+06:16 < dypsilon> jesusabdullah, i'm really pragmatic either, but really frustrated with 90% of "solutions" because in most projects maintained long enough, those solutions only get in the way and make development hard to controll
+06:16 < dypsilon> so i switched to library-approach as opposed to framework-approach or cms-approach
+06:17 < dypsilon> and this is where node seems to be pretty well
+06:17 < jesusabdullah> yeah definitely dypsilon node's very library oriented in culture
+06:18 < dypsilon> i mean, php doesn't even have a decent standalone router
+06:27 < jesusabdullah> dypsilon: I mean, php kinda locks you into one route one file no?
+06:28 < Lorentz> use a half-decent framework and you get full front controller with routing
+06:28 < Lorentz> php itself doesn't give you it, no
+06:29 < zaleb> You can get the Controller from symfony as a sepperate component
+06:29 < dypsilon> jesusabdullah, true if you use the standard routing provided by apache, but nowadays everyone is routing all apache requests through index.php which analyzes the url and does real routing
+06:30 < dypsilon> zaleb, probably, but I'm just done with it. do not want.
+06:30 < zaleb> fair enough =)
+06:30 < dypsilon> :)
+06:32 < jesusabdullah> dypsilon: interesting, I wonder why nobody's written a reasonable routing library then?
+06:33 < dypsilon> jesusabdullah, well, there are some, it's hard to get standalone routing libraries, like flatiron, or even express. Also as I said, there are some, but as I researched this space a year ago, they all were "bad".
+06:34 < dypsilon> flatiron, meaning, flatirons director
+06:34 < jesusabdullah> yeah I'm aware of director
+06:34 < jesusabdullah> honestly not huge on director <_<;
+06:36 < dypsilon> is there a quick way to diff a tag with current master in github?
+06:38 < jesusabdullah> lol, look up "shitty-router" on npm
+06:38 < jesusabdullah> ahh, i used "routes" for this project
+06:38 < jesusabdullah> I SEE
+06:38 < dypsilon> lol
+06:38 < jesusabdullah> that one worked reasonably well
+06:39 < jesusabdullah> is that yours dypsilon? The username is like one character off from your handle
+06:39 < dypsilon> nope
+06:57 < ChrisPartridge> jesusabdullah: perhaps you can use http://crapcha.com with your shitty-router ;P
+06:59 < dypsilon> :)
+06:59 < jesusabdullah> ChrisPartridge: possibly!
+07:05 < d2dchat> I'm trying to use request to pipe an output stream to a file
+07:05 < d2dchat> and it's not doing it :(
+07:05 < ChrisPartridge> d2dchat: gist some code
+07:05 < d2dchat> https://gist.github.com/lancecarlson/a672bc0e7fe68f557e46 
+07:05 < d2dchat> ChrisPartridge: ^
+07:06 < d2dchat> ChrisPartridge: also, shouldn't I be able to replace the file write stream with a console log?
+07:09 < ChrisPartridge> d2dchat: probably not to console.log, perhaps try process.stdout
+07:09 < d2dchat> ChrisPartridge: when I run mocha test
+07:10 < d2dchat> I don't get any output except
+07:10 < d2dchat> 1 test complete
+07:11 < d2dchat> ha
+07:11 < d2dchat> must be mocha's fault
+07:12 < ChrisPartridge> it might be
+07:12 < quang> hi
+07:12 < ChrisPartridge> your test code works fine here on 0.8.x
+07:12 < d2dchat> ChrisPartridge: actually, it's because I didn't let done callback do it's waiting
+07:12 < quang> how do i change my stylus or jade or app.js to use jqueryLayout.jade instead of layout.jade
+07:12  * d2dchat facepalm
+07:29 < Sven_vB> quang, first consult the stylus or jade manual. when you did and the problem persists, tell us what you found there, so we have more information tu guess from.
+07:38 < [AD]Turbo> hola
+08:06 < booyaa> what's best way to parse a web page via dom in node? I was think I would grab HTML using request then use something like jsdom?
+08:06 < gildean> booyaa: cheerio is a pretty good module for that too
+08:07 < booyaa> ah thanks
+08:09 < booyaa> that looks like some awesomely low hanging fruit (Cheerio)
+08:37 < greelgorke> good morning:P
+08:39 < SargoDarya> morning guys
+08:47 < radiodario> morning
+08:51 < iksik> hello
+08:51 < iksik> how can i read first 10mb of a remote file?
+08:53 < greelgorke> with streams and a counter?
+08:57 < trodrigues> booyaa: if jsdom or cheerio give you any trouble, phantomjs is a good solution. i had to use it for some scraping of complex pages after jsdom choked with it (I think cheerio wasn't around or I didn't know about it)
+08:58 < iksik> hmmm greelgorke and stringFromOnResponse.length on each chunk?
+08:59 < greelgorke> if you count bytes then do response.on('data', function(chunk){ dataReceived += chunk.length;})
+08:59 < greelgorke> on the buffer, not the string made from the buffer
+09:00 < iksik> yeah, and what if dataReceived will be bigger than 10mb? i need to trim it?
+09:03 < greelgorke> i might be wrong, but the typical tcp mtu is something by 1500 bytes. the highwater-marks of the streams are default by 16kb. i don' think you'll get bigger chunks unless you change that behavior
+09:04 < greelgorke> but if you get more than 10mb, then you can just slice the buffer: http://nodejs.org/api/buffer.html#buffer_buf_slice_start_end
+09:04 < mbor> hi, what's the best practice in this simple inheritance example: http://pastie.org/private/nhebmyfatrcgj8mf0lpug?
+09:05 < iksik> greelgorke: nice, thanks ;-)
+09:06 < Bubo> Hi
+09:06 < greelgorke> mbor: it's not inheritance
+09:06 < Bubo> https://gist.github.com/nexxy/fb141e4af562a2a7a58d - in this code line 18 to 20 -> if "names" has a lot of objects inside, would that block the event loop?
+09:08 < greelgorke> Bubo: yes
+09:08 < Bubo> so how do you handle this asynchronously greelgorke?
+09:08 < greelgorke> Bubo: unless client.emit is async
+09:08 < Bubo> names.forEach(function(name){ - but this isn't, right?
+09:08 < mbor> greelgorke: well, no, but I'd like to know the best practice for the child to access the parent. doing: new Child(this); isn't too pretty IMO
+09:09 < Bubo> it will be stuck in that loop until it finishes?
+09:15 < iksik> hmm, ok, so i'm able to download now, but how can i cancel my download when downloaded file size is valid? 
+09:16 < envex> anyone interested in working on an irc bot project for twitchtv?
+09:17 < Bubo> envex: for which game?
+09:17 < envex> Bubo: twitchtv in general; just a channel bot
+09:17 < iksik> envex: take a look at hubot -_-
+09:18 < envex> iksik: I certainly will, thanks
+09:19 < Bubo> so envex twitch chat works as irc? on which network is it?
+09:20 < envex> Bubo: it's username.jtvirc.com
+09:20 < Bubo> Ah
+09:20 < Bubo> nice
+09:20 < envex> yep, way better than the twitch chat interface
+09:21 < Bubo> so what are you going to use the bot for, envex?
+09:23 < envex> essentially I'd like to get a "points" system going -- seems to be pretty popular right now
+09:23 < envex> whereas each idler receives points every, say... 10 minutes
+09:47 < foobar321> Hi. Can any1 explain to me --nodedir option? I would like to build my npm binary packages offline and new version is looking for .h files
+09:47 < foobar321> Or is there any other option for that?
+09:50 < khismetix> What are the advantages of using a web framework eg express in node.js versus say a more mature one such as rails, etc
+09:54 < mkozjak> how to check if i already have a connection to the server?
+09:54 < bnoordhuis> foobar321: --nodedir tells node-gyp where to look for node's header files
+09:54 < mkozjak> seems like i can't do anything with 'server.getConnections'
+09:55 < bnoordhuis> foobar321: if you don't specify it, it'll try to download the appropriate tarball from nodejs.org
+09:55 < foobar321> bnoordhuis: Yes but after I specify this dir the npm complains about some package.json file which is just weird
+09:56 < bnoordhuis> foobar321: 'complains' is a bit vague. how do you invoke npm/node-gyp and what's the exact error message?
+09:56 < foobar321> So after passing --node-dir /tmp/usr/bin I've got npm ERR! Error: ENOENT, open '/tmp/setup-scripts/build/tmp-angstrom_v2012_05-eglibc/sysroots/x86_64-linux/usr/bin/package.json'
+09:57 < bnoordhuis> foobar321: --nodedir is the path to the _source_ tree
+09:57 < bnoordhuis> foobar321: e.g. wherever you cloned the joyent/node git repo
+09:57 < master5o1> my fault for using JSON nick and being in a JS channel >_>
+09:58 < foobar321> bnoordhuis: ok. just to amke sure I should just cal npm install --nodedir /tmp/foo -d mypackage
+09:58 < bnoordhuis> foobar321: if /tmp/foo is where the nodejs source tree is, yes
+09:59 < foobar321> bnoordhuis: does it accept FTP urls? Or git? Or just path on the same file system?
+10:00 < bnoordhuis> foobar321: only local file system paths
+10:03 < foobar321> bnoordhuis: is it possible just to specify my usr/include dir? Because I don't think I have directory with just unpacked sources. It was already installed in my staging dir by previous build step and the sources are gone.
+10:04 < bnoordhuis> foobar321: no, that's not possible. to compile a native add-on you need the appropriate header files
+10:07 < MI6> joyent/node: Ben Noordhuis v0.10 * 626d7ab : doc: cluster: s/server.destroy/server.close/ - http://git.io/XRqkcg
+10:09 < foobar321> bnoordhuis: So Can I just specify directory with header files?
+10:10 < bnoordhuis> foobar321: it needs to adhere to the node source tree layout
+10:10 < bnoordhuis> i.e. /path/to/nodedir should have a src/ subdirectory with the header files
+10:10 < bnoordhuis> oh, and the v8 files in deps/v8/include of course. then there's openssl, etc, etc.
+10:11 < bnoordhuis> just download the tarball or have node-gyp download it for you
+10:13 < r1chard> Folks what can I use in order to do codepoint-aware math on JavaScript (UTF8 strings)
+10:19 < bnoordhuis> r1chard: i'm not sure what you mean
+10:23 < r1chard> bnoordhuis I'd like to measure the length of a string in Unicode codepoints.
+10:27 < bnoordhuis> r1chard: that's string.length, right?
+10:28 < r1chard> bnoordhuis, no that returns UCS-2 16-bit pairs.
+10:28 < bnoordhuis> r1chard: that's because there is no code plane but the BMP
+10:28 < bnoordhuis> at least, according to v8
+10:28 < bnoordhuis> unless you're counting surrogate pairs
+10:29 < r1chard> bnoordhuis, well, but what about chars not in the BMP
+10:29 < bnoordhuis> those don't exist, according (again) to v8
+10:29 < r1chard> bnoordhuis, what does that mean.
+10:29 < bnoordhuis> it doesn't support them
+10:30 < bnoordhuis> not just v8 though, it's a limitation of js the language
+10:30 < r1chard> Yes, but there are characters outside BMP which people use.
+10:30 < bnoordhuis> as surrogate pairs
+10:30 < r1chard> No, not surrogate pairs.
+10:31 < bnoordhuis> well, they don't use them in node.js / v8
+10:32 < MI6> joyent/node: Ben Noordhuis v0.10 * 4fdb8ac : deps: downgrade openssl to v1.0.0f - http://git.io/eg81ug
+10:34 < r1chard> bnoordhuis, but, Emoji :P
+10:38 < bnoordhuis> r1chard: yeah, that's where surrogate pairs come in
+10:39 < bnoordhuis> they're the escape hatch in the ucs-2 world that is js
+10:45 < r1chard> bnoordhuis :)
+10:50  * sinclair-work plays with TS 0.9
+10:56 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+11:02 < Bascka> Does anybody know a round robin based dfirewall Project? Dns round robin..
+11:26 < syskk> is there a limit to Content length the node http server will accept?
+11:26 < syskk> is 10772 too large?
+11:27 < Omid> hi
+11:28 < Omid> is it possible to make the npm to show the progress bar while downloading a file?!
+11:28 < Omid> I have a very slow internet connection and I want to see if it is downloading or it has stoed working!
+11:30 < Omid> what is the temporary folder for npm package manager?!
+11:31 < bnoordhuis> syskk: the limit is about 2^53
+11:32 < syskk> bnoordhuis: thats weird… when i set content-length to 100 the request goes through… but when its 10000, im not getting a request
+11:33 < RLa> Omid, check ~/.npm
+11:34 < Omid> RLa: it is not there
+11:35 < Omid> RLa: it showed message: "gyp http 200 http://nodejs.org/dist/v0.8.23/node-v0.8.23.tar.gz"
+11:35 < Omid> RLa: and I want to install this package directly and put it for npm
+11:36 < RLa> hm
+11:36 < RLa> that's not package but node's source
+11:37 < Omid> RLa: yes, strangely, it is trying to recompile node
+11:37 < Omid> RLa: it's node-gyp's attitude
+11:38 < Omid> RLa: but I need to download that package manually and let the gyp recompile it
+11:39 < RLa> i think it might want to get headers from that download
+11:39 < RLa> what npm command you entered to get this
+11:41 < MI6> joyent/libuv: Ben Noordhuis v0.10 * 4e5b8dc : build: link with libkvm on openbsd - http://git.io/RPS2ew
+11:41 < bnoordhuis> all three openbsd users, rejoice!
+11:42 < sinclair-work> well, TypeScript generics are amazing
+11:42 < sinclair-work> being able to apply generics to classes, interfaces and methods is sick man
+11:43 < sinclair-work> more people should be excited about the potential os TS
+11:43 < Havvy> sinclair-work: TypeScript seems like adding the type system of Java to the expressive capabilities of JavaScript.
+11:44 < sinclair-work> Havvy: its optional typing, that is what makes it so good
+11:44 <@isaacbw> that misses the whole point of static typing
+11:44 < Havvy> Yeah. I feel like I'd have a hard time typing some of my functions.
+11:44 < Havvy> isaacbw: It compiles with warnings. ;)
+11:44 < sinclair-work> isaacbw: it doesn't really
+11:45 < Havvy> IMO, it's like JSLint.
+11:45 < sinclair-work> Havvy: yeah, its partly like that
+11:46 < sinclair-work> Havvy: the TypeScript compiler is designed to be compiler as a service, so you could write your own JSLint and other code analysis tools on TS, irrespective of is you are using TypeScript or not to code your apps in
+11:47 < Havvy> sinclair-work: Yeah, I saw comments suggesting people modify it to their whimsies.
+11:47 < sinclair-work> http://journal.stuffwithstuff.com/2013/04/23/playing-with-generics-in-typescript-0.9.0/
+11:50 < sinclair-work> TypeScript is classy, I've been saying it since day one, its the Ferrari of JavaScript compiled languages. people should take notice
+11:51 < sinclair-work> i can't wait to see where they take the language
+11:52 < Havvy> sinclair-work: In TS, if you have a class C with a constuctor, are `C()` and `new C()` equivalent?
+11:53 < sinclair-work> Havvy: no
+11:53 < Havvy> :(
+11:54 < dypsilon> The JavaScript Event Loop [Presentation]: http://thomashunter.name/blog/the-javascript-event-loop-presentation/
+11:54 < dypsilon> not mine
+11:55 < dypsilon> thought it may be relevant
+11:57 < sinclair-work> Havvy: that's not a bad thing
+11:57 < Havvy> But `new` is yucky...
+11:57 < sinclair-work> Havvy: its maybe worth noting that TS does not stop you from having C() 
+11:58 < sinclair-work> Havvy: what is wrong with new?
+11:59 < Havvy> It's unnecessary, and is overall strange.
+11:59 < sinclair-work> what is so strange about creating a new instance of something?
+11:59 < gildean> the whole constructor deal in js is pretty strange
+11:59 < Havvy> But it doesn't create a new instance of something.
+11:59 < Havvy> It creates an empty object and binds it to this.
+11:59 < dypsilon> new is not chainable
+12:00 < Havvy> And if the return value is not of type `object` (including not null), it changes to returning `this`.
+12:00 < sinclair-work> dypsilon: that is not necessary a bad thing
+12:00 < sinclair-work> var context = new Context();
+12:01 < sinclair-work> context.method().method().method() and so on
+12:01 < sinclair-work> where method() returns a new Context()
+12:01 < dypsilon> i insist :)
+12:02 < sinclair-work> dypsilon: anyway, JS has been giving people too much rope to hang themselves with, that's my opinion anyway
+12:02 < Havvy> We have Object.create(__proto__). We don't exactly need `new`.
+12:02 < Havvy> And it also adds a requirement to the call signature of the function.
+12:03 < Havvy> And if it wasn't a keyword, it could easily be emulated with a function.
+12:03 < dypsilon> sinclair-work, hey, I use all that rope to climb mountains! Also I've seen people hang themselves with much less rope.
+12:03 < Havvy> https://gist.github.com/Havvy/5037770 specifically.
+12:05 < sinclair-work> dypsilon: i prefer to keep JS gymnastics to a minimum, and follow conventions im used to in other more OOP languages, im fine with new, but im even more fine with a factory pattern that returns an interface
+12:06 < sinclair-work> JS doesn't really give you much guidance on implementing OOP things, but it doesn't exactly stop you either
+12:07 < Havvy> sinclair-work: Are you ignoring me arguments against `new`?
+12:07 < Havvy> *my
+12:08 < dypsilon> sinclair-work, yeah, I'm beeing only half serious here. Ofc one should try to code as clear as possible and follow the classic OOP everybody understands, but I also like the JavaScript patterns. A lot. And I don't want to implement Abstract Factory pattern or the Strategy pattern again, just because my language is so square.
+12:08 < dypsilon> Also I don't want to have classes like BeanFactoryTransactionAttributeSourceAdvisor 
+12:09 < s_e> on the other hand, not everyone is OOP pattern focused or even aware.
+12:09 < dypsilon> And I don't want to type that twice (at least) to declare the type and to create new object.
+12:10 < s_e> there are a lot of functional programmers coming through this generation, including me.
+12:10 < sambarino> functional programming is the future!
+12:10 < sambarino> apparently :P
+12:11 < FPSJosh01> So what exactly is wrong with the new keyword?
+12:12 < zomg> purists don't like it
+12:12 < zomg> I think that's all
+12:12 < zomg> :p
+12:12 < s_e> it doesn't behave mechanically the same as in more rigid OOP languages FPSJosh01. You don't really get a new instance, you get a reference.
+12:12 < FPSJosh01> lol
+12:12 < FPSJosh01> Oh really
+12:13 < FPSJosh01> What exactly is it a reference to?
+12:13 < syskk> theres something rlly strange
+12:13 < oxigen8> heya
+12:13 < gildean> the whole prototype chaining and constructors are pretty weird in javascript, imo it's easier just to use objects and functions
+12:14 < syskk> node's http server wont detect my requests when content-length is above a given number.. 1000 for example
+12:16 < FPSJosh01> s_e I was just curious.
+12:16 < s_e> reference probably isn't the right word
+12:17 < s_e> trying to find a link that makes it more clear
+12:21 < MI6> joyent/node: Ben Noordhuis master * 179784e : Revert "deps: downgrade openssl to v1.0.0f" (+23 more commits) - http://git.io/GpykIA
+12:24 < gildean> this was a pretty good series of posts explaining the whole mess: http://davidwalsh.name/javascript-objects
+12:26 < s_e> and here is a nice simple explaination of what new in js actually does: http://pivotallabs.com/javascript-constructors-prototypes-and-the-new-keyword/
+12:27 < Havvy> FPSJosh01: Did you read what I said in describing what is wrong with it?
+12:27 < s_e> gildean: I started reading that recently, never finished it though
+12:28 < s_e> see, I've grown up on functional scripting languages, classical OOP is the alien thing to me :)
+12:29 < FPSJosh01> I jumped in and wanted more opinions Havvy. I'll go back and read your stuff. :)
+12:31 < s_e> Havvy: what are the differences between object.create(__proto__) and new?
+12:31 < dypsilon> s_e, 1. first one is chainable
+12:31 < Havvy> Object.create() is a function that returns a new object with a prototype of the first argument.
+12:32 < FPSJosh01> so you get a "new prototype" as well
+12:32 < FPSJosh01> right?
+12:33 < Havvy> `new` is a function invocation type (like function call and method call) that binds `this` to a new object that has a prototype of the function's prototype property (not to be confused with the function's prototype)
+12:34 < Havvy> Object.create() has a two-argument form that can be mostly ignored.
+12:35 < s_e> how do the prototype property and actual prototype differ, one can be set and one cannot?
+12:35 < Havvy> The prototype property is just a plain old object property that all functions have when created.
+12:36 < Havvy> (function () {}).prototype
+12:37 < Havvy> The prototype is a value all objects have, and can be obtained with Object.getPrototypeOf(obj)
+12:39 < s_e> so object create gives you more control over the prototype value (rather than the property)?
+12:39 < Havvy> Yes.
+12:40 < Havvy> You can emulate Object.create() with `new` and you can emulate `new` with Object.create
+12:41 < s_e> so, where does this cause problems?
+12:41 < MI6> joyent/node: Miroslav Bajtoš master * 5ddf7f4 : debugger: fix bug in breakpoint regex escaping - http://git.io/nGhD0Q
+12:42 < syskk> does anyone know whats wrong with this? http://pastebin.com/PscSwzQP
+12:42 < syskk> it cannot handle large POST requests
+12:42 < syskk> it just stalls
+12:42 < Havvy> Calling a constructor function that expects to called as a `new invocation` as a `function invocation` by leaving out the `new` causes `this` to be `window` or whatever the global object is.
+12:43 < Havvy> And there's no syntactical requirement that a constructor be called with the `new invocation`. We have a convention to require constructor functions start with an uppercase because of this.
+12:44 < bnoordhuis> Havvy: if (!(this instanceof MyClass)) return new MyClass(args)
+12:44 < bnoordhuis> syskk: define 'stalls'? looks like it should work. do you have keep-alive enabled?
+12:45 < syskk> bnoordhuis: no
+12:45 < Havvy> bnoordhuis: if (Object.getPrototypeOf(this) !== expectedPrototype) return Ctor.apply(Object.create(expectedPrototype), arguments);
+12:45 < bnoordhuis> syskk: what are you using to POST the data?
+12:46 < Havvy> Or....
+12:46 < syskk> bnoordhuis: home made C++ client haha
+12:46 < syskk> bnoordhuis: works fine if I listen to port 80 with netcat but that node server wont console.log the whole body of the post
+12:46 < Havvy> var ctor = (Object.getPrototypeOf(this) === expectedPrototype) ? this : Object.create(expectedPrototype);
+12:47 < mkozjak> node.js:762 throw errnoException(process._errno, 'uv_signal_start');   with v0.10.5 on ubuntu. any ideas?
+12:47 < Havvy> Or even...
+12:48 < bnoordhuis> syskk: so how do you know the bug is not in your client?
+12:48 < Havvy> var ctor = Object.create(expectedPrototype); // and if they use the `new invocation` form, ignore the extra object.
+12:48 < syskk> bnoordhuis: not 100% sure.. guess i could test it with apache
+12:48 < FPSJosh01> Havvy, I think you just converted me :)
+12:50 < syskk> Havvy: it seems req.on('end' never gets called
+12:50 < Havvy> syskk: Yeah...I don't have that much experience with Node streams.
+12:52 < syskk> yeah i think its a problem with my client then
+12:52 < s_e> try using 'close' rather than 'end'?
+12:53 < barnes> what is the diffrence between the node-v0.10.5.tar.gz package and node-v0.10.5-linux-x64.tar.gz ?
+12:54 < Havvy> barnes: Probably 32bit vs. 64bit.
+12:55 < greelgorke> the first is the source code, the second is precompiled
+12:55 < barnes> ok thanks 
+12:56 < Havvy> Oh.
+12:57 < Bascka> Does anyone know a good irc channel for network enginering talks?
+12:57 < SomeoneWeird> ##networking ?
+12:58 < Bascka> Thanks
+13:06 <@isaacbw> does anyone actually run a 32bit os anymore
+13:06 < niix> Anyone here have any experience with using PhoneGap and Node for server side?
+13:08 < RLa> niix, i have used both but not in the same project
+13:09 < s_e> isaacbw: anyone who took an upgrade path from xp or is still on xp
+13:09 < RLa> just stuff communicating over rest-like interface
+13:09 < RLa> isaacbw, last week i have been trying to find a machine with 64 bit windows, no luck so far
+13:10 < s_e> OTOH, server wise, I hope not
+13:10 < RLa> isaacbw, on vps it makes sense to run 32bit since pointers are smaller and take less memory
+13:10 <@isaacbw> RLa: what do you mean trying to find a machine
+13:11 < RLa> isaacbw, to test a desktop app which is said to crash on 64 bit machines
+13:12 < JohnMcLear> RLa: Try sauce labs?
+13:12 < JohnMcLear> Dunno if you can fire up a desktop app thogh
+13:12 < JohnMcLear> though
+13:12 < JohnMcLear> But just hire a VM, easiest way
+13:12 < RLa> hm, thanks
+13:12 < RLa> might try that
+13:13 < Bascka> Does anyone know of a round robin dns based firewall Project? Kinda like distributing a ddos with an anycast IP.
+13:13 < RLa> damn, they have monthly fees, not usage based
+13:13 < JohnMcLear> free for open source :)
+13:14 < RLa> it's not open source :/
+13:15 < JohnMcLear> Then it sucks to be you!
+13:15 < s_e> does anyone have a technet account there? make your own vm
+13:17 < RLa> i will send out some mails, hopefully there is someone with 64 bit desktop windows
+13:27 <@isaacbw> I had 64bit win7 on a hard drive but I rebuilt my system recently and left it out
+13:27 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+13:47 < realhans> Hi. I know how to use Lua as scripting language. Can someone guide me to a information how to use Javascript as scripting language for my own program ? (outside of a browser)
+13:48 < TehShrike> realhans: probably by embedding V8 in your app
+13:48 < realhans> what is V8 ?
+13:48 < s_e> google's javascript engine
+13:48 < TehShrike> realhans: the top result on Google for "V8 Javascript": https://code.google.com/p/v8/
+13:52 < realhans> thanks. bye
+13:52 < greelgorke> yay?
+13:52  * TehShrike shrugs
+13:59 < quang> hey guys
+13:59 < quang> where do u guys put the jquery and other web javascript files in ur project?
+14:00 < greelgorke> on harddrive or on cdn
+14:00 < foobar321> Do you know is there any wrapper for node.js settimeofday? I've got a mix of strange results from google due to date keyword :/
+14:00 < greelgorke> oh, and sometimes i don't put any web javascript at all in my project
+14:01 < foobar321> I know there's a a node-time module but it does not provide ability to settimeofday as far as I see?
+14:02 < greelgorke> foobar321 you can use moment.js if you want a powerfull date-lib
+14:02 < grep_awesome> foobar: http://momentjs.com/docs/
+14:02 < grep_awesome> lol greelgorke beat me to it
+14:02 < greelgorke> :P
+14:03 < sinclair-work> i have a question about nodes exec
+14:03 < sinclair-work> i have the following....
+14:03 < sinclair-work> var proc = exec('[some command line thing]');
+14:03 < sinclair-work> proc.stdout.pipe(process.stdin);
+14:03 < sinclair-work> where i am trying to output the proc's console output into the current process
+14:04 < grep_awesome> foobar: when you have keywords like that in google, put a "+" in front of the other words you find significant. here was my query that found moment.js "+node.js settimeofday date plugin"
+14:04 < sinclair-work> i see nothing, am i doing this right?
+14:06 < foobar321> the moment.js does not provide wrapper for system settimeofday
+14:06 < sinclair-work> nevermind, i got it
+14:06  * sinclair-work hugs node
+14:06 < greelgorke> sinclair-work: you probably need spwan
+14:06 < greelgorke> spawn*
+14:06 < sinclair-work> greelgorke: exec('[something]', function(error, stdout, stderror){ stdout.pipe(process.stdin); });
+14:07 < greelgorke> sinclair-work: this will fail
+14:07 < sinclair-work> greelgorke: it works fine
+14:07 < foobar321> grep_awesome: thnx but on the page you've got results there's no settimeofday
+14:07 < greelgorke> even with pipe?
+14:07 < sinclair-work> greelgorke: of course
+14:07 < foobar321> grep_awesome: that's why google sux at this query
+14:08 < foobar321> Do you know is there any wrapper for node.js settimeofday? I've got a mix of strange results from google due to date keyword :/ and on the result page there's usualy no settimeofday mentioned
+14:08 < greelgorke> http://nodejs.org/api/child_process.html#child_process_child_process_exec_command_options_callback sais stdout is a buffer, not stream
+14:09 < grep_awesome> foobar321: quoth google "No results found for +node.js +settimeofday date plugin"
+14:09 < greelgorke> foobar321 do you want to set the system-time of the os?
+14:09 < foobar321> Yes I'm wokring on a system-admistriative webpage
+14:10 < foobar321> And there should be a function to set system-wide time
+14:10 < sinclair-work> greelgorke: it works, but it also doesn't work
+14:10 <@isaacbw> why
+14:10 < greelgorke> in core there isn't you have to do this via child_process or write own binding. et least i'm anaware of any modules, which can do that
+14:11 < greelgorke> sinclair-work: i'm not in the mood for paradoxons :D
+14:12 < shlevy> Hi. What are the "implicit headers" referred to in the html documentation?
+14:12 < shlevy> the ones if you don't use writeHead
+14:13 < greelgorke> sinclair-work: ich think this will do what you need:  spawn('[some command line thing]').stdout.pipe(process.stdin)
+14:14 < sinclair-work> greelgorke: what is spawn ? a npm package?
+14:14 < greelgorke> :O
+14:14  * sinclair-work isn't touching anymore npm packages
+14:15  * greelgorke suggest to read http://nodejs.org/api/child_process.html#child_process_child_process_spawn_command_args_options
+14:15 < sinclair-work> greelgorke: already there
+14:15 < greelgorke> spawn is the big brother of exec
+14:16 < s_e> shlevy: date:, connection:, transfer-encoding: are all set for you afaik
+14:16 < shlevy> s_e: OK, thanks
+14:17 < sinclair-work> greelgorke: don't need it
+14:17 < greelgorke> q_q
+14:17 < sinclair-work> oh ok
+14:17 < sinclair-work> i will use it
+14:19 < der_On> hi. Does someone know if there is something like gitlab, but made with node.js?
+14:20 < h22> Guys, What should I do to the *object* returned by the mongoose model.findOne(), before passing it to res.render(view, *object*)?
+14:20 < h22> JSONify?
+14:22 < greelgorke_work> h22: just pass it to the view?
+14:23 < h22> greelgorke_work: That works as expected, except that it throws a *Cannot read property* error on the console, only on the console.
+14:24 < greelgorke_work> it's hard to argue about it, without knowledge of your code and the view
+14:26 < h22> greelgorke_work: http://pastebin.com/a6EzKHnn
+14:28 < greelgorke_work> what happens in the view?
+14:29 < h22> greelgorke_work: I just do <%= post.property %>
+14:29 < h22> and it works fine in the browser
+14:29 < vekexasia1> Hello all, how can i get the content lenght of a stream ?
+14:36 < greelgorke_work> h22 dunno. it may depend on your schema, or you just got no Post at all or whatever.
+14:36 < greelgorke_work> vekexasia1: it depends
+14:36 < vekexasia1> hmm ?
+14:37 < vekexasia1> from what?
+14:37 < h22> greelgorke_work: I console.log'd (post) and Found null objects in addition to the expected hash.
+14:38 < greelgorke_work> vekexasia1: streams are representation of possibly endless data 
+14:38 < vekexasia1> hmm k
+14:38 < vekexasia1> thanks
+14:38 < greelgorke_work> but if we are talking about http
+14:38 < greelgorke_work> there is the content-length header, that can be a hint
+14:39 < greelgorke_work> and files can be fs.stat'ed first to check their size
+14:39 < vekexasia1> hmm no i'm using node-canvas
+14:39 < vekexasia1> and i wanted to know how long was the stream
+14:39 < vekexasia1> before uploading to amazon s3
+14:39 < vekexasia1> :)
+14:39 < greelgorke_work> was or will be?
+14:39 < vekexasia1> will
+14:39 < vekexasia1> i think the only way would be consume the content of the stream right? 
+14:40 < greelgorke_work> if the source gives you no hints, then you can't now until you've consumed the data
+14:40 < greelgorke_work> know*
+14:45 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+15:38 < Voting> OK, so, I'm LOVING programming in node. I know NOTHING about npm, however. So, I want to commit my code to version control and, when I pull the code back into a new directory and want to get a second copy of the server running on the same machine (or a different port) what should I need to do to get the new copy running? Node is on the box (as I've been programming on that box....) Should it work after I do a "npm install" in 
+15:39 < Voting> or a different port -> ON a different port
+15:41 < ljharb> Voting: `npm install` is for installing app dependencies, so you'll need to do that in a newly cloned repo
+15:41 < pachet> what you're trying to do doesnt require npm per se
+15:41 < pachet> except for as ljharb mentioned
+15:42 < Voting> ljharb: What about doing something like that in sub directories of my main directory (main one being the one with "server.js" file in it. 
+15:42 < Voting> pachet: how should I get a new copy running then?
+15:42 < pachet> just start a new process pointing at the same entrypoint?
+15:42 < pachet> specify a different port?
+15:43 < Voting> pachet: I get all sorts of errors... then I fuddle around and eventually I get it working but I have no check list.
+15:43 < ljharb> subdirectories?
+15:43 < dshap> Hey all - is there anyone here familiar with node canvas?  I'm trying to figure out how I can enable pango support
+15:43 < ljharb> Voting: a node app should be a single repo, at the root
+15:43 < ljharb> large repos are an antipattern
+15:44 < Voting> ljharb: I think I had to go into "node_modules" then do something like "npm install" 
+15:44 < ljharb> no
+15:44 < ljharb> "package.json" should be in the root of the repo, and that's where you should run `npm install`
+15:45 < ljharb> it will put the modules into the "node_modules" folder though
+15:49 < lochlite> Hello, I am wondering if the net module of Node 10.0.5 is emitting 'readable' events, or just 'data' ?
+15:50 < lochlite> I am trying to make a tcp protocol client and I want to use the new features of streams 2, but I need net.connect.. any suggestions?
+15:58 < Bascka> Does anyone know if round robin dns could distribute a ddos, almost like a anycast IP?
+15:58 <@Nexxy> Bascka, it helps
+15:59 < Bascka> Do you know of any Project/software that uses this kind of aproach?
+16:00 <@Nexxy> afaik it's usually a matter of administration
+16:00 -!- mode/#Node.js [+o TooTallNate] by ChanServ
+16:01 < barnes> Bascka: simplest way is to spend money on it, Arbor have some great hardware to filter out ddos but you probably want to buy that as a service from your ISP if you can afford it
+16:02 < Bascka> I dont actuallt get ddos, im Just a developer, só its Just an Idea of mine for cheap ddos protection..
+16:03 <@Nexxy> I'm not sure where you plan on sending the traffic
+16:03 < pachet> the robin
+16:03 < pachet> ;[
+16:03 < pachet> hot potato :[
+16:03 <@Nexxy> but you still need to own the IPs
+16:04 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+16:04 < Bascka> I was planing on using cloudflare as the rr dns provider, and create an autonomouse system that would boot ec2 instances on the go
+16:05 <@Nexxy> that sounds more expensive than a proper ddos host
+16:05 < jergason> friends, what is the difference between using module.exports or just plain exports in node?
+16:08 < ljharb> jergason: nothing really, since they're both defined. personally i find "module.exports" more explicit, which i consider better
+16:08 < kevinswiber> jergason: It's an assignment issue in JavaScript.
+16:08 < kevinswiber> Setting 'exports = obj' won't set the exports property on the module object.
+16:08 < ljharb> kevinswiber: how so?
+16:08 < ljharb> sure it will
+16:09 < ljharb> hm, i guess i'm assuming that the commonjs wrapper won't care which you set
+16:09 < jergason> ljharb: looks like it is a thing about exporting functions
+16:09 < kevinswiber> Test it out.  Maybe I'm wrong, but I don't think so.  :P
+16:09 < pachet> setting exports = x will expose the properties of x
+16:09 < pachet> it won't expose x itself
+16:10 < ljharb> pachet: O.o what?
+16:10 < ljharb> exports = x; and module.exports = x; should be exactly the same
+16:10 < pachet> should !== does
+16:11 < paul4> i'm having some trouble with crypto cyphers in 0.10.x
+16:11 < paul4> TypeError: error:0606506D:digital envelope routines:EVP_DecryptFinal_ex:wrong final block length
+16:11 < ljharb> pachet: can you show me a test case? cause that seems like really nonintuitive behavior
+16:12 < pachet> 1sec
+16:12 <@Nexxy> using module.exports will export whatever you want
+16:12 < kevinswiber> It's pretty easy to test.
+16:12 <@Nexxy> you have to use exports.something
+16:12 <@Nexxy> if you're just using exports
+16:12 <@Nexxy> but that's bad so don't
+16:13 < kevinswiber> Setting a property on the exports object will expose that property when the module is required.  Just setting `exports = a` does not execute the assignment of `module.exports`.
+16:16 < pachet> ljharb: https://gist.github.com/pachet/5482675
+16:16 < kevinswiber> Gist: https://gist.github.com/kevinswiber/5482676
+16:16 < kevinswiber> Oh... too late.
+16:16 < ljharb> Nexxy: so using the plain "exports" syntax is basically just setting keys on the exported object?
+16:17 < ljharb> weird, i've always only used module.exports and now i'm glad
+16:17  * spion combined node-any-db with node-sql and got this - https://gist.github.com/spion/5468043 (first file is implementation, last 2 files are usage example)
+16:17 < pachet> ljharb: tbh im not sure what c++ black magic required it to work this way
+16:17 < pachet> :[
+16:18 < kevinswiber> It's not C++ black magic.  It's just JavaScript
+16:20 < pachet> oh, you're right
+16:20 < pachet> reassignment, z
+16:20 < spion> yep, its only changing the reference
+16:20 < ljharb> seems like the "exports" syntax is confusing. wish they'd removed it
+16:21 < kevinswiber> Well, it's convenient to not type 'module.' for modules that are more concerned with exposing a block of functions than exposing a constructor/factory method.
+16:23 < spion> exports is commonjs
+16:25 < ljharb> perhaps, but you could just modules.exports = {…} with all your functions too
+16:26 < spion> or var exports = module.exports = {};
+16:26 < spion> then proceed attaching stuff to exports :)
+16:28 < spion> I think what happens internally is something like this: var module = createNewModule(...);  (function(require, exports, module) { /* module_contents_goes_here */ }(module.require, module.exports, module)); return module;
+16:34 < thomblake> Exports is basically just a reference to module.exports, but that means that setting exports=foo just loses the reference.
+16:35 < pachet> https://github.com/joyent/node/blob/master/lib/module.js#L415
+16:35 < ljharb> right, that makes sense from a js perspective
+16:36 < thomblake> So I just tell people to never use exports, always use module.exports, and then you won't get confused.
+16:36 < ljharb> but it'd seem like at the end, it'd "if (exports !== module.exports) { module.exports = exports; }"
+16:36 < ljharb> would make sense
+16:37 < ljharb> then if exports was ever assigned to directly, it'd reattach it, and if not, noop
+16:39 < thomblake> That's even more confusing, since then it blows away anything you might have put on module.exports.
+16:39 < ljharb> i don't know about "more"
+16:39 < ljharb> if you're using the global "exports" *and* the global "module.exports", i think anything that happens will be confusing.
+16:40 < pachet> ^
+16:40 < ljharb> and if you're only using one of them, you'll get the expected behavior, removing the confusion from above.
+16:40 < pachet> just dont ever export anything
+16:40 < pachet> solved
+16:40 < ljharb> so obv that's still confusing (cause there's two syntaxes) but i think it'd be less so.
+16:40 < Havvy> Is there even a reason why `exports` is even set?
+16:41 < ljharb> people mistakenly think that "convenience when writing via shortcuts" is more important than "a more confusing universe"
+16:41 < ljharb> *than avoiding a more confusing universe
+16:41 < niggler> sometimes confusing is the goal
+16:42 < niggler> ljharb: confusion is a moat
+16:42 < ljharb> lol
+16:43 < ljharb> considering the percentages and demographics in computing versus the world, i don't think we need any more moats than we've already got.
+16:47 <@isaacbw> demographics?
+16:48 < ljharb> gender, ethnicities, socioeconomic status, what have you
+16:48 < ljharb> we're pretty insular as it is. nobody needs more barriers.
+16:48 <@isaacbw> oh, you mean that computing is weighted compared to the world
+16:48 < ljharb> insanely so, yes
+16:48 < ljharb> and "node" is probably also very weighted compared to computing
+16:48 < ljharb> et cetera
+16:49 < niggler> meh that's due to a confluence of factors
+16:49 <@isaacbw> node is for computing hipsters
+16:49 < ljharb> lol
+16:49 <@isaacbw> rails is too mainstream
+16:49 < niggler> who can be here at 12:45 PM ET on a node chatroom
+16:49 < Bubo> how do you do non-blocking for loops? 
+16:49 < ljharb> Bubo: don't do for loops
+16:49 < brianc> Bubo: check out the 'async' module
+16:49 < Bubo> if you need to iterate over an a big array..
+16:49 < ljharb> use an async forEach
+16:49 < niggler> so there you've already selected for a small group of (ostensibly) affluent people
+16:50 < Bubo> thanks, i'll check out async
+16:50 < ljharb> niggler: "owning a computer" makes you pretty affluent as it is, let alone "has internet access"
+16:50 < niggler> this is where mscdex the npm bot would be useful
+17:13 <@isaacbw> I just heard on npr that the number of women pursuing computer science degrees has done down
+17:13 <@isaacbw> *is going down
+17:14 <@isaacbw> I don't know the numbers, but it's an interesting idea
+17:14 < g0z> good, less competition for jobs :P
+17:15 <@Nexxy> g0z, that's not even close to funny
+17:16 <@Nexxy> also completely unwelcome in #Node.js 
+17:16 < yawnt> isaacbw: yeah it was on reddit 3 days ago or so
+17:16 < yawnt> http://www.reddit.com/r/programming/comments/1d91eu/percentage_of_women_in_programming_peaked_at_37/
+17:16 <@isaacbw> ultimately it means businesses are missing out on a potentially large pool of talented developers
+17:17 <@isaacbw> damn
+17:17 < yawnt> i honestly care more about what those female programmers could code that's cool and useful
+17:17 < yawnt> than opportunities for business
+17:17 < yawnt> :D
+17:17 <@Nexxy> cool & useful = opportunity
+17:17 < yawnt> EXCEPT NINJABLOCKS
+17:17 < TheAceOfHearts> I saw that on reddit too, it sucks :(. I'm in college right now, and I only know one REALLY good girl programmer. Literally every other girl that entered Computer Engineering in my year has fallen behind or changed majors 
+17:18 <@Nexxy> TheAceOfHearts, woman*
+17:18 < yawnt> Nexxy: ninjablock*
+17:18 < yawnt> jeez i ate too many pancakes
+17:18 < yawnt> ;_;
+17:18 <@isaacbw> buying this 100% cocoa bar was a bad idea
+17:18 < yawnt> bleah
+17:18 <@isaacbw> but it was $10 and I feel obligated to finish it
+17:18 < yawnt> i ate 99% 
+17:18 < yawnt> and couldn't finish it
+17:19 < TheAceOfHearts> Nexxy: sorry, you're right, woman*; it's just that my first language is Spanish, and I usually refer to people as nenes y nenas
+17:19 <@isaacbw> I eat 85% like snickers
+17:19 < yawnt> isaacbw: 85 is ok
+17:19 <@Nexxy> TheAceOfHearts, no worries :) just trying to help!
+17:19 <@Nexxy> thanks for being receptive
+17:19 < yawnt> actually i've always wondered
+17:20 < yawnt> what's the real difference in english among the two terms?
+17:20 <@isaacbw> age
+17:20 < yawnt> because in italian, even though we do have two different words
+17:20 <@isaacbw> and maturity
+17:20 <@isaacbw> women are adults, girls are not
+17:20 < yawnt> you see people using them referring to the same person
+17:20 < yawnt> oh i see
+17:21 <@isaacbw> it's a little more flexible than that, but for the most part that's what it means
+17:21 < pachet> just call everyone 'human'
+17:21 < qard> More like maturity.
+17:21 < pachet> it always makes the right impression
+17:22 <@isaacbw> or be the guy who refers to women as 'females'
+17:22 <@Nexxy> it's also quite diminutive to use the word 'girl' in the context of work
+17:22 <@Nexxy> particularly since there is such an environment of bias as it is
+17:22 < g0z> Nexxy: I'm glad when anyone of any sex doesn't get into computer science so I wasn't being sexist ok :P
+17:23 <@Nexxy> g0z, it was a sexist statement regardless of your intent :)
+17:23 < qard> I've met a few adults I'd struggle to call "women", and I've met just as many teens that feel like they fit the "woman" label better than "girl"
+17:23 < g0z> Nexxy: depends on if you are looking for it I guess :P
+17:23 < niggler> I've got a strange git question:
+17:23 < niggler> so i set up a submodule for test files
+17:23 < ljharb> a nice rule of thumb i've found is, if i wouldn't use "boy", or "male", i shouldn't use "girl", or "female"
+17:23 < niggler> and i made changes in that directory -- how do i push those to the repo?
+17:23 < TheAceOfHearts> makes sense
+17:24 < ljharb> niggler: cd to the submodule root, and git push
+17:24 <@isaacbw> for men, I like the relatively neutral 'guy'
+17:24 <@isaacbw> gal is a little weird to say
+17:24 < ljharb> niggler: inside the submodule, it's a totally separate git repo
+17:24 < qard> Unless you're Ryan Gosling. ;)
+17:24 < FPSJosh01> Why are we even bringing up gender?
+17:24 <@isaacbw> scroll up?
+17:24 < FPSJosh01> Programming is awesome, and all those people are missing out if they aren't participating.
+17:24 <@Nexxy> it's an issue that's contextual to the community
+17:25 < ljharb> FPSJosh01: yes, but most of them are either prevented from choosing, or raised never to consider the choice.
+17:25 < pachet> humans, humans
+17:25 < pachet> cant we get along
+17:25 < ljharb> so it's absolutely not just a question of pure choice
+17:25 < niggler> ljharb i tried and all it said was "everything up-to-date"
+17:25 < sinclair-work> just to note, the new TS 0.9.0 compiler is a hell of a lot slower than the 0.8.3
+17:25 < ljharb> niggler: did you commit it to the submodule repo first?
+17:25 < TheAceOfHearts> I've got a phone interview in 35 minutes and now I'm a bit scared I might use some improper word and screw things up
+17:26  * sinclair-work notes, the 0.9 compiler seems to take, 2.5 seconds to compile.......nothing.
+17:26 < niggler> i changed test file, cd test directory, git add file, git commit, git log (verified it was taken locally), git push (everything up-to-date)
+17:26 < sinclair-work> actually, thats note quite true, it took 2.5 seconds to compile console..log
+17:26 < FPSJosh01> SO then gender should be discussed.
+17:27 < FPSJosh01> My children (regardless of gender) will have the opportunity to discuss what they want to do.
+17:27 < ljharb> FPSJosh01: until the % of <insert group here> on the planet matches the % of <that group> in computer science, how to stop oppressing <that group> should always be discussed.
+17:27 < niggler> why are people discussing gender?
+17:27 < FPSJosh01> I have two actually.
+17:28 < ljharb> niggler: because gender inequality is a thing, and we're decent people who think that nobody should be oppressed.
+17:28 < niggler> as a parent its your job to inculcate good values in your children FPSJosh01 
+17:28 < niggler> gender inequality is a thing if you allow it to be a thing
+17:28 < niggler> but ljharb  you can't change other people
+17:28 < niggler> the most you can really do is introspect
+17:28 < howdynihao> what the heck is going on
+17:29 < s5fs> I'm raising two little girls, gender equality is an important issue for me as well, and I'm very pleased to see the programming community at large discussing these topics.
+17:29 < niggler> (and that applies to every form of discrimination)
+17:29 < ljharb> niggler: that's not really true. you can make people aware of things, and you can help set the tone of the social atmosphere, which has a far-reaching effect.
+17:29 <@Nexxy> you can change people in that you can refuse to tolerate certain behaviours
+17:29 < niggler> to an extent, you have to make an active effort ljharb  to set a non-gender-neutral tone
+17:29 <@Nexxy> people exhitibing that behaviour must make a decision to either change, or continue to exclude themselves
+17:30 < FPSJosh01> I agree with Nexxy, all you can do is try to make people aware of things.
+17:30 < ljharb> Nexxy: "behavior" :-p
+17:30 < FPSJosh01> and then it's just "trying"
+17:30 < ljharb> FPSJosh01: totally, but word choice matters.
+17:30 < niggler> there are a group of people who are dead-set in their ways
+17:30 < ljharb> niggler: for example, your irc nick absolutely does not set a good tone imo because of what it connotes to some.
+17:31 < niggler> ljharb the ironic part is that the type of people who make that association are generally themselves racist to begin with
+17:31 < FPSJosh01> what niggler said
+17:31 < ljharb> that's quite possible
+17:31 < g0z> I can be sensitive to other's point of view even if I think they are unreasonable. (what?)
+17:31 < ljharb> that ^
+17:32 < niggler> must we be sensitive to the point of view of racists or sexists or other types of bigots ?
+17:33 < niggler> i mean, after all, they too have points of view
+17:33 <@Nexxy> in the sense that understanding their perspective helps you combat their bias
+17:33 <@Nexxy> yes
+17:33 < g0z> in those cases I try to understand why they have those points of view
+17:33 < g0z> I mean no one was born with those traits as far as I know
+17:33 < eighty4> Anyone have a good css/js combine+minified module they recommend? I've been playing a bit with https://github.com/epeli/piler but can't seem to get it working
+17:33 < niggler> id argue Nexxy that in this day and age, there are few people whose biases could be rectified
+17:34 < Havvy> eighty4: Grunt
+17:34 < poeticninja> yeah Grunt is great
+17:34 < eighty4> http://gruntjs.com/ ?
+17:34 < ljharb> niggler: it's less about rectifying them, and more about making it very uncomfortable for them to impose their biases on others.
+17:34 < Havvy> Yes.
+17:35 < eighty4> Thanks :) I'll read up on it
+17:35 < TheAceOfHearts> so, any good interview suggestions~? 
+17:35 < niggler> ljharb I highly doubt that any new information or argument would change a racist or sexist in 2013 and I highly doubt that any level of discomfort would change their behaviors
+17:35 <@Nexxy> niggler, like ljharb says
+17:35 < niggler> so what you are left with is the banhammer
+17:35 < ljharb> niggler: but it's also for the others. the quieter ones. it's important to set a good example.
+17:35 < niggler> literally we have to vote the racists and sexists off the proverbial island of computer science
+17:35 <@Nexxy> it's about making it clear what is tolerated
+17:35 <@Nexxy> and what is not
+17:36 < ljharb> niggler: a society that, for example, glorifies musicians who beat their gfs, or celebrities who make racist comments, is not a society that encourages good attitudes.
+17:36 <@Nexxy> social pressure is the only effective tool of change
+17:36 < ljharb> ^
+17:36 <@Nexxy> (other than money, but we can't steal people's paychecks for being a bigot)
+17:36 < ljharb> we can fire them tho!
+17:36 < Havvy> Nexxy: You can fire them.
+17:36 <@Nexxy> exactly! ;3
+17:36 < Havvy> Which is effectively the same thing.
+17:36 <@Nexxy> social pressure.
+17:36 < ljharb> i want this to be a world where companies are afraid to hire bigots, because of the social pressure.
+17:36 < niggler> where we disagree Nexxy and ljharb is the number of impressionable bigots that could be changed
+17:37 < niggler> and I think that number is pretty close to zero
+17:37 < ljharb> niggler: unless you're arguing that people are born bigoted, or not, social pressure matters.
+17:37 < ljharb> and if bigotry is from conditioning, and not DNA, then EVERYONE is an impressionable possible bigot.
+17:37 < Havvy> niggler: It's also about the future generations.
+17:37 < ljharb> so EVERYONE needs to be influenced.
+17:37 < niggler> i think that the age of entering an IRC channel or conference is probably too late 
+17:37 < ljharb> it's never too late.
+17:37 <@Nexxy> nope
+17:37 < ljharb> *the more you know*
+17:38 < Havvy> I was on IRC when I was 16.
+17:38 <@Nexxy> it makes the individual statistically less likely to actually change their views
+17:38 <@Nexxy> but it's still not 'too late' by any means
+17:38 < Havvy> I know 13 year olds who get on IRC.
+17:38 <@Nexxy> and we dont necessarily need everyone to change their views for it to be obvious to them what society is expecting of them
+17:39 < gildean> i was 12 when i first came to irc
+17:39 < Sly> I was 13 when I started IRC.
+17:39 <@mbalho> IMO you're getting trolled by a guy named 'niggler'
+17:39 < ljharb> lol
+17:39 < gildean> that was 17 years ago
+17:39 < Sly> Well, religiously that is..
+17:39 <@Nexxy> mbalho, ljharb started it!
+17:39 < Sly> I _really_ started at like 10'ish. xD
+17:39 <@Nexxy> Sly, haha
+17:39 <@Nexxy> I was on irc.msn.com circa 1998
+17:39 < Havvy> I was on IRC for like a week when I was 12.
+17:39 <@Nexxy> doing netsplits and bluescreening people ;\
+17:39 < Havvy> That was a fun week.
+17:40 <@Nexxy> CTCP SOUND /con/con.wav
+17:40 < Sly> Nexxy, remember the old mIRC /decode and /encode shutdown trick?
+17:40 < Sly> So many n00bs owned by that shit. :3
+17:40 <@Nexxy> lol yes
+17:41 <@Nexxy> COPY PASTE THIS INTO STATUS WINDOW FOR FREE OPS
+17:41 < Havvy> Join #funtime,0 for a fun time.
+17:41 <@Nexxy> Havvy, you just beat me to it
+17:42 <@Nexxy> I used /join #2,600 for l33t h4x
+17:42 <@Nexxy> does join 0 work on freenode?
+17:42 < Havvy> Probably.
+17:44 < niggler> yawn mbalho 
+17:44 < niggler> im a pragmatist
+17:45 < niggler> the most you can really do is introspect
+17:45 < niggler> or indulge in pandemonium
+17:46 < Sly> Nexxy: it was even better if you knew they were on *NIX. Encode rm -rf / before they put in protection for it. :3
+17:46 < TheAceOfHearts> evil
+17:46 < niggler> disappointed no one referenced bash.org
+17:47 < Havvy> Sly: There's no protection for `rm -rf ~`
+17:47 < Sly> True, but it's still bootable. :3
+17:48 < Havvy> Sure...but user data gets hosed.
+17:48 < Sly> Only their home folder. I don't even really keep important data in my home folder.
+18:02 < jn> hi, i'm having some troubles trying to restart a http server
+18:02 < jn> http://hastebin.com/qabikehuri.coffee
+18:02 < jn> after sending sighup to that script it will start responding with "stopped"
+18:02 < jn> can't figure out why
+18:03 < geNAZt> its easy
+18:04 < geNAZt> becuase you set the stopped variable outside of the handler function
+18:04 < geNAZt> so its the same for all handler callbacks
+18:04 < geNAZt> and you send it once to true and everything will start ending in stopped
+18:04 < geNAZt> set*
+18:04 < ljharb> of course if this were JS instead, it'd be easy to see where the var statements were
+18:04 < jn> http://hastebin.com/moxopabiri.coffee
+18:04 < jn> here's a js version
+18:05 < jn> geNAZt: but i recreate the handler
+18:05 < ljharb> jn: it's because in line 16, you're not testing equality
+18:05 < ljharb> you're assigning to stopped.
+18:05 < ljharb> oh no wait
+18:05 < ljharb> you're just mixing assignment and expressions there. it's ugly but correct.
+18:06 < geNAZt> well are you sure that the server has closed ?
+18:06 < ljharb> jn: check out https://npmjs.org/package/server-destroy
+18:08 < jn> geNAZt: shouldn't the new server.listen complain otherwise?
+18:09 < geNAZt> ni
+18:09 < geNAZt> if you close a server it stops to listen to that port
+18:09 < geNAZt> but it can be that the server runs further
+18:09 < geNAZt> because it has opened connections
+18:12 < jn> even if it keeps some connections, shouldn't it at some point come to the new handler?
+18:12 < geNAZt> yes it should for new connections
+18:14 < jn> ah, opening a new browser does it
+18:14 < jn> now it makes sense :)
+18:14 < jn> thx
+18:17 < ddod> does anyone know why node uses 100% of one of my cores on osx but on windows doesn't seem to use nearly that much?
+18:18 < ddod> … when doing a computationally intensive task
+18:18 < ddod> i'd actually like to use the full potential
+18:18 < ddod> not lower its usage
+18:24 < ryanrolds> For anyone wanting a laugh, this was my weekend Node.js project: https://twitter.com/DrFrasierWCrane https://github.com/ryanrolds/frasierkov
+18:24 <@mbalho> lol
+18:25 < FPSJosh01> oh man
+18:25 < FPSJosh01> That's priceless
+18:25 < ryanrolds> The responses aren't tailored yet, they will be in a couple of right. I need to build a right to left set of markov chains.
+18:26 < ryanrolds> *couple of nights
+18:30 < ryanrolds> Oh, a key thing about the bot, right now it only badgers people with #YOLO in their tweets.
+18:31 < SrPx> Is this the right syntax to browserify multiple libs? browserify -r jquery-browserify -r three -o test.js
+18:32 <@mbalho> you could just put var jquery = require('jquery-browserify') in test.js and then 'browserify test.js'
+18:34 < FPSJosh01> ryanrolds: why would you badger anyone else?
+18:34 < FPSJosh01> Ever?
+18:36 < ryanrolds> Haha. The plan is to have it badger accounts is set to follow as well has people tweeting #YOLO. I will have it follow Kesley Grammer and other actors in Frasier. The "follower badgering" will be on a very long variable time (like between 1 and two weeks).
+18:38 < FPSJosh01> Dpm
+18:38 < FPSJosh01> don't forget to add #swag to the list of hashtags
+18:38 < jeffwhelpley> Is there a standard preferred way that most people do inheritence within node.js?  I noticed that there is sys.inherits as well as util.extend and then of course all the other external libraries like underscore. I would like to do it the way most node.js developers do it, but I can't seem to get a feel for what that is.
+18:39 < qard> util.inherits
+18:40 < AAA_awright> jeffwhelpley: Object.create is the correct way to do it in ECMAScript, util.inherits adds instance.constructor on top of that
+18:40 < ljharb> jeffwhelpley: i recommend no inheritance at all. pass data to functions instead of maintaining a persistent state.
+18:41 < AAA_awright> e.g. function Class(){}; Class.prototype = Object.create(Superclass);
+18:42 < CoverSlide> AAA_awright: Object.create(Superclass.prototype)
+18:42 < AAA_awright> CoverSlide: Right
+18:42 < AAA_awright> Yeah I was thinking the old-school way of doing it, Class.prototype = new Superclass;
+18:42 < CoverSlide> although there's nothing wrong with using constructors
+18:42 < FPSJosh01> just don't forget the new keyword
+18:42 < FPSJosh01> or "this
+18:43 < FPSJosh01> will be the whole window
+18:43 < niggler> ok ljharb I've got the problem again
+18:43 < niggler> "Everything up-to-date"
+18:43 < ljharb> CoverSlide: there is if you need to call the superclass's methods too. that's classical inheritance, and JS doesn't have that.
+18:43 < niggler> but the submodule seems blissfully unaware of the fact that it's ahead of the repo
+18:43 < qard> Class.prototype = new SuperClass doesn't work when the SuperClass expects arguments.
+18:43 < ljharb> niggler: wait, what?
+18:43 < AAA_awright> ljharb: Superclass.prototype.function.call
+18:43 < AAA_awright> Maybe you've heard of it
+18:43 < qard> Just use util.inherits.
+18:43 < ljharb> yup, that's not how JS inheritance is supposed to work.
+18:44 < ljharb> but you go ahead and pretend it works like java
+18:44 < ljharb> niggler: you're in the submodule root, and you've made some commits and pushed them
+18:44 < niggler> i made some commits
+18:44 < CoverSlide> ljharb: the fact is it's flexible enough that it CAN work similar to java
+18:44 < niggler> but when i try to push it says "Everything up-to-date"
+18:44 < niggler> and a push -f isn't doing anything either
+18:44 < ljharb> niggler: are you just typing 'git push'?
+18:44 < CoverSlide> ljharb: and a great deal of other patterns 
+18:44 < niggler> yeah
+18:44 < AAA_awright> qard: There's work-arounds if that's the case, if you need to do it old-style
+18:44 < ljharb> well no, it wouldn't, -f just forces a push that's otherwise rejected
+18:44 < niggler> am i supposed to do submodule push?
+18:45 < ljharb> CoverSlide: it can kind of work similar to java, yes, but just cause it can doesn't mean it should.
+18:45 < ljharb> niggler: oh maybe, i usually modify my submodules separately as full repos, and just advance them when they're submodules
+18:45 <@Nexxy> git submodule update?
+18:47 < eaz_> can someone help me add mysql to my node js+socket.io app?
+18:47 < CoverSlide> eaz_: npm install mysql
+18:47 < eaz_> i keep getting this error from nodejitsu https://gist.github.com/erikandrewzimmerman/5483678
+18:48 < Sly> eaz_: add mysql to your package.json dependencies
+18:48 < eaz_> which version number do i use?
+18:48 < Sly> "dependencies": { "mysql": "*" }, or replace "*" with the version you want to use.
+18:48 < CoverSlide> or npm install mysql --sace
+18:48 < eaz_> thanks :)
+18:48 < CoverSlide> *save
+18:48 < Sly> ^ That too, except --save
+18:48 < Sly> xD
+18:48 < CoverSlide> curse these human fingers
+18:50 < ljharb> except that "--save" will screw up your indentation and trailing newline, if you don't use 2 spaces
+18:52 <@mbalho> --save left me for dead in the sahara in the nineties
+18:53 < CoverSlide> jesus uses 2 spaces
+18:53 < CoverSlide> wwjd
+18:54 <@mbalho> i thought he used 3 spaces to remind you of his 3 day zombie thing
+18:55 < Havvy> I use 4 spaces for everything...
+18:55 < Havvy> (Except Scala...)
+18:56 < niggler> what happened to the venerable tab character?
+18:56 < ljharb> 2 spaces is insane
+18:56 < ljharb> but that's not the point
+18:56 < niix> hiya niggler
+18:56 < ljharb> the point is, nothing should force their indentation preference upon me.
+18:56 < niggler> hey niix
+18:56 < Havvy> niggler: Nobody could decide how to print a tab.
+18:56 < ljharb> "print"?
+18:56 < niggler> Havvy vim modeline
+18:57 < ljharb> i'm sure they couldn't decide how to telegram something either, but that shouldn't affect us in 2013.
+18:57 < Havvy> Should it show as 2 spaces? 4 spaces? 8?
+18:57 < ljharb> it's up to the viewer (or in this case the printer). thats the beauty of it.
+18:57 <@isaacbw> "beauty"
+18:58 < qard> 7 spaces. Just to piss people off. :O
+18:58 < FPSJosh01> Space  you say? &nbsp;
+18:58 < ljharb> yes, the beauty of it.
+18:58 < jergason> the real point is this is the most overpainted bikeshed in the universe
+18:58 < Havvy> ljharb: Until you grab somebody else's code and it's suddenly going past 80 characters because they use a smaller tab length than you.
+18:58 < jergason> and node uses 2 so you should use 2
+18:58 < ljharb> nobody fascistly imposes their syntax highlighting, or their font choice, on your code.
+18:58 < CoverSlide> I used to use 1 space for while
+18:58 < qard> But only for leading spaces. All spacing between characters should be tabs. :P
+18:58 < CoverSlide> that was awesome
+18:58 < ljharb> Havvy: who gives a fuck, when have you used a monitor that's stuck at 80 chars?
+18:58 <@mbalho> bikesheds are the goal of irc
+18:58 <@mbalho> so that they dont seep into other parts of society
+18:58 < CoverSlide> ljharb: /* vim: */
+18:58 < ljharb> that's an arbitrary limit
+18:59 <@isaacbw>         <div class="half-day">
+18:59 <@isaacbw>           <div class="day">Saturday</div>
+18:59 <@isaacbw> erm, woops
+18:59 < jergason> golang is smart for solving this at the language level
+18:59 <@isaacbw> middle-click instant-paste
+18:59 <@mbalho> ljharb: why dont you write a js module that autodetects indent style so that we can all benefit from using it in our json modifying module
+18:59 <@mbalho> modules*
+18:59 <@isaacbw> whitespace shouldn't be language-level unless you're python
+19:00 < jergason> gofmt enforces coding conventions
+19:00 < jergason> well, it isn't a syntax error
+19:00 < CoverSlide> gofmt is like jslint?
+19:00 < jergason> but running gofmt will automatically format a file to the community standards
+19:00 < jergason> no
+19:00 < Havvy> isaacbw: The significant whitespace actually causes issues for blind people in Python.
+19:00 < jergason> it doesn't complain
+19:00 < niggler> does python let you control how many spaces are in a tab?
+19:00 < jergason> it just reformats your code
+19:00 < eaz_> does anyone have an example of how node js and mysql work?
+19:00 < jergason> to be the same style as the accepted guidelines
+19:00 <@isaacbw> niggler: I think it's just "any whitespace"
+19:01 < CoverSlide> OK I JUST FIXED ALL SPACE FORMATTING ISSUES: USE FUCKING SED
+19:01 <@isaacbw> and then from there everything just has to line up
+19:01 < jergason> and it isn't customizable, because the whole point is to enforce a single standard so these discussions don't happen :)
+19:01 < eaz_> nevermind
+19:01 < ljharb> jergason: alternatively, require it to be the tab character, and then it doesn't happen either.
+19:01 < ljharb> and then people are free to choose their own width instead of being oppressed
+19:02 < niggler> >> var s = "\u0020", t = "\t"; s+s+s+s+t+s+s+s+s == t+t @ isaacbw 
+19:02 < purr> isaacbw: (boolean) false
+19:02 < FPSJosh01> unless you oppressed the spacebar
+19:02  * jergason oppresses ljharb with 2 spaces and laughs
+19:02 < niggler> isaacbw in python those are the same
+19:02  * Havvy sets tabwidth to 0 characters.
+19:02 <@isaacbw> what do you mean they're the same. Python converts tabs in string literals to spaces?
+19:03 < niggler> Havvy excel does that
+19:03 < niggler> @isaacbw in the significant whitespace, a tab character is the same as 8 spaces
+19:03 < niggler> so you can mix those
+19:03 <@isaacbw> ah okay
+19:03 < nathan7> >>> '\t' == ('\n' * 8)
+19:03 < nathan7> False
+19:03 < purr> nathan7: (boolean) true
+19:04 < nathan7> oh, like that
+19:04 < ljharb> ugh, so you can have mixed tabs and spaces? that's nuts
+19:04 < LoppEar> it is highly discouraged.
+19:04 < nathan7> It's for the tabs-for-indentation-spaces-for-alignment crowd
+19:04 < ljharb> yeah, alignment is overrated anyways
+19:04 < CoverSlide> mixed tabs and spaces is a crime agains humanity
+19:04 < ljharb> but at least "smart tabs" is more sane than "spaces for EVERYTHING" imo
+19:05 <@isaacbw> using spaces for everything means that if someone else opens your code, they'll see the same thing
+19:05 < g0z> well I probably just trashed my install
+19:05 < g0z> (not of node all the stuff I need to use under node)
+19:05 < LoppEar> having weird troubles with npm installing dependencies that are private github repos. "npm install <git+ssh://url>" works but the same url in dependencies gets Permission denied (publickey).
+19:05 < ljharb> isaacbw: right. but they won't already. cause of syntax highlighting, font size, and font choice. so that's a strawman argument.
+19:06 <@isaacbw> not really
+19:06 < ljharb> isaacbw: "seeing the same thing as me" isn't what's important
+19:06 < ljharb> since nobody sees the same thing anyways
+19:06 <@isaacbw> I don't think different colors is the same as everything being aligned or not
+19:06 < ljharb> i know you don't, but you're wrong
+19:06 < ljharb> cause it's subjective
+19:06 <@isaacbw> hah, okay
+19:06 < ljharb> and since > 0 people think it's the same, *it's the same*
+19:07 < LoppEar> i would like tumblr that knows everytime a channel has a spaces vs tabs argument and saves the results for posterity. every time.
+19:07 < niggler> isaacs: http://hastebin.com/jihalewoxe.py 
+19:07 < CoverSlide> > 0 people think ljhard is a moron
+19:08 <@isaacs> niggler: are you trolling me? ;P
+19:08 < niggler> sorry isaacs i meant isaacbw
+19:08 <@isaacs> ;)
+19:08 < ljharb> CoverSlide: that's a subjective opinion about an objective fact, so that's not the min requirement to establish it as truth. also it's "b" not "d" if you're going to attack my intelligence
+19:08  * niggler offers mint chocolate chip ice cream
+19:09 < CoverSlide> niggler: so in python, a tab is implied 8 spaces?
+19:09 < niggler> no its not
+19:09 <@isaacbw> ljharb: you seem to be the only one claiming an objective truth
+19:09 < niggler> its "to the next 8-character boundary"
+19:09 < niggler> CoverSlide if it were truly 8 spaces, then "    \t    " would be the same as "\t\t" but they arent
+19:10 < ljharb> isaacbw: i'm claiming that "some people consider font choice/color/font size to be in the same category as indentation". which is objectively true, since i think so.
+19:11 < CoverSlide> ljharb: you'll find many organizations are strict about indentation of code. 
+19:11 < ljharb> CoverSlide: sure, i agree all code in a project should be indented the same way
+19:11 < ljharb> CoverSlide: i'm just saying that if you use tab characters, it will be indented in the same way, without forcing some engineers' choices on the rest (ie, fascism)
+19:12 < ljharb> CoverSlide: i suspect you'll find that zero organizations mandate syntax highlighting, or font size, when it comes to code.
+19:13 < CoverSlide> ljharb: umm, yes because syntax higlighting and font size are never part of the code itself that is shared. 
+19:13 < CoverSlide> indentaion is
+19:14 < ljharb> CoverSlide: right, font size is the *appearance* of the code, not the code.
+19:14 < ljharb> if you use tab characters, the *appearance* is no longer stored in the repo.
+19:14 < LoppEar> eg, can I get a merge conflict from syntax highlighting?
+19:14 < ljharb> and the less concepts in your code, the better :-)
+19:14 < ljharb> you won't get one from changing file permissions either, so that's not really a good metric
+19:15 <@isaacbw> tabs are still appearance though. It sounds like you want editors to generate editable code from something completely stripped of whitespace
+19:15 < ljharb> tabs aren't appearance
+19:15 < ljharb> they represent "one level of indentation"
+19:16 < ljharb> how "one level" looks should be up to me
+19:16 < AAA_awright> It's really not that hard guys
+19:16 < AAA_awright> TABS TO INDENT, SPACES TO ALIGN
+19:16 < Nuck> ^ THIS
+19:16 < CoverSlide> AAA_awright: FASCIST! I SHALL USE TABS TO ALIGN!! REVOLUCION!
+19:16 < ljharb> yup
+19:16 < Nuck> CoverSlide: VIVA LA REVOLUCION
+19:17 <@mbalho> this is the only answer https://gist.github.com/maxogden/3401560
+19:17 < conphile> it's simple people
+19:17 < conphile> 0x0F to indent
+19:17 < conphile> because then you have 0x0E afterwards if you overshoot
+19:17 <@mbalho> the key is to use /*;;;;;;;;;;;;;*/ when you cant just use ;;;;;;;;
+19:17 < ljharb> mbalho: except that has one extra level of semicolons on lines 4-6, so that's a fail.
+19:17 < AAA_awright> And really you shouldn't be aligning anything in code, only indenting, so:
+19:17 < AAA_awright> TABS TO INDENT, period.
+19:17 < LoppEar> eheh. it is interesting (?) to me that every whitespace-matters language I've used (node, python, haskell) the community eventually settles on spaces for indentation.
+19:17 < conphile> then align with nonbreaking spaces
+19:17 < ljharb> AAA_awright++
+19:17 <@mbalho> ljharb: read comments
+19:17 < conphile> so that you have control over wrapping
+19:18 < LoppEar> er, i meant coffeescript not node.
+19:18 < ljharb> screw cs
+19:19 < Willox> I'd use spaces for indentation if my editor could delete 1 level of indentation with just backspace
+19:19 < CoverSlide> there are small pockets of people who use tabs, greater consensus is reached by using spaces
+19:19 < Willox> That's pretty much the only difference depending on your editor
+19:19 < niggler> lol what's going on with this ghost blogging thing
+19:20 < Willox> Which can be solved if you use tab/shift+tab
+19:20 < AAA_awright> The biggest problem I have with spaces is it's far harder to highlight code, you have to select the *exact* character, instead of being close enough to the nearest +-1/2 tab
+19:20 < CoverSlide> it is rare to find a community project that supports spaces
+19:20 < CoverSlide> s/spaces/tabs/
+19:20 < ljharb> that too
+19:21 < ljharb> Willox: it's not a good solution if i have to hit a different key.
+19:21 < Willox> ljharb, you use backspace currently?
+19:21 < ljharb> yup
+19:21 < CoverSlide> so if you are writing code that you expect anyone other than you to use at least once, you should use spaces
+19:21 < LoppEar> so anyways, npm install dependencies that are private github repos denied (vs cmdline install works)
+19:21 < CoverSlide> otherwise, go nuts
+19:21 < txdv> the goold old tabs vs spaces war
+19:21 < Willox> As far as I can tell, that's the only issue with using spaces vs tabs
+19:22 < LoppEar> txdv: seeing a lot of the classics here.
+19:22 < Willox> And moving through code
+19:22 < AAA_awright> CoverSlide: Appeal to popularity isn't very convincing
+19:22 < Willox> ljharb, what editor do you use?
+19:22 < txdv> I use tabs for the initial indent function {\tvar... and then spaces for specific alignment, I think this is how it should be used
+19:22 < AAA_awright> And even then, it's not that popular
+19:23 < ljharb> Willox: all of the ones i use support shift-tab
+19:23 < txdv> 8 spaces instead of one tab are stupid imo
+19:23 < ljharb> 8 spaces is stupid, sure
+19:23 < Willox> I just noticed that sublime can delete space indentation using backspace
+19:23 < txdv> 4 spaces is just as stupid
+19:23 < Willox> So depending on what you use, you might find that happens too
+19:24 < AAA_awright> Willox: Backspace, how to indent/unindent is ambigious, it's harder to highlight an exact amount of indentation, you can't easily change how much you see an indentation (I use 3-space tabs, who else would bother to adopt that in their coding standards?)
+19:24 < AAA_awright> There's lots of good reasons
+19:25 < Willox> I'm actually against the use of spaces
+19:25 < Willox> I'm just taking a look at both sides
+19:30  * CoverSlide goes back in time an uninvents the tab key and tab character, and ends this stupid fucking debate
+19:31 < conphile> can you replace it with a key that dispenses biscuits
+19:31 < CoverSlide> the tab character is just compatibility mode for legacy typewriters
+19:31 < conphile> that way you kill two birds with one stone
+19:31 < s_e> replace it with quadraspace
+19:31 < ljharb> CoverSlide: "tab" means only "indentation". it'd have been better to make all langs just require it.
+19:31 < CoverSlide> tabs are considered harmful
+19:31 < conphile> solving indentation arguments AND hunger
+19:31 < conphile> ljharb: like makefiles?
+19:31 < ljharb> sure. everything.
+19:32 < conphile> here's a man who's never dealt with the makefile tab frustration
+19:32 < ljharb> nope, i hate compilers :-p
+19:34 < CoverSlide> yes makefiles are a POS. your opinion is null and void for not having experience with them
+19:35 < kenperkins> so why would you call new https.Agent() passing host, key, and cert? I can't find anything in source that leverages said options
+19:36 -!- mbalho changed the topic of #Node.js to: Node.js - A place to escape your day job via whitespace bikeshedding - http://nodejs.org - http://logs.nodejs.org - http://stackoverflow.com/questions/tagged/node.js
+19:36 < CoverSlide> mbalho: that happens in every channel, btw
+19:36 < kenperkins> for example. this line of code: https://github.com/nodejitsu/pkgcloud/blob/master/lib/pkgcloud/common/azure-signature.js#L38
+19:37 <@mbalho> CoverSlide: doesnt make it any less true
+19:38 < CoverSlide> kenperkins: if you want to customize agent behavior specific for your app
+19:39 < CoverSlide> kenperkins: agents are per-host right? so if it requires tls credentials, should be specific to all connections for that agent
+19:39 < kenperkins> coverslide: but those options (host/key/cert) don't appear to be used anywhere...
+19:40 < kenperkins> I'm looking here and i'm confused: https://github.com/joyent/node/tree/master/lib
+19:40 < kenperkins> oops
+19:40 < kenperkins> https://github.com/joyent/node/blob/master/lib/_http_agent.js#L38-L68
+19:41 < FPSJosh01> How much is light purple buttons and light blue text on said buttons a sin?
+19:42 < FPSJosh01> like out of 10 being the worst
+19:42 < CoverSlide> kenperkins: try looking in the v0.10 branch. they seem to be doing some refactorings of http on master
+19:42 < kenperkins> 1 sec
+19:43 < glasser> Is the 'slashes' field in the object returned by url.parse() something that is safe to use? It's not mentioned in the docs.
+19:43 < kenperkins> CoverSlide: still nothing that makes use of host/cert/key https://github.com/joyent/node/blob/v0.10/lib/http.js#L1184-L1214
+19:43 < CoverSlide> kenperkins: possibly here: https://github.com/joyent/node/blob/v0.10/lib/https.js#L79
+19:44 < CoverSlide> not specifically, but i think tls.connect does
+19:44 < ljharb> CoverSlide: lol, no need to be a dick. nothing makes any opinion null and void.
+19:46 < kenperkins> CoverSlide: maybe I'm just not seeing how options of cert/key/host to Agent find their way through to anything
+19:46  * CoverSlide shrugs
+19:47 < CoverSlide> I never had a reason to dive into the tls/https stuff.
+19:53 < kenperkins> CoverSlide: found it
+19:54 < kenperkins> mikeal/request has a shortcut to extract that stuff out of the Agent for SSL
+20:07 < bmatusiak_> i want to create a voice comm out of node-webkit.. anybody want to help?
+20:08 <@isaacbw> what's a voice comm
+20:08 < bmatusiak_> ever herd of ventrilo?
+20:08 < bmatusiak_> teamspeak
+20:08 < bmatusiak_> skype
+20:09 < CoverSlide> roger wilco?
+20:09 < bmatusiak_> o yea thats freakin old! lol
+20:09 < CoverSlide> like one of the first
+20:10 < CoverSlide> i think with gamespy and everything
+20:10 < bmatusiak_> i used that back during counter-strike 1.3
+20:11 < CoverSlide> well i'm not sure what people are using now. voxxer is doing something like that on node, but none of their core stuff is FLOSS i'm sure
+20:12 < bmatusiak_> well i was reading http://stackoverflow.com/questions/14065421/saving-wav-at-nodejs-server
+20:13 < bmatusiak_> was just thinking node-webkit would be perfect for this
+20:15 < CoverSlide> right, well if you're using node-webkit i would just use plain websockets instead of socket.io or binaryjs
+20:15 < CoverSlide> don't have to worry about IE compatibility
+20:15 < bmatusiak_> exactly :P
+20:19 < chapel> you could also have a pure browser version as well
+20:20 < chapel> so it could work just about anywhere, even without an install
+20:21 < bmatusiak_> yea good idea
+20:22 < chapel> you could use mumble as the backend and write a front end for it
+20:23 < bmatusiak_> is there voice recognition for nodejs yet ?
+20:24 < CoverSlide> bmatusiak_: there's stenographer, but it uses google apis
+20:25 < CoverSlide> not sure if there is one for node natively
+20:25 < CoverSlide> the best you can do is get a wrapper for some C library.
+20:25 < CoverSlide> but I think the best options use some external API. 
+20:26 < CoverSlide> s/best/most reliable/
+20:29 < bmatusiak_> CoverSlide i see
+20:31 < bmatusiak_> now i just need a free server to host and test.. im thinking heroku wont do for this, they dont support websockets 
+20:32 < CoverSlide> right
+20:34 < bmatusiak_> oo i think openshift supports ws
+20:34 < CoverSlide> right, but i think they're on node 6.x
+20:35 <@isaacbw> if you're just testing, it would be pretty easy to fire up an ec2 instance
+20:35 < bmatusiak_> i dont trust my self on ec2.. i ran a bill up once
+20:36 <@isaacbw> lol okay
+20:37 < thomblake> I use rackspace cloud - it is pretty cheap for casual usage.
+20:38 < bmatusiak_> CoverSlide i can build 8.x on openshift
+20:38 < CoverSlide> bmatusiak_: O RLY?
+20:38 < bmatusiak_> cloud9... c9.io uses openshift and they have 8.x bin
+20:39 < bmatusiak_> i thinks thats all part of the dyi cartrigd
+20:39 < brianc> I'm using the cluster module and I'm getting a "listening" event emitted on the cluster master after ever request
+20:39 < brianc> has anyone else seen this?
+20:40 < brianc> master.on('listening', function() { console.log('worker is listening') });
+20:40 < brianc> that fires every request to the worker. wtf?
+20:41 < Sven_vB> what do the docs say about the "listening" event and its purpose?
+20:42 < brianc> When calling listen() from a worker, a 'listening' event is automatically assigned to the server instance. When the server is listening a message is send to the master where the 'listening' event is emitted.
+20:48 < jcoglan> dropping by on izs's recommendation, I'm wondering if someone can give me some code review on how I'm using streams
+20:48 < brianc> might have something to do with dgram socket
+20:51 < brianc> yes it was indeed
+20:51 < brianc> gelf-node opens a new socket for each packet
+21:00 < mscdex> niggler: i'm not an npm bot
+21:03 < dcholth_> Afternoon!
+21:04 < dcholth_> I have a PUT method in my app, and when I do console.log( req.body ), the console spits out something like: { '{"__v":0,"_id":"517ae7a04f0a43612b000001","correct":"Nicotine"
+21:04 < dcholth_> So it looks like its sending an object, in the form of a string... Is there a good way to get that back into an object?
+21:05 < nbari> hi all, i have this small function: http://pastebin.com/iM09mzN1
+21:05 < nbari> the idea is to json.parse all the posted data
+21:05 < nbari> but for an uknown reason I can't store the results to the global story var
+21:05 < context> stop using global vars ?
+21:06 < nbari> I am using a var story = {} for (var item in data) {...}
+21:06 < dcholth_> nbari: global vars are evil... but that said, if you trace out story, does it print anything?
+21:06 < nbari> nothing
+21:06 < nbari> only inside the for
+21:07 < dcholth_> Did you declare var story inside a function somewhere else?
+21:07 < howdynihao> dcholth_: JSON.parse is what you want
+21:07 < nbari> var story = { test: 1 };
+21:07 < nbari> only that
+21:07 < dcholth_> Where in your app though?
+21:07 < dcholth_> inside app.js?
+21:07 < dcholth_> or a different js file?
+21:08 < nbari> and later I have the for with JSON.parse(data)
+21:08 < nbari> how could I avoid the globals ?
+21:09 < dcholth_> nbari: since you can't see the var everywhere, it sounds like you already have :P
+21:10 < nbari> http://pastebin.com/U1adCzGV
+21:10 < howdynihao> nbari: side note if (item.length) instead of if (item.length > 0)
+21:10 < nbari> that is how I have it 
+21:10 < nbari> thanks howdynihao 
+21:11 < howdynihao> also
+21:11 < howdynihao> if (data[item].length)
+21:11 < howdynihao> right?
+21:12 < MI6> joyent/node: Ben Noordhuis master * b5c1721 : tools: fix test.py after v8 upgrade (+2 more commits) - http://git.io/wkNqpQ
+21:12 < nbari> what about if (item.lenght && data[item].length )
+21:13 < howdynihao> well what is data? because item.length is just checking the key's length
+21:13 < mscdex> if data[item] is a string you can just do `if (data[item])`
+21:14 < nbari> ok
+21:15 < nbari> this line  story[item] = JSON.parse(data[item]); is working but for an uknow reason out of the for if I do a console.log(story)
+21:15 < nbari> it returns empty
+21:15 < nbari> also if I change story to foo or anything
+21:15 < ljharb> nbari: show a gist of the code
+21:15 < nbari> http://pastebin.com/U1adCzGV
+21:16 < ljharb> nbari: so i wouldn't use a for..in loop there. i'd do `Object.keys(data).reduce(function (story, item) { if (item.length > 0) { story[item] = JSON.parse(data[item]); } return story; }, story);`
+21:16 < nbari> thanks, let me try
+21:16 < ljharb> but i don't see what's wrong with your current code either
+21:19 < brianc> anyone here use graylog2 with node?
+21:19 < vwoo> Does anyone have any recommendations for ORMs like activerecord, in NodeJS? I'm having a hard time seeing what the state of the art is like right now.
+21:19 < mscdex> vwoo: sequelize is fairly popular for sql
+21:20 < vwoo> mscdex: are there any glaring deficiencies I should be aware of, up front?
+21:20 < mscdex> vwoo: i don't know, i have not used it myself
+21:20 < vwoo> alright, thanks for that, anyhow
+21:21 < dcholth_> Ok, I'm feeling really stupid here... this is what the object looks like in webstorm debugger: https://www.evernote.com/shard/s148/sh/755cb654-55cf-41b3-b3f9-31ff966c85a9/23b201bb160f67d54ef2eb6366a21b5c
+21:21 < dcholth_> But req.body[0] spits out undefined, and req.body spits out [Object object] or something
+21:22 < mscdex> woohoo! faster sort() in v8!
+21:22 < howdynihao> dcholth_: its an object that has no 0 key
+21:22 < dcholth_> So how do I get at the data in its string format?
+21:22 < dcholth_> To be JSON parsed
+21:22 < devoidfury> JSON.stringify(object)
+21:22 < howdynihao> dcholth_ its already what you want
+21:23 < jergason> dcholth_: you want to encode it to json? It is already an object
+21:23 < howdynihao> you want it as an object right?
+21:23 < dcholth_> Right...  But JSON.parse is giving me token errors.
+21:23 < howdynihao> because its already an object
+21:23 < jergason> JSON.parse() takes a string and turns it into an object
+21:23 < jergason> you already have an object
+21:23 < dcholth_> hmm... but req.body.correct and such gives me undefined as well
+21:24 < jergason> is this coming from mongoose by any chance?
+21:24 < mscdex> dcholth_: what does `console.dir(req.body);` say?
+21:24 < dcholth_> I'm working with mongoose
+21:24 < devoidfury> dcholth_: are you using any particular framework (express/flatiron/etc)?
+21:24 < nbari> Object.keys(data).reduce(function (story, item) { if (item.length >  0) { story[item] = JSON.parse(data[item]); } return story; }, story);`
+21:24 < nbari> that worked
+21:24 < dcholth_> ExpressJS & Mongoose
+21:25 < nbari> but if I type console.log(story) I don't get nothing
+21:25 < dcholth_> console.dir(req.body) spits out: { '{"__v":0,"_id":"517ae7a04f0a43612b000001","correct":"Nicotine","difficulty":1,"modified":"2013-04-29T20:43:4
+21:25 < ljharb> nbari: after that reduce is done?
+21:25 < dcholth_> correction: 
+21:25 < dcholth_> { '{"__v":0,"_id":"517ae7a04f0a43612b000001","correct":"Nicotine","difficulty":1,"modified":"2013-04-29T20:43:45.931Z","qid":"1","wrongAnswer1":"Alcohol","wrongAnswer2":"Carbon Monoxide","wrongAnswer3":"Nitrogen","zone":"General Knowledge","question":"What is the addictive chemical in cigarettes?"}': '' }
+21:25 < dcholth_> So the entire object I want... is the key... grr...
+21:25 < mscdex> dcholth_: there you have it :-)
+21:26 < nbari> if I type the console.log(story) within / before the return story; I so get the data
+21:26 < nbari> but not out of the Object.keys ...
+21:26 < ljharb> can you show a gist of that, including the console.log?
+21:26 < nbari> yes, plese give me 1 min to put it
+21:27 < mscdex> i wonder how many V8 releases do not contain the changlog item, "Performance and stability improvements on all platforms"
+21:27 < mscdex> s/changlog/changelog/
+21:29 < dcholth_> thats weird... why is the data I want being sent as a key...
+21:31 < bnoordhuis> mscdex: zero, i think. there are even releases whose only changelog entry consists of "performance and stability improvements on all platforms"
+21:31 < mscdex> :-)
+21:33 < nbari> here is the gist:
+21:33 < nbari> https://gist.github.com/nbari/5484970
+21:33 < dcholth_> Oh jeeze, I figured it out:  headers: {'Content-Type': 'application/x-www-form-urlencoded' was in my post 
+21:34 < mscdex> application/json !
+21:34 < nbari> the flow is something like (post data) ---> this.post () --> send's it to save function
+21:35 < ljharb> nbari: hm, it shouldn't be necessary, but you can do `story = Object.keys…` and that should fix it.
+21:35 < nbari> sorry to ask bue can you please explain me with more detail
+21:35 < ljharb> nbari: on line 23. change "Object.keys" to be "story = Object.keys"
+21:35 < ljharb> then see if it works
+21:36 < nbari> ok let me try
+21:39 < nbari> can't make it run with story = Object.keys"
+21:39 < nbari> SyntaxError: Unexpected token =
+21:39 < MI6> joyent/node: Andrew Paprocki master * c081809 : vm: add support for timeout argument - http://git.io/uWPsQw
+21:39 < ljharb> no quote
+21:42 < nbari> mmm need mor help, just can make it pass the syntax error
+21:42 < ljharb> please use a jsfiddle, and i'll edit it directly.
+21:45 < nbari> http://jsfiddle.net/f9VVh/
+21:47 < ljharb> nbari: http://jsfiddle.net/f9VVh/1/
+21:47 < nbari> many thanks, let me see
+21:48 < nbari> this is very strange I can't see the output
+21:49 < ljharb> you're running this in node? or in a browsr
+21:49 < nbari> node console
+21:49 < nbari> and with an application I send the post data
+21:49 < ljharb> nbari: try http://jsfiddle.net/f9VVh/2/ >?
+21:50 < nbari> let me check
+21:51 < nbari> still nothing
+21:51 < ljharb> that's very weird.
+21:52 < ljharb> oh wait
+21:52 < ljharb> are you sure all the JSON.parse's are working?
+21:52 < ljharb> it will throw an exception if you have invalid json data.
+21:52 < nbari> http://jsfiddle.net/6Jcpj/
+21:52 < nbari> that's the data
+21:53 < nbari> mmmm good question maybe not all working
+21:53 < nbari> doing a try/catch could work there ?
+21:54 < ljharb> sure
+21:56 < gildean> separate the try/catch as an function of its own, as it will make the js engines bail out of optimization on that function
+21:57 < gildean> function isValidJson(json) { try { return JSON.parse(json); } catch (e) { console.log(e); return false; } }
+21:57 < gildean> then just var json = isValidJson(data); if (json) { doSomething... etc.
+21:57 < nbari> ljharb:  http://jsfiddle.net/6Jcpj/1/  got it working this way (many thanks )
+21:58 < ljharb> but i'm not sure why you wouldn't json parse the entire `data` object at once
+21:58 < ljharb> instead of doing it on each key individually
+21:59 < nbari> the data I am receiving seems not to bee all well encoced
+21:59 < nbari> in thery a full JSON.parse(data) should work right ?
+21:59 < ljharb> yes
+22:00 < ljharb> but it's already parsed
+22:00 < ljharb> json is a string
+22:00 < ljharb> you can't pass it into object.keys
+22:00 < ljharb> so it's likely you don't need to parse it at all in your function.
+22:00 < nbari> what I notice is that the (key,value) values need to be parsed 
+22:08 < Bascka> Is there some kind of microseconds timeouts in node?
+22:13 < bnoordhuis> Bascka: process.hrtime()
+22:17 < Bascka> is there any way to use it on timeouts?
+22:18 < ljharb> no, setTimeout only works in ms
+22:18 < ljharb> and it's not guaranteed execution anyways
+22:18 < ljharb> what needs to be that frequent?
+22:34 < bmatusiak_> i need a helloworld c++ for v0.8 off github  can someome supply me with a link
+22:35 < ljharb> why not 0.10
+22:35 < bmatusiak_> because
+22:35 < howdynihao> http://nodejs.org/docs/v0.8.23/api/addons.html#addons_hello_world
+22:36 < bmatusiak_> aww thanks
+22:37 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+22:39 < TheJH> Bascka: if you need that kind of speed, maybe node isn't the right environment for it?
+22:42 < ljharb> it's even odder that you'd need that kind of speed in the first place
+22:43 < crashsystems> Would anyone mind looking at an annoying bug in some code I've written? To learn node, I decided I'd write a chat server using socket.io. I've got two pertinent events the server-side code is listening for: requestName and chat. The bug is that if requestName has already fired, the chat event never fires for that socket. http://pastebin.com/Z2fs0g6e
+22:47 < thealphanerd> crashsystems: are you trying to make an npm module?
+22:48 < crashsystems> I just split out the socket specific code out from my main server.js. I'm not planning on sharing this anywhere.
+22:48 < thealphanerd> ahh
+22:49 < thealphanerd> you might find things a bit easier with a bit of thatism
+22:49 < thealphanerd> putting that = that || {}; at the top of the anonymous function you are making
+22:49 < thealphanerd> then making the functions that.function
+22:50 < ljharb> i like "self" better :-) but it's the same
+22:50 < thealphanerd> lol
+22:50 < thealphanerd> I'm a crockfordist
+22:50 < crashsystems> Do you think that is part of the bug I'm experiencing, or is this just a practice you prefer?
+22:50 < thealphanerd> well it is harder to read the code this way
+22:51 < thealphanerd> and more prone to bugs
+22:51 < thealphanerd> you might also find that making it an export might make more sense once everything is working
+22:51 < thealphanerd> but that's just the way I like to work
+22:51 < crashsystems> I'll keep that in mind.
+22:52 < thealphanerd> have you also tried just throwing some console.log in there
+22:52 < thealphanerd> on the events
+22:52 < crashsystems> I have
+22:52 < thealphanerd> and just make sure the events are firing
+22:53 < crashsystems> thats how I discovered that the chat event fires if the requestName event hasn't fired yet.
+22:53 < thealphanerd> hmmm
+22:53 < thealphanerd> are you hoping for some sync in this?
+22:53 < thealphanerd> like one event needs to happen first?
+22:54 < crashsystems> Well, when user's open the web interface, they pick a name for themselves. The requestName event is emitted from the browser once they've picked a name, at which point they see the UI where they can send messages to the room.
+22:54 < thealphanerd> and the problem is that the chat event is firing even though the requestName event hasn't gotten their name
+22:54 < thealphanerd> ?
+22:55 < crashsystems> so I opened Chrome's web console to manually emit a chat before requestName emitted, and that worked. In ordinary use though, requestName would always come first.
+22:55 < crashsystems> no, the problem is that once requestName has fired, the chat event _never_ fires.
+22:55 < thealphanerd> ahhh
+22:55 < thealphanerd> weird
+22:55 < crashsystems> indeed
+22:55 < Bubo> crashsystems: so is line 72 your problem?
+22:56 < crashsystems> Bubo: I thought it might be, so I put a console.log before the if, and it never logged to the console
+22:56 < Bubo> Ah
+22:56 < thealphanerd> could be in your client side code then
+22:56 < Bubo> so are you correctly emiting in the client side?
+22:56 < thealphanerd> are you even firing the chat messages?
+22:57 < crashsystems> I am. I used Chrome's dev tools to manually inspect the frames the websocket is sending, and the chat event is getting emitted
+22:57 < Bubo> Can you give us your client side code too?
+22:58 < thealphanerd> have you tried using something like wireshark
+22:58 < thealphanerd> to see exactly what is happening on the network interface?
+22:58 < crashsystems> I've not, but I can see all traffic via chrome developer tools.
+22:58 < crashsystems> Bubo, let me see if I can get you the client-side code
+23:00 < Bubo> I can give you my code if you want to compare it?
+23:00 < crashsystems> Here you go. I warn you in advance about my UI skills...
+23:00 < crashsystems> http://pastebin.com/5qG4FrLz <- index.html
+23:01 < vwoo> Does anyone know if there's a nodejs/connect/express utility like rails c?
+23:01 < crashsystems> http://pastebin.com/QYji1Syd <- static/app.js
+23:01 < vwoo> I would really love to run db queries, etc remotely in the node environment
+23:01 < thealphanerd> one quick tip
+23:01 < thealphanerd> line 12
+23:01 < thealphanerd> in the js
+23:02 < thealphanerd> just do "var connection = io.connect()"
+23:02 < thealphanerd> no ip or port
+23:02 < thealphanerd> it will default back to your server
+23:02 < Bubo> why thealphanerd? 
+23:02 < thealphanerd> otherwise it can become annoying to have to change it every time you deploy
+23:02 < crashsystems> and it will automatically use the right port number?
+23:02 < thealphanerd> yup
+23:02 < thealphanerd> this will also break it if you try and connect from devices other than the server
+23:02 < crashsystems> I was already planning on un-hardcoding the hostname later
+23:02 < Bubo> nice, i didn't know that
+23:03 < thealphanerd> Bubo: it took me a year to figure that out
+23:03 < thealphanerd> after attempting like 100 work arounds
+23:03 < thealphanerd> sigh
+23:03 < thealphanerd> crashsystems: is all the binding stuff working correctly?
+23:04 < Bubo> I Was just about to ask that
+23:04 < thealphanerd> have you set console logs after each emit
+23:04 < thealphanerd> to make sure it is sending
+23:04 < crashsystems> thealphanerd: It is.
+23:04 < TheAceOfHearts> so… does anyone have any cool project ideas they'd like to share? I'm a computer engineering student, and my team and I have to develop a large application for next semester. The team has an algorithms/C/C++ specialist, an android specialist, a web specialist, and the manager, which is the glue that keeps us together. Any ideas for cool stuff? It has to be something pretty big, and we're gonna make it open source if we actually create it
+23:05 < thealphanerd> TheAceOfHearts: do you guys like web audio?
+23:05 < TheAceOfHearts> I don't know that much about web audio; but go on?
+23:05 < Bubo> TheAceOfHearts: a web-based MMORPG xD
+23:05 < thealphanerd> well there is some work going on to get web audio support in node
+23:05 < TheAceOfHearts> heh, no
+23:05 < thealphanerd> so you can use node.js as a synthesis environment
+23:06 < TheAceOfHearts> I see
+23:06 < TheAceOfHearts> that might be cool 
+23:06 < Bubo> do you have any ideas so far TheAceOfHearts? i'm curious
+23:06 < TheAceOfHearts> but I don't really know how we'd tackle that, like, the problem has to be something 'marketable' 
+23:06 < willwh> web based mmo = stupididea
+23:07 < willwh> highly competitive space
+23:07 < willwh> and a tiny dev team you have
+23:07 < willwh> build unsexy something for business
+23:07 < willwh> that is where the money is
+23:07 < Bascka> you don't really need to think on marketable, just create something cool, and the big guys will make it marketable… imo...
+23:07 < thealphanerd> mmmmoney
+23:07 < TheAceOfHearts> well, this one idea is to have a platform where we provide server + db and we generate like a restful API for you; and we'd develop a lib to generate some of the code for your server + android app, since a lot of this stuff can get repetitive 
+23:07 < thealphanerd> crashsystems: so you have confirmed that all the stuff on client side is 100% working
+23:07 < thealphanerd> all your binding
+23:07 < TheAceOfHearts> well, one of the requirements for our Capstone is that we need to have a "client" 
+23:07 < thealphanerd> and all the emits
+23:07 < crashsystems> yes I have.
+23:08 < thealphanerd> do you have wireshark?
+23:08 < thealphanerd> and just so I know correctly
+23:08 < thealphanerd> the message you are losing
+23:08 < thealphanerd> is the passing of the chat from the server -> client
+23:08 < crashsystems> Not on my host OS. I'd have to put it in one of my VMs.
+23:08 < thealphanerd> like… client types message… that sends to server… then server sends message to all clients?
+23:09 < crashsystems> That would account for the problem, but what sort of networking problem would cause chat emits to fail to reach the server, but no other kind?
+23:09 < TheAceOfHearts> thealphanerd: could you expand a bit about the audio thing :)?
+23:09 < thealphanerd> https://github.com/jussi-kalliokoski/node-cubeb
+23:09 < TheAceOfHearts> we're all in computer engineering, so we know how to work with hardware interfacing too
+23:10 < thealphanerd> crashsystems: are any of the messages getting to the server/
+23:10 < thealphanerd> and y errors in console
+23:10 < Bubo> rusi :D
+23:10 < thealphanerd> TheAceOfHearts: that above library is used to pump audio to soundcard
+23:10 < Bubo> wrong chat sorry
+23:10 < TheAceOfHearts> I see
+23:10 < thealphanerd> https://github.com/colinbdclark/Flocking
+23:10 < crashsystems> all of the other messages are getting to the server. as for the chat event, it is ether getting there but never triggering the event, or not getting there. it _is_ getting sent by the browser though.
+23:10 < thealphanerd> this web audio framework can use JS to do synthesis
+23:11 < thealphanerd> is there a silly spelling error/
+23:11 < thealphanerd> ?
+23:11 < TheAceOfHearts> I don't really know what this stuff is used for, though; I don't know much about audio.
+23:11 < crashsystems> in the event names? I copied and pasted, just to be sure.
+23:11 < thealphanerd> hmmm you have the event name being the same
+23:12 < thealphanerd> TheAceOfHearts: if you don't know much about audio… it probably isn't the project for you:D
+23:12 < thealphanerd> crashsystems: you should maybe have different names for events from the server -> client
+23:12 < TheAceOfHearts> oh well, I guess :P, but thanks
+23:12 < crashsystems> I'll give that a try
+23:12 < TheAceOfHearts> anyone have any other ideas to share? 
+23:13 < thealphanerd> TheAceOfHearts: you guys could maybe do something with asm.js and llvm byte code
+23:13 < thealphanerd> make some super efficient js stuff
+23:13 < TheAceOfHearts> well, I'm the only one that works with JS, my teammates are really good with Android/Java and Algorithms/C/C++
+23:13 < thealphanerd> crashsystems: have you put a console.og in all the places it should go on the server?
+23:14 < thealphanerd> TheAceOfHearts: That is why it would be great… very little actual js
+23:14 < thealphanerd> lots of systems stuff
+23:14 < thealphanerd> and c / c++
+23:14 < crashsystems> yes
+23:14 < TheAceOfHearts> Hmmm
+23:14 < TheAceOfHearts> mgiht read up on those things a bit
+23:14 < thealphanerd> crashsystems: so you have on line 18 and line 71?
+23:14 < crashsystems> yep
+23:15 < thealphanerd> crashsystems: and nothing in either… hmmmmm  I might suggest comment out all that shit
+23:15 < thealphanerd> then just add a new emit message…. "Test"
+23:15 < thealphanerd> or whatever
+23:15 < thealphanerd> and just try and getting the connection working
+23:15 < thealphanerd> then work up
+23:15 < crashsystems> I should clarify: like 17 fires and binds the event, but the bound event is never triggered.
+23:16 < thealphanerd> so onChat doesn't work then?
+23:16 < crashsystems> and when a chat is emitted from the browser and the function bound to requestName hasn't fired yes, the event bound to chat _does_ fire
+23:16 < thealphanerd> also I don't think you are using the term "bound" correctly here
+23:16 < thealphanerd> (not to be a nitpick)… but calling a function isn't binding a function
+23:17 < crashsystems> but a call to the function is bound to an event, right?
+23:17 < thealphanerd> but it isn't like a call back or anything
+23:17 < thealphanerd> socket.on is bound
+23:17 < thealphanerd> onChat is called
+23:17 < thealphanerd> but I could be wrong… and now we are arguing semantics
+23:18 < thealphanerd> you might want to take a look at other socket code
+23:18 < thealphanerd> because the way you implemented it… while keeping things tidy, is a tad confusing
+23:19 < thealphanerd> take a look at this https://github.com/TheAlphaNerd/interface.js/blob/master/server.js
+23:19 < Ardivaba> Hello.
+23:19 < Ardivaba> Anyone here who is familiar with TCP?
+23:19 < thealphanerd> it is not as decomposed as yours crashsystems … but I think it is a bit easier to read
+23:20 < Ardivaba> I am just going to drop this question, have to go afk for 4 minutes. Can someone lightly explain me why it is not possible to TCP hole punch with Websockets to establish Peer To Peer connection.
+23:21 < ljharb> browser security limitations, i imagine
+23:21 < TheJH> Ardivaba: for TCP hole punching, you need to spoof TCP packets
+23:22 < TheJH> Ardivaba: you usually need system administration level access for that afaik
+23:24 < Ardivaba> TheJH but it would still be possible, right?
+23:25 < thealphanerd> crashsystems: I did find a problem actually
+23:25 < thealphanerd> line 8
+23:25 < thealphanerd> io.sockets.on( "connection", bindEvents ) should be io.sockets.on( "connection", bindEvents (socket) )
+23:26 < TheJH> Ardivaba: a webapp doesn't have system administaration level access to your PC
+23:26 < Ardivaba> Oh, right.
+23:26 < crashsystems> but no variable named socket exists yet
+23:26 < thealphanerd> it does
+23:26 < thealphanerd> it is sent when socket.on is called
+23:26 < thealphanerd> take a look at my code that I sent...
+23:26 < Ardivaba> Are there any webRtc fallback methods for Firefox yet?
+23:27 < thealphanerd> crashsystems: https://github.com/TheAlphaNerd/interface.js/blob/master/server.js#L24
+23:27 < crashsystems> I get a ReferenceError: socket is not defined
+23:27 < thealphanerd> you should change the way you are implementing it then
+23:27 < thealphanerd> do it in the callback fashion you see in my example
+23:27 < Ardivaba> Oh wait, firefox already has webrtc.
+23:27 < crashsystems> I previously had it that way actually.
+23:28 < Ardivaba> Meh, i'll just use that then.
+23:28 < thealphanerd> if you look a the way they have it set up on the socket.io site, they use the same model
+23:29 < thealphanerd> I also don't think you need all the extra function calls
+23:29 < thealphanerd> you are not calling onRequestName or any of those functions more than just in the event
+23:29 < thealphanerd> so you are adding unnecessary stack frames / complexity
+23:33 < Bascka> I have an idea, but its seems kinda obvious, would a cloud based firewall be a dumb idea? I mean, use AWS ec2`s and route 53, route 53 would be used to distribute the network load, and the ec2`s would filter the traffic, block UDP (amplification ddos), and use the cloud computing power to filter TCP floods, and the layer 7 attacks is another story… I have been asking this for a while now...
+23:36 < Industrial> substack: Say I would want to build a framework for hierarchical components in the browser that each have their own css/html/models/controllers/yadda packed up and can be composed to create the pages. I want to configure these components with nested js objects much like css property overrides. So a sub-component inherits its parent component's settings. The thing is, I want to be notified by events when stuff changes in the confi
+23:37 < Industrial> automatically. Would using scuttlebutt/crdt make sense here? because once I decouple a tree of components from its parent to place it under another, I want that tree to reconfigure to the new parent automatically.
+23:37 < substack> that sounds complicated
+23:37 < Industrial> because edit mode :p
+23:38 < substack> I would just use scuttlebutt for doing state synchronization
+23:38 < substack> then just write code to update the dom when state changes
+23:38 < substack> easy
+23:39 < Industrial> I was getting down to writing EventedObject.js and thought waitaminit! I can do better :p
+23:39 < substack> just do simple things
+23:40 < substack> and wrap them up into reusable components
+23:40 < substack> brick by brick
+23:44 < Raynos> anyone really comfortable with mongo?
+23:44 < Raynos> Industrial: try to do simple things
+23:46 < Sgeo> Sorry to ask an irrelevant question in here, but is there an appropriate channel for asking questions about Karma (formerly Testacular)?
+23:48 < Industrial> I want a (private) library of re-usable ui-components that may be constructed out of bits of template/css/js. buttons/sliders to maps/charts/graphs. I really like backbone.marionette's idea of regions, where regions manage a dom node and render one view in it at a time. I'd want a region to show a component or a view :) so I can easily populate a tree of components in ways that make sense to the components by providing regions pe
+23:48 < Industrial> Raynos: ^
+23:48 < Raynos> that sounds easy to do
+23:49 < Raynos> the hard part is CSS
+23:49 < Raynos> you need to figure out how to avoid conflicts in CSS
+23:49 < Raynos> the easiest solution is namespacing and tieing into the npm namespace ala https://github.com/shtylman/npm-css
+23:49 < Industrial> it sounds complicated but I want to make it really simple :P
+23:49 < Raynos> well you just used a lot of silly words :P
+23:49 < Raynos> bundlign templates into a js module is trivial
+23:50 < Raynos> modular CSS accross multiple packages / repos is difficult. Good luck
+23:50 < Industrial> already doing that with around 25 git repos :D
+23:50 < Industrial> gettin my scrum on
+23:51 < Industrial> anyway, yeah, it should be simple to do, and easy to look at .. :)
+23:51 < Industrial> in the current system all the components have unique identifiers.
+23:53 -!- mode/#Node.js [+o piscisaureus_] by ChanServ
+23:58 < qard> Any clever ideas on how to manage a pipe into a net.Socket when the server disappears and the client reconnects?
+23:59 < qard> I have it reconnecting, but now I need to re-open the pipe.
+--- Log closed Tue Apr 30 00:00:14 2013
