@@ -6,8 +6,10 @@ module.exports = function(grunt) {
     urls: 'etc/urls.json',
     logdir: 'logs',
     docdir: 'docs',
+    sitemapdir: 'sitemaps',
     template: 'etc/index.tmpl',
-    sitemap: 'etc/sitemap.tmpl'
+    sitemap: 'etc/sitemap.tmpl',
+    sitemapindex: 'etc/sitemapindex.tmpl'
   };
 
   var config = {};
